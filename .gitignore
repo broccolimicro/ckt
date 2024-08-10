@@ -1,0 +1,10 @@
+*.astg
+*.png
+*.svg
+*.hse
+*.prs
+*.o
+tmp*
+ckt
+test
+build
