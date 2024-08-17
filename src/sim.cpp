@@ -7,7 +7,7 @@
 
 #include <parse_chp/composition.h>
 #include <chp/graph.h>
-//#include <chp/simulator.h>
+#include <chp/simulator.h>
 #include <interpret_chp/import.h>
 #include <interpret_chp/export.h>
 #include <interpret_arithmetic/export.h>
@@ -110,18 +110,22 @@ void print_prsim_help() {
 	printf(" force <expr>        execute a transition as if it were local to all tokens\n");
 }
 
-void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps = vector<chp::term_index>())
-{
-	/*chp::simulator sim;
+void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps = vector<chp::term_index>()) {
+	chp::simulator sim;
 	sim.base = &g;
 	sim.variables = &v;
 
 	tokenizer assignment_parser(false);
 	parse_expression::composition::register_syntax(assignment_parser);
 
+	// TODO(edward.bingham) use a minheap and random event times to implement a
+	// discrete event simulator here based upon the set of enabled signals.
+	//vector<pair<uint64_t, > > events;
+
 	int seed = 0;
 	srand(seed);
 	int enabled = 0;
+	bool uptodate = false;
 	int step = 0;
 	int n = 0, n1 = 0;
 	char command[256];
@@ -129,12 +133,17 @@ void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps =
 	FILE *script = stdin;
 	while (!done)
 	{
-		printf("(chpsim)");
-		fflush(stdout);
+		if (script == stdin)
+		{
+			printf("(chpsim)");
+			fflush(stdout);
+		}
 		if (fgets(command, 255, script) == NULL && script != stdin)
 		{
 			fclose(script);
 			script = stdin;
+			printf("(chpsim)");
+			fflush(stdout);
 			if (fgets(command, 255, script) == NULL)
 				exit(0);
 		}
@@ -143,7 +152,7 @@ void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps =
 		length--;
 
 		if ((strncmp(command, "help", 4) == 0 && length == 4) || (strncmp(command, "h", 1) == 0 && length == 1))
-			print_command_help();
+			print_chpsim_help();
 		else if ((strncmp(command, "quit", 4) == 0 && length == 4) || (strncmp(command, "q", 1) == 0 && length == 1))
 			done = true;
 		else if (strncmp(command, "seed", 4) == 0)
@@ -196,8 +205,8 @@ void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps =
 		{
 			if (sscanf(command, "reset %d", &n) == 1 || sscanf(command, "r%d", &n) == 1)
 			{
-				sim = chp::simulator(&g, &v, g.reset[n], 0, false);
-				enabled = sim.enabled();
+				sim = chp::simulator(&g, &v, g.reset[n]);
+				uptodate = false;
 				step = 0;
 				srand(seed);
 			}
@@ -208,11 +217,11 @@ void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps =
 		else if ((strncmp(command, "tokens", 6) == 0 && length == 6) || (strncmp(command, "t", 1) == 0 && length == 1))
 		{
 			vector<vector<int> > tokens;
-			for (int i = 0; i < (int)sim.local.tokens.size(); i++)
+			for (int i = 0; i < (int)sim.tokens.size(); i++)
 			{
 				bool found = false;
 				for (int j = 0; j < (int)tokens.size() && !found; j++)
-					if (g.places[sim.local.tokens[i].index].mask == g.places[sim.local.tokens[tokens[j][0]].index].mask)
+					if (g.is_reachable(petri::iterator(chp::place::type, sim.tokens[i].index), petri::iterator(chp::place::type, sim.tokens[tokens[j][0]].index)))
 					{
 						tokens[j].push_back(i);
 						found = true;
@@ -224,20 +233,41 @@ void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps =
 
 			for (int i = 0; i < (int)tokens.size(); i++)
 			{
-				printf("%s {\n", export_expression(sim.encoding.flipped_mask(g.places[sim.local.tokens[tokens[i][0]].index].mask), v).to_string().c_str());
-				for (int j = 0; j < (int)tokens[i].size(); j++)
-					printf("\t(%d) P%d\t%s\n", tokens[i][j], sim.local.tokens[tokens[i][j]].index, export_node(chp::iterator(chp::place::type, sim.local.tokens[tokens[i][j]].index), g, v).c_str());
+				printf("%s {\n", export_composition(sim.encoding, v).to_string().c_str());
+				for (int j = 0; j < (int)tokens[i].size(); j++) {
+					int virt = -1;
+					for (int k = 0; k < (int)sim.loaded.size() and virt < 0; k++) {
+						if (find(sim.loaded[k].output_marking.begin(), sim.loaded[k].output_marking.end(), tokens[i][j]) != sim.loaded[k].output_marking.end()) {
+							virt = k;
+						}
+					}
+					if (virt >= 0) {
+						printf("\t\t(%d) %s->%s\tP%d\t%s\n", tokens[i][j], export_expression(sim.tokens[tokens[i][j]].guard, v).to_string().c_str(), export_composition(g.transitions[sim.loaded[virt].index].action, v).to_string().c_str(), sim.tokens[tokens[i][j]].index, export_node(chp::iterator(chp::place::type, sim.tokens[tokens[i][j]].index), g, v).c_str());
+					} else {
+						printf("\t(%d) P%d\t%s\n", tokens[i][j], sim.tokens[tokens[i][j]].index, export_node(chp::iterator(chp::place::type, sim.tokens[tokens[i][j]].index), g, v).c_str());
+					}
+				}
 				printf("}\n");
 			}
 		}
 		else if ((strncmp(command, "enabled", 7) == 0 && length == 7) || (strncmp(command, "e", 1) == 0 && length == 1))
 		{
+			if (!uptodate)
+			{
+				enabled = sim.enabled();
+				uptodate = true;
+			}
+
 			for (int i = 0; i < enabled; i++)
 			{
-				if (g.transitions[sim.local.ready[i].index].behavior == chp::transition::active)
-					printf("(%d) T%d.%d:%s     ", i, sim.local.ready[i].index, sim.local.ready[i].term, export_composition(g.transitions[sim.local.ready[i].index].local_action[sim.local.ready[i].term], v).to_string().c_str());
-				else
-					printf("(%d) T%d.%d:[%s]     ", i, sim.local.ready[i].index, sim.local.ready[i].term, export_expression(g.transitions[sim.local.ready[i].index].local_action[sim.local.ready[i].term], v).to_string().c_str());
+				printf("(%d) T%d.%d:%s->%s\n", i, sim.loaded[sim.ready[i].first].index, sim.ready[i].second, export_expression(g.transitions[sim.loaded[sim.ready[i].first].index].guard, v).to_string().c_str(), export_composition(g.transitions[sim.loaded[sim.ready[i].first].index].action[sim.ready[i].second], v).to_string().c_str());
+				if (sim.loaded[sim.ready[i].first].vacuous) {
+					printf("\tvacuous");
+				}
+				if (!sim.loaded[sim.ready[i].first].stable) {
+					printf("\tunstable");
+				}
+				printf("\n");
 			}
 			printf("\n");
 		}
@@ -258,19 +288,17 @@ void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps =
 
 			assignment_parser.insert("", string(command).substr(i));
 			parse_expression::composition expr(assignment_parser);
-			arithmetic::cube action = import_cube(expr, v, 0, &assignment_parser, false);
-			arithmetic::cube remote_action = action.remote(v.get_groups());
+			arithmetic::parallel assign = import_parallel(expr, v, 0, &assignment_parser, false);
 			if (assignment_parser.is_clean())
 			{
-				sim.encoding = arithmetic::local_assign(sim.encoding, action, true);
+				arithmetic::state local_action = assign.evaluate(sim.encoding);
+				arithmetic::state remote_action = local_action.remote(v.get_groups());
+				sim.encoding = arithmetic::local_assign(sim.encoding, local_action, true);
 				sim.global = arithmetic::local_assign(sim.global, remote_action, true);
 				sim.encoding = arithmetic::remote_assign(sim.encoding, sim.global, true);
 			}
 			assignment_parser.reset();
-			enabled = sim.enabled();
-			sim.interference_errors.clear();
-			sim.instability_errors.clear();
-			sim.mutex_errors.clear();
+			uptodate = false;
 		}
 		else if (strncmp(command, "force", 5) == 0)
 		{
@@ -280,18 +308,16 @@ void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps =
 			{
 				assignment_parser.insert("", string(command).substr(6));
 				parse_expression::composition expr(assignment_parser);
-				arithmetic::cube action = import_cube(expr, v, 0, &assignment_parser, false);
-				arithmetic::cube remote_action = action.remote(v.get_groups());
+				arithmetic::parallel assign = import_parallel(expr, v, 0, &assignment_parser, false);
 				if (assignment_parser.is_clean())
 				{
+					arithmetic::state local_action = assign.evaluate(sim.encoding);
+					arithmetic::state remote_action = local_action.remote(v.get_groups());
 					sim.encoding = arithmetic::local_assign(sim.encoding, remote_action, true);
 					sim.global = arithmetic::local_assign(sim.global, remote_action, true);
 				}
 				assignment_parser.reset();
-				enabled = sim.enabled();
-				sim.interference_errors.clear();
-				sim.instability_errors.clear();
-				sim.mutex_errors.clear();
+				uptodate = false;
 			}
 		}
 		else if (strncmp(command, "step", 4) == 0 || strncmp(command, "s", 1) == 0)
@@ -299,57 +325,84 @@ void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps =
 			if (sscanf(command, "step %d", &n) != 1 && sscanf(command, "s%d", &n) != 1)
 				n = 1;
 
-			for (int i = 0; i < n && enabled != 0; i++)
+			for (int i = 0; i < n && (enabled != 0 || !uptodate); i++)
 			{
-				int firing = rand()%enabled;
-				if (step < (int)steps.size())
+				if (!uptodate)
 				{
-					for (firing = 0; firing < (int)sim.local.ready.size() &&
-					(sim.local.ready[firing].index != steps[step].index || sim.local.ready[firing].term != steps[step].term); firing++);
-
-					if (firing == (int)sim.local.ready.size())
-					{
-						printf("error: loaded simulation does not match HSE, please clear the simulation to continue\n");
-						break;
-					}
+					enabled = sim.enabled();
+					uptodate = true;
 				}
-				else
-					steps.push_back(chp::term_index(sim.local.ready[firing].index, sim.local.ready[firing].term));
 
-				if (g.transitions[sim.local.ready[firing].index].behavior == chp::transition::active)
-					printf("%d\tT%d.%d\t%s\n", step, sim.local.ready[firing].index, sim.local.ready[firing].term, export_composition(g.transitions[sim.local.ready[firing].index].local_action[sim.local.ready[firing].term], v).to_string().c_str());
-				else if (g.transitions[sim.local.ready[firing].index].behavior == chp::transition::passive)
-					printf("%d\tT%d\t[%s]\n", step, sim.local.ready[firing].index, export_expression(sim.local.ready[firing].guard_action, v).to_string().c_str());
+				if (enabled != 0)
+				{
+					int firing = rand()%enabled;
+					bool vacuous = false;
+					if (step < (int)steps.size())
+					{
+						for (firing = 0; firing < (int)sim.ready.size() &&
+						(sim.loaded[sim.ready[firing].first].index != steps[step].index || sim.ready[firing].second != steps[step].term); firing++);
 
-				sim.fire(firing);
+						if (firing == (int)sim.ready.size())
+						{
+							printf("error: loaded simulation does not match HSE, please clear the simulation to continue\n");
+							break;
+						}
+					}
+					else {
+						vacuous = sim.loaded[sim.ready[firing].first].vacuous;
+						steps.push_back(chp::term_index(sim.loaded[sim.ready[firing].first].index, sim.ready[firing].second));
+					}
 
-				enabled = sim.enabled();
-				sim.interference_errors.clear();
-				sim.instability_errors.clear();
-				sim.mutex_errors.clear();
-				step++;
+					/*for (auto h = sim.history.begin(); h != sim.history.end(); h++) {
+						printf("%s->%s; ", export_expression(h->first, v).to_string().c_str(), export_composition(g.transitions[h->second.index].local_action[h->second.term], v).to_string().c_str());
+					}
+					printf("\n");*/
+
+					string flags = "";
+					if (vacuous) {
+						flags = " [vacuous]";
+					}
+					printf("%d\tT%d.%d\t%s -> %s%s\n", step, sim.loaded[sim.ready[firing].first].index, sim.ready[firing].second, export_expression(sim.loaded[sim.ready[firing].first].guard_action, v).to_string().c_str(), export_composition(g.transitions[sim.loaded[sim.ready[firing].first].index].action[sim.ready[firing].second], v).to_string().c_str(), flags.c_str());
+
+					sim.fire(firing);
+
+					uptodate = false;
+					sim.interference_errors.clear();
+					sim.instability_errors.clear();
+					sim.mutex_errors.clear();
+					step++;
+				}
 			}
 		}
 		else if (strncmp(command, "fire", 4) == 0 || strncmp(command, "f", 1) == 0)
 		{
 			if (sscanf(command, "fire %d", &n) == 1 || sscanf(command, "f%d", &n) == 1)
 			{
+				if (!uptodate)
+				{
+					enabled = sim.enabled();
+					uptodate = true;
+				}
+
 				if (n < enabled)
 				{
 					if (step < (int)steps.size())
 						printf("error: deviating from loaded simulation, please clear the simulation to continue\n");
 					else
 					{
-						steps.push_back(chp::term_index(sim.local.ready[n].index, sim.local.ready[n].term));
+						bool vacuous = sim.loaded[sim.ready[n].first].vacuous;
+						steps.push_back(chp::term_index(sim.loaded[sim.ready[n].first].index, sim.ready[n].second));
 
-						if (g.transitions[sim.local.ready[n].index].behavior == chp::transition::active)
-							printf("%d\tT%d.%d\t%s\n", step, sim.local.ready[n].index, sim.local.ready[n].term, export_composition(g.transitions[sim.local.ready[n].index].local_action[sim.local.ready[n].term], v).to_string().c_str());
-						else if (g.transitions[sim.local.ready[n].index].behavior == chp::transition::passive)
-							printf("%d\tT%d\t[%s]\n", step, sim.local.ready[n].index, export_expression(sim.local.ready[n].guard_action, v).to_string().c_str());
+						string flags = "";
+						if (vacuous) {
+							flags = " [vacuous]";
+						}
 
+						printf("%d\tT%d.%d\t%s -> %s%s\n", step, sim.loaded[sim.ready[n].first].index, sim.ready[n].second, export_expression(sim.loaded[sim.ready[n].first].guard_action, v).to_string().c_str(), export_composition(g.transitions[sim.loaded[sim.ready[n].first].index].action[sim.ready[n].second], v).to_string().c_str(), flags.c_str());
+						
 						sim.fire(n);
 
-						enabled = sim.enabled();
+						uptodate = false;
 						sim.interference_errors.clear();
 						sim.instability_errors.clear();
 						sim.mutex_errors.clear();
@@ -364,7 +417,8 @@ void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps =
 		}
 		else if (length > 0)
 			printf("error: unrecognized command '%s'\n", command);
-	}*/
+	}
+
 }
 
 void hsesim(hse::graph &g, ucs::variable_set &v, vector<hse::term_index> steps = vector<hse::term_index>()) {
@@ -975,6 +1029,24 @@ int sim_command(configuration &config, int argc, char **argv) {
 	ucs::variable_set v;
 
 	if (format == "chp") {
+		vector<chp::term_index> steps;
+		if (sfilename != "") {
+			FILE *seq = fopen(sfilename.c_str(), "r");
+			char command[256];
+			int n, n1;
+			if (seq != NULL)
+			{
+				while (fgets(command, 255, seq) != NULL)
+				{
+					if (sscanf(command, "%d.%d", &n, &n1) == 2)
+						steps.push_back(chp::term_index(n, n1));
+				}
+				fclose(seq);
+			}
+			else
+				printf("error: file not found '%s'\n", sfilename.c_str());
+		}
+
 		chp::graph cg;
 
 		parse_chp::composition::register_syntax(tokens);
@@ -991,8 +1063,7 @@ int sim_command(configuration &config, int argc, char **argv) {
 			tokens.expect<parse_chp::composition>();
 		}
 
-		// TODO(edward.bingham) create CHP simulator
-		return 0;
+		chpsim(cg, v, steps);
 	} else if (format == "hse" or format == "astg") {
 		vector<hse::term_index> steps;
 		if (sfilename != "") {

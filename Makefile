@@ -23,7 +23,13 @@ TEST_OBJECTS := $(TESTS:%.cpp=build/%.o) build/$(TESTDIR)/gtest_main.o
 TEST_DEPS    := $(shell mkdir -p build/$(TESTDIR); find build/$(TESTDIR) -name '*.d')
 TEST_TARGET   = test
 
-all: $(TARGET)
+all: setgv $(TARGET)
+
+nogv: $(TARGET)
+
+setgv:
+	$(eval CXXFLAGS += -DGRAPHVIZ_SUPPORTED=1)
+	$(eval LIBRARIES += -lcgraph -lgvc)
 
 $(TARGET): $(OBJECTS)
 	$(CXX) $(LIBRARY_PATHS) $(CXXFLAGS) $(OBJECTS) -o $(TARGET) $(LIBRARIES)

@@ -63,14 +63,17 @@ int main(int argc, char **argv) {
 	for (int i = 1; i < argc; i++)
 	{
 		string arg = argv[i];
-		if (arg == "--version") {
+		if (arg == "--help" or arg == "-h") {
+			print_help();
+			return 0;
+		} else if (arg == "--version") {
 			print_version();
 			return 0;
-		} else if (arg == "--verbose" || arg == "-v") {
+		} else if (arg == "--verbose" or arg == "-v") {
 			set_verbose(true);
-		} else if (arg == "--debug" || arg == "-d") {
+		} else if (arg == "--debug" or arg == "-d") {
 			set_debug(true);
-		} else if (arg == "--progress" || arg == "-p") {
+		} else if (arg == "--progress" or arg == "-p") {
 			progress = true;
 		} else if (arg == "sim") {
 			++i;
