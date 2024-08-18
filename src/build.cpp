@@ -468,6 +468,16 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 	if (format != "hse"
 		and format != "astg"
 		and format != "prs") {
+
+		if (elab) {
+			FILE *fout = stdout;
+			if (prefix != "") {
+				fout = fopen((prefix+".astg").c_str(), "w");
+			}
+			fprintf(fout, "%s", export_astg(cg, v).to_string().c_str());
+			fclose(fout);
+		}
+
 	
 		// TODO(edward.bingham) implement handshaking expansion
 		// TODO(edward.bingham) implement handshaking reshuffling

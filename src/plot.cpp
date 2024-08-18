@@ -189,6 +189,9 @@ int plot_command(configuration &config, int argc, char **argv) {
 			tokens.increment(false);
 			tokens.expect<parse_chp::composition>();
 		}
+		if (process) {
+			cg.post_process(v, true);
+		}
 
 		if (is_clean()) {
 			render(ofilename, oformat, export_graph(cg, v, labels).to_string());

@@ -260,7 +260,7 @@ void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps =
 
 			for (int i = 0; i < enabled; i++)
 			{
-				printf("(%d) T%d.%d:%s->%s\n", i, sim.loaded[sim.ready[i].first].index, sim.ready[i].second, export_expression(g.transitions[sim.loaded[sim.ready[i].first].index].guard, v).to_string().c_str(), export_composition(g.transitions[sim.loaded[sim.ready[i].first].index].action[sim.ready[i].second], v).to_string().c_str());
+				printf("(%d) T%d.%d:%s->%s\n", i, sim.loaded[sim.ready[i].first].index, sim.ready[i].second, export_expression(sim.loaded[sim.ready[i].first].guard_action, v).to_string().c_str(), export_composition(sim.loaded[sim.ready[i].first].local_action.states[sim.ready[i].second], v).to_string().c_str());
 				if (sim.loaded[sim.ready[i].first].vacuous) {
 					printf("\tvacuous");
 				}
@@ -271,6 +271,28 @@ void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps =
 			}
 			printf("\n");
 		}
+		else if ((strncmp(command, "disabled", 7) == 0 && length == 7) || (strncmp(command, "d", 1) == 0 && length == 1))
+		{
+			if (!uptodate)
+			{
+				enabled = sim.enabled();
+				uptodate = true;
+			}
+
+			for (int i = 0; i < (int)sim.loaded.size(); i++)
+			{
+				printf("(%d) T%d:%s->%s\n", i, sim.loaded[i].index, export_expression(sim.loaded[i].guard_action, v).to_string().c_str(), export_composition(sim.loaded[i].local_action, v).to_string().c_str());
+				if (sim.loaded[i].vacuous) {
+					printf("\tvacuous");
+				}
+				if (!sim.loaded[i].stable) {
+					printf("\tunstable");
+				}
+				printf("\n");
+			}
+			printf("\n");
+		}
+
 		else if (strncmp(command, "set", 3) == 0)
 		{
 			int i = 0;
@@ -362,7 +384,7 @@ void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps =
 					if (vacuous) {
 						flags = " [vacuous]";
 					}
-					printf("%d\tT%d.%d\t%s -> %s%s\n", step, sim.loaded[sim.ready[firing].first].index, sim.ready[firing].second, export_expression(sim.loaded[sim.ready[firing].first].guard_action, v).to_string().c_str(), export_composition(g.transitions[sim.loaded[sim.ready[firing].first].index].action[sim.ready[firing].second], v).to_string().c_str(), flags.c_str());
+					printf("%d\tT%d.%d\t%s -> %s%s\n", step, sim.loaded[sim.ready[firing].first].index, sim.ready[firing].second, export_expression(sim.loaded[sim.ready[firing].first].guard_action, v).to_string().c_str(), export_composition(sim.loaded[sim.ready[firing].first].local_action[sim.ready[firing].second], v).to_string().c_str(), flags.c_str());
 
 					sim.fire(firing);
 
@@ -398,7 +420,7 @@ void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps =
 							flags = " [vacuous]";
 						}
 
-						printf("%d\tT%d.%d\t%s -> %s%s\n", step, sim.loaded[sim.ready[n].first].index, sim.ready[n].second, export_expression(sim.loaded[sim.ready[n].first].guard_action, v).to_string().c_str(), export_composition(g.transitions[sim.loaded[sim.ready[n].first].index].action[sim.ready[n].second], v).to_string().c_str(), flags.c_str());
+						printf("%d\tT%d.%d\t%s -> %s%s\n", step, sim.loaded[sim.ready[n].first].index, sim.ready[n].second, export_expression(sim.loaded[sim.ready[n].first].guard_action, v).to_string().c_str(), export_composition(sim.loaded[sim.ready[n].first].local_action[sim.ready[n].second], v).to_string().c_str(), flags.c_str());
 						
 						sim.fire(n);
 
@@ -740,7 +762,7 @@ void prsim(prs::production_rule_set &pr, ucs::variable_set &v, vector<prs::term_
 	int enabled = 0;
 	bool uptodate = false;
 	int step = 0;
-	int n = 0, n1 = 0, n2 = 0;
+	int n = 0, n1 = 0;
 	char command[256];
 	bool done = false;
 	FILE *script = stdin;
@@ -1062,6 +1084,7 @@ int sim_command(configuration &config, int argc, char **argv) {
 			tokens.increment(false);
 			tokens.expect<parse_chp::composition>();
 		}
+		cg.post_process(v, true);
 
 		chpsim(cg, v, steps);
 	} else if (format == "hse" or format == "astg") {
@@ -1123,7 +1146,7 @@ int sim_command(configuration &config, int argc, char **argv) {
 		if (sfilename != "") {
 			FILE *seq = fopen(sfilename.c_str(), "r");
 			char command[256];
-			int n, n1, n2;
+			int n, n1;
 			if (seq != NULL)
 			{
 				while (fgets(command, 255, seq) != NULL)
