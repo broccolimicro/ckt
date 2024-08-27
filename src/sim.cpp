@@ -15,6 +15,7 @@
 
 #include <hse/graph.h>
 #include <hse/simulator.h>
+#include <hse/elaborator.h>
 #include <interpret_hse/import.h>
 #include <interpret_hse/export.h>
 
@@ -1012,8 +1013,14 @@ int sim_command(configuration &config, int argc, char **argv) {
 
 	string sfilename = "";
 
+	bool full = false;
+
 	for (int i = 0; i < argc; i++) {
-		if (filename == "") {
+		string arg = argv[i];
+
+		if (arg == "-f" or arg == "--full") {
+			full = true;
+		} else if (filename == "") {
 			filename = argv[i];
 			size_t dot = filename.find_last_of(".");
 			if (dot == string::npos) {
@@ -1140,7 +1147,11 @@ int sim_command(configuration &config, int argc, char **argv) {
 		hg.post_process(v, true);
 		hg.check_variables(v);
 
-		hsesim(hg, v, steps);
+		if (full) {
+			hse::elaborate(hg, v, false, true);
+		} else {
+			hsesim(hg, v, steps);
+		}
 	} else if (format == "prs") {
 		vector<prs::term_index> steps;
 		if (sfilename != "") {

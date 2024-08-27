@@ -25,6 +25,8 @@
 #include <interpret_prs/import.h>
 #include <interpret_prs/export.h>
 
+#include <parse_spice/netlist.h>
+
 //#include <parse_expression/expression.h>
 //#include <parse_expression/assignment.h>
 //#include <parse_expression/composition.h>
@@ -279,7 +281,7 @@ void real_time(hse::graph &g, ucs::variable_set &v, string filename)
 		else if ((strncmp(command, "quit", 4) == 0 && length == 4) || (strncmp(command, "q", 1) == 0 && length == 1))
 			done = true;
 		else if ((strncmp(command, "elaborate", 9) == 0 && length == 9) || (strncmp(command, "e", 1) == 0 && length == 1))
-			hse::elaborate(g, v, true);
+			hse::elaborate(g, v, true, true);
 		else if ((strncmp(command, "conflicts", 9) == 0 && length == 9) || (strncmp(command, "c", 1) == 0 && length == 1))
 		{
 			enc.check(true, true);
@@ -362,8 +364,6 @@ void save_bubble(string filename, const prs::bubble &bub, const ucs::variable_se
 
 int build_command(configuration &config, int argc, char **argv, bool progress) {
 	tokenizer tokens;
-	tokens.register_token<parse::block_comment>(false);
-	tokens.register_token<parse::line_comment>(false);
 	
 	string filename = "";
 	string prefix = "";
@@ -423,10 +423,17 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 				return 0;
 			}
 			format = filename.substr(dot+1);
+			if (format == "spice"
+				or format == "sp"
+				or format == "s") {
+				format = "spi";
+			}
+
 			if (format != "chp"
 				and format != "hse"
 				and format != "astg"
-				and format != "prs") {
+				and format != "prs"
+				and format != "spi") {
 				printf("unrecognized file format '%s'\n", format.c_str());
 				return 0;
 			}
@@ -445,6 +452,8 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 	prs::bubble bub;
 
 	if (format == "chp") {
+		tokens.register_token<parse::block_comment>(false);
+		tokens.register_token<parse::line_comment>(false);
 		parse_chp::composition::register_syntax(tokens);
 		config.load(tokens, filename, "");
 
@@ -467,7 +476,8 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 
 	if (format != "hse"
 		and format != "astg"
-		and format != "prs") {
+		and format != "prs"
+		and format != "spi") {
 
 		if (elab) {
 			FILE *fout = stdout;
@@ -485,6 +495,8 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 	}
 
 	if (format == "hse") {
+		tokens.register_token<parse::block_comment>(false);
+		tokens.register_token<parse::line_comment>(false);
 		parse_chp::composition::register_syntax(tokens);
 		config.load(tokens, filename, "");
 
@@ -499,6 +511,8 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 			tokens.expect<parse_chp::composition>();
 		}
 	} else if (format == "astg") {
+		tokens.register_token<parse::block_comment>(false);
+		tokens.register_token<parse::line_comment>(false);
 		parse_astg::graph::register_syntax(tokens);
 		config.load(tokens, filename, "");
 		
@@ -519,11 +533,12 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		return false;
 	}
 
-	if (format != "prs") {
+	if (format != "prs"
+		and format != "spi") {
 		hg.post_process(v, true);
 		hg.check_variables(v);
 
-		hse::elaborate(hg, v, progress);
+		hse::elaborate(hg, v, true, progress);
 		if (not is_clean()) {
 			complete();
 			return false;
@@ -573,7 +588,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 
 			enc.insert_state_variables();
 
-			hse::elaborate(hg, v, progress);
+			hse::elaborate(hg, v, true, progress);
 			if (not is_clean()) {
 				complete();
 				return false;
@@ -631,6 +646,8 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 	}
 
 	if (format == "prs") {
+		tokens.register_token<parse::block_comment>(false);
+		tokens.register_token<parse::line_comment>(false);
 		parse_prs::production_rule_set::register_syntax(tokens);
 		config.load(tokens, filename, "");
 
@@ -647,58 +664,75 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		complete();
 		return false;
 	}
-	
-	pr.post_process(v);
 
-	if (not pr.cmos_implementable()) {
-		bub.load_prs(pr, v);
+	if (format != "spi") {	
+		pr.post_process(v);
 
-		if (bubble) {
-			save_bubble(prefix+"_bubble.png", bub, v);
-		}
+		if (not pr.cmos_implementable()) {
+			bub.load_prs(pr, v);
 
-		//int step = 0;
-		//if (render_steps) {
-		//	save_bubble(oformat, step++, bub, v);
-		//}
-		for (auto i = bub.net.begin(); i != bub.net.end(); i++) {
-			bub.step(i);
-			//if (render_steps && result.second) {
+			if (bubble) {
+				save_bubble(prefix+"_bubble.png", bub, v);
+			}
+
+			//int step = 0;
+			//if (render_steps) {
 			//	save_bubble(oformat, step++, bub, v);
 			//}
+			for (auto i = bub.net.begin(); i != bub.net.end(); i++) {
+				bub.step(i);
+				//if (render_steps && result.second) {
+				//	save_bubble(oformat, step++, bub, v);
+				//}
+			}
+
+			bub.save_prs(&pr, v);
+
+			if (bubble) {
+				FILE *fout = stdout;
+				if (prefix != "") {
+					fout = fopen((prefix+"_bubbled.prs").c_str(), "w");
+				}
+				fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
+				fclose(fout);
+
+				// TODO(edward.bingham) emit bubble reshuffled production rules
+			}
 		}
 
-		bub.save_prs(&pr, v);
-	}
+		if (stage >= 0 and stage < 5) {
+			complete();
+			return is_clean();
+		}
 
-	if (bubble) {
+		// TODO(edward.bingham) Do prs sizing
+
 		FILE *fout = stdout;
 		if (prefix != "") {
-			fout = fopen((prefix+"_bubbled.prs").c_str(), "w");
+			fout = fopen((prefix+".prs").c_str(), "w");
 		}
 		fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
 		fclose(fout);
-
-		// TODO(edward.bingham) emit bubble reshuffled production rules
 	}
 
-	if (stage >= 0 and stage < 5) {
+	if (format == "spi") {
+		parse_spice::netlist::register_syntax(tokens);
+		config.load(tokens, filename, "");
+
+		tokens.increment(false);
+		tokens.expect<parse_spice::netlist>();
+		if (tokens.decrement(__FILE__, __LINE__))
+		{
+			parse_spice::netlist syntax(tokens);
+			cout << syntax.to_string() << endl;
+			//pr = prs::import_production_rule_set(syntax, v, 0, &tokens, true);
+		}
+	}
+
+	if (!is_clean()) {
 		complete();
-		return is_clean();
+		return false;
 	}
-
-	// TODO(edward.bingham) Do prs sizing
-
-	if (size) {
-		// TODO(edward.bingham) print sized production rules
-	}
-
-	FILE *fout = stdout;
-	if (prefix != "") {
-		fout = fopen((prefix+".prs").c_str(), "w");
-	}
-	fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
-	fclose(fout);
 
 	return 0;
 }
