@@ -25,7 +25,16 @@
 #include <interpret_prs/import.h>
 #include <interpret_prs/export.h>
 
-#include <parse_spice/netlist.h>
+#include <sch/Netlist.h>
+#include <interpret_sch/import.h>
+#include <interpret_sch/export.h>
+
+#include <phy/Tech.h>
+#include <phy/Script.h>
+#include <phy/Layout.h>
+#include <phy/Library.h>
+#include <interpret_phy/import.h>
+#include <interpret_phy/export.h>
 
 //#include <parse_expression/expression.h>
 //#include <parse_expression/assignment.h>
@@ -368,16 +377,21 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 	string filename = "";
 	string prefix = "";
 	string format = "";
+	string techPath = "";
 
 	bool cmos = true;
 	int stage = -1;
 
-	bool elab = false;
-	bool conflicts = false;
-	bool encode = false;
-	bool rules = false;
-	bool bubble = false;
-	bool size = false;
+	bool doElab = false;
+	bool doConflicts = false;
+	bool doEncode = false;
+	bool doRules = false;
+	bool doBubble = false;
+	bool doSize = false;
+	bool doNets = false;
+	bool doCells = false;
+	bool doPlace = false;
+	bool doRoute = false;
 
 	for (int i = 0; i < argc; i++) {
 		string arg = argv[i];
@@ -385,30 +399,46 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		if (arg == "--no-cmos") {
 			cmos = false;
 		} else if (arg == "--all") {
-			elab = true;
-			conflicts = true;
-			encode = true;
-			rules = true;
-			bubble = true;
-			size = true;
+			doElab = true;
+			doConflicts = true;
+			doEncode = true;
+			doRules = true;
+			doBubble = true;
+			doSize = true;
+			doNets = true;
+			doCells = true;
+			doPlace = true;
+			doRoute = true;
 		} else if (arg == "-g" or arg == "--graph") {
-			elab = true;
+			doElab = true;
 			stage = stage < 0 ? 0 : stage;
 		} else if (arg == "-c" or arg == "--conflict") {
-			conflicts = true;
+			doConflicts = true;
 			stage = stage < 1 ? 1 : stage;
 		} else if (arg == "-e" or arg == "--encode") {
-			encode = true;
+			doEncode = true;
 			stage = stage < 2 ? 2 : stage;
 		} else if (arg == "-r" or arg == "--rules") {
-			rules = true;
+			doRules = true;
 			stage = stage < 3 ? 3 : stage;
 		} else if (arg == "-b" or arg == "--bubble") {
-			bubble = true;
+			doBubble = true;
 			stage = stage < 4 ? 4 : stage;
 		} else if (arg == "-s" or arg == "--size") {
-			size = true;
+			doSize = true;
 			stage = stage < 5 ? 5 : stage;
+		} else if (arg == "-n" or arg == "--nets") {
+			doNets = true;
+			stage = stage < 6 ? 6 : stage;
+		} else if (arg == "-l" or arg == "--cells") {
+			doCells = true;
+			stage = stage < 7 ? 7 : stage;
+		} else if (arg == "-p" or arg == "--place") {
+			doPlace = true;
+			stage = stage < 8 ? 8 : stage;
+		} else if (arg == "-x" or arg == "--route") {
+			doRoute = true;
+			stage = stage < 9 ? 9 : stage;
 		} else if (arg == "-o" or arg == "--out") {
 			if (++i >= argc) {
 				printf("expected output prefix\n");
@@ -416,25 +446,37 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 
 			prefix = argv[i];
 		} else {
-			filename = argv[i];
-			size_t dot = filename.find_last_of(".");
+			size_t dot = arg.find_last_of(".");
 			if (dot == string::npos) {
 				printf("unrecognized file format\n");
 				return 0;
 			}
-			format = filename.substr(dot+1);
-			if (format == "spice"
-				or format == "sp"
-				or format == "s") {
-				format = "spi";
+			string ext = arg.substr(dot+1);
+			if (ext == "spice"
+				or ext == "sp"
+				or ext == "s") {
+				ext = "spi";
 			}
 
-			if (format != "chp"
-				and format != "hse"
-				and format != "astg"
-				and format != "prs"
-				and format != "spi") {
-				printf("unrecognized file format '%s'\n", format.c_str());
+			if (ext == "py") {
+				techPath = arg;
+			} else {
+				filename = arg;
+				format = ext;
+
+				if (prefix == "") {
+					prefix = filename.substr(0, dot);
+				}
+			}
+
+			if (ext != "chp"
+				and ext != "hse"
+				and ext != "astg"
+				and ext != "prs"
+				and ext != "spi"
+				and ext != "gds"
+				and ext != "py") {
+				printf("unrecognized file format '%s'\n", ext.c_str());
 				return 0;
 			}
 		}
@@ -471,15 +513,12 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 
 	if (!is_clean()) {
 		complete();
-		return false;
+		return 1;
 	}
 
-	if (format != "hse"
-		and format != "astg"
-		and format != "prs"
-		and format != "spi") {
+	if (format == "chp") {
 
-		if (elab) {
+		if (doElab) {
 			FILE *fout = stdout;
 			if (prefix != "") {
 				fout = fopen((prefix+".astg").c_str(), "w");
@@ -530,21 +569,22 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 
 	if (!is_clean()) {
 		complete();
-		return false;
+		return 1;
 	}
 
-	if (format != "prs"
-		and format != "spi") {
+	if (format == "chp"
+		or format == "hse"
+		or format == "astg") {
 		hg.post_process(v, true);
 		hg.check_variables(v);
 
 		hse::elaborate(hg, v, true, progress);
 		if (not is_clean()) {
 			complete();
-			return false;
+			return 1;
 		}
 
-		if (elab) {
+		if (doElab) {
 			FILE *fout = stdout;
 			if (prefix != "") {
 				fout = fopen((prefix+"_predicate.astg").c_str(), "w");
@@ -564,7 +604,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 
 		enc.check(!cmos, progress);
 
-		if (conflicts) {
+		if (doConflicts) {
 			if (!cmos) {
 				print_conflicts(enc, hg, v, -1);
 			} else {
@@ -591,7 +631,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 			hse::elaborate(hg, v, true, progress);
 			if (not is_clean()) {
 				complete();
-				return false;
+				return 1;
 			}
 
 			enc.check(!cmos, progress);
@@ -610,7 +650,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 			return is_clean();
 		}
 
-		if (encode) {
+		if (doEncode) {
 			FILE *fout = stdout;
 			if (prefix != "") {
 				fout = fopen((prefix+"_complete.astg").c_str(), "w");
@@ -630,7 +670,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		gates.build_reset();
 		gates.save(&pr);
 
-		if (rules) {
+		if (doRules) {
 			FILE *fout = stdout;
 			if (prefix != "") {
 				fout = fopen((prefix+"_simple.prs").c_str(), "w");
@@ -662,16 +702,19 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 
 	if (!is_clean()) {
 		complete();
-		return false;
+		return 1;
 	}
 
-	if (format != "spi") {	
+	if (format == "chp"
+		or format == "hse"
+		or format == "astg"
+		or format == "prs") {	
 		pr.post_process(v);
 
 		if (not pr.cmos_implementable()) {
 			bub.load_prs(pr, v);
 
-			if (bubble) {
+			if (doBubble) {
 				save_bubble(prefix+"_bubble.png", bub, v);
 			}
 
@@ -688,7 +731,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 
 			bub.save_prs(&pr, v);
 
-			if (bubble) {
+			if (doBubble) {
 				FILE *fout = stdout;
 				if (prefix != "") {
 					fout = fopen((prefix+"_bubbled.prs").c_str(), "w");
@@ -715,6 +758,42 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		fclose(fout);
 	}
 
+	if (stage >= 0 and stage < 6) {
+		complete();
+		return is_clean();
+	}
+
+	if (techPath == "") {
+		if (!is_clean()) {
+			complete();
+			return 1;
+		}
+		return 0;
+	}
+
+	phy::Tech tech;
+	phy::loadTech(tech, techPath);
+	sch::Netlist net(tech);
+
+
+	// TODO(edward.bingham) remove this when we have a way to convert production
+	// rules into a spice netlist
+	if (format == "chp"
+		or format == "hse"
+		or format == "astg"
+		or format == "prs") {
+		if (!is_clean()) {
+			complete();
+			return 1;
+		}
+		return 0;
+	}
+
+	if (stage >= 0 and stage < 7) {
+		complete();
+		return is_clean();
+	}
+
 	if (format == "spi") {
 		parse_spice::netlist::register_syntax(tokens);
 		config.load(tokens, filename, "");
@@ -724,14 +803,35 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		if (tokens.decrement(__FILE__, __LINE__))
 		{
 			parse_spice::netlist syntax(tokens);
-			cout << syntax.to_string() << endl;
-			//pr = prs::import_production_rule_set(syntax, v, 0, &tokens, true);
+			sch::import_netlist(syntax, net, &tokens);
 		}
 	}
 
+	phy::Library lib(&tech);
+	
+	if (format == "chp"
+		or format == "hse"
+		or format == "astg"
+		or format == "prs"
+		or format == "spi") {
+		net.build();
+		for (auto ckt = net.subckts.begin(); ckt != net.subckts.end(); ckt++) {
+			lib.cells.push_back(Layout(tech));
+			ckt->draw(lib.cells.back());
+		}
+
+		phy::export_library(prefix, prefix+".gds", lib);
+	}
+
+	if (stage >= 0 and stage < 8) {
+		complete();
+		return is_clean();
+	}
+		
+
 	if (!is_clean()) {
 		complete();
-		return false;
+		return 1;
 	}
 
 	return 0;

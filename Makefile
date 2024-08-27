@@ -1,5 +1,7 @@
+PYTHON_RELEASE = python$(shell python3 -c "import sys;sys.stdout.write('{}.{}'.format(sys.version_info[0],sys.version_info[1]))")
+
 NAME          = ckt
-DEPEND        = interpret_prs interpret_hse interpret_chp interpret_arithmetic interpret_boolean interpret_ucs chp hse prs petri arithmetic boolean ucs parse_prs parse_chp parse_astg parse_spice parse_dot parse_expression parse_ucs parse common
+DEPEND        = interpret_phy interpret_sch interpret_prs interpret_hse interpret_chp interpret_arithmetic interpret_boolean interpret_ucs chp hse prs sch phy petri arithmetic boolean ucs parse_prs parse_chp parse_astg parse_spice parse_dot parse_expression parse_ucs parse common
 
 SRCDIR        = src
 TESTDIR       = tests
@@ -7,9 +9,9 @@ GTEST        := ../../googletest
 GTEST_I      := -I$(GTEST)/googletest/include -I.
 GTEST_L      := -L$(GTEST)/build/lib -L.
 
-INCLUDE_PATHS = $(DEPEND:%=-I../../lib/%) -I.
-LIBRARY_PATHS = $(DEPEND:%=-L../../lib/%) -I.
-LIBRARIES     = $(DEPEND:%=-l%)
+INCLUDE_PATHS = $(DEPEND:%=-I../../lib/%) -I../../lib/gdstk/build/include -I.
+LIBRARY_PATHS = $(DEPEND:%=-L../../lib/%) -L../../lib/gdstk/build/lib -L../../lib/gdstk/build/lib64 -I.
+LIBRARIES     = $(DEPEND:%=-l%) -l$(PYTHON_RELEASE) -l:libgdstk.a -l:libclipper.a -l:libqhullstatic_r.a -lz
 CXXFLAGS	    = -std=c++14 -O2 -g -Wall -fmessage-length=0
 LDFLAGS		    =  
 
