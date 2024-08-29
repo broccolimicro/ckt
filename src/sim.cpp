@@ -667,7 +667,16 @@ void hsesim(hse::graph &g, ucs::variable_set &v, vector<hse::term_index> steps =
 
 				if (enabled != 0)
 				{
-					int firing = rand()%enabled;
+					vector<int> now;
+					for (int i = 0; i < (int)sim.ready.size(); i++) {
+						if (now.empty() or sim.loaded[sim.ready[i].first].fire_at < sim.loaded[sim.ready[now[0]].first].fire_at) {
+							now.clear();
+							now.push_back(i);
+						} else if (sim.loaded[sim.ready[i].first].fire_at == sim.loaded[sim.ready[now[0]].first].fire_at) {
+							now.push_back(i);
+						}
+					}
+					int firing = now[rand()%(int)now.size()];
 					bool vacuous = false;
 					if (step < (int)steps.size())
 					{
@@ -694,7 +703,7 @@ void hsesim(hse::graph &g, ucs::variable_set &v, vector<hse::term_index> steps =
 					if (vacuous) {
 						flags = " [vacuous]";
 					}
-					printf("%d\tT%d.%d\t%s -> %s%s\n", step, sim.loaded[sim.ready[firing].first].index, sim.ready[firing].second, export_expression(sim.loaded[sim.ready[firing].first].guard_action, v).to_string().c_str(), export_composition(g.transitions[sim.loaded[sim.ready[firing].first].index].local_action[sim.ready[firing].second], v).to_string().c_str(), flags.c_str());
+					printf("%lu\tT%d.%d\t%s -> %s%s\n", sim.now, sim.loaded[sim.ready[firing].first].index, sim.ready[firing].second, export_expression(sim.loaded[sim.ready[firing].first].guard_action, v).to_string().c_str(), export_composition(g.transitions[sim.loaded[sim.ready[firing].first].index].local_action[sim.ready[firing].second], v).to_string().c_str(), flags.c_str());
 
 					sim.fire(firing);
 
@@ -730,7 +739,7 @@ void hsesim(hse::graph &g, ucs::variable_set &v, vector<hse::term_index> steps =
 							flags = " [vacuous]";
 						}
 
-						printf("%d\tT%d.%d\t%s -> %s%s\n", step, sim.loaded[sim.ready[n].first].index, sim.ready[n].second, export_expression(sim.loaded[sim.ready[n].first].guard_action, v).to_string().c_str(), export_composition(g.transitions[sim.loaded[sim.ready[n].first].index].local_action[sim.ready[n].second], v).to_string().c_str(), flags.c_str());
+						printf("%lu\tT%d.%d\t%s -> %s%s\n", sim.now, sim.loaded[sim.ready[n].first].index, sim.ready[n].second, export_expression(sim.loaded[sim.ready[n].first].guard_action, v).to_string().c_str(), export_composition(g.transitions[sim.loaded[sim.ready[n].first].index].local_action[sim.ready[n].second], v).to_string().c_str(), flags.c_str());
 						
 						sim.fire(n);
 

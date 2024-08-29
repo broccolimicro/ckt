@@ -379,6 +379,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 	string format = "";
 	string techPath = "";
 
+	bool hasPrefix = false;
 	bool cmos = true;
 	int stage = -1;
 
@@ -444,6 +445,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 				printf("expected output prefix\n");
 			}
 
+			hasPrefix = true;
 			prefix = argv[i];
 		} else {
 			size_t dot = arg.find_last_of(".");
@@ -520,7 +522,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 
 		if (doElab) {
 			FILE *fout = stdout;
-			if (prefix != "") {
+			if (hasPrefix and prefix != "") {
 				fout = fopen((prefix+".astg").c_str(), "w");
 			}
 			fprintf(fout, "%s", export_astg(cg, v).to_string().c_str());
@@ -586,7 +588,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 
 		if (doElab) {
 			FILE *fout = stdout;
-			if (prefix != "") {
+			if (hasPrefix and prefix != "") {
 				fout = fopen((prefix+"_predicate.astg").c_str(), "w");
 			}
 			fprintf(fout, "%s", export_astg(hg, v).to_string().c_str());
@@ -652,7 +654,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 
 		if (doEncode) {
 			FILE *fout = stdout;
-			if (prefix != "") {
+			if (hasPrefix and prefix != "") {
 				fout = fopen((prefix+"_complete.astg").c_str(), "w");
 			}
 			fprintf(fout, "%s", export_astg(hg, v).to_string().c_str());
@@ -672,7 +674,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 
 		if (doRules) {
 			FILE *fout = stdout;
-			if (prefix != "") {
+			if (hasPrefix and prefix != "") {
 				fout = fopen((prefix+"_simple.prs").c_str(), "w");
 			}
 			fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
@@ -714,7 +716,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		if (not pr.cmos_implementable()) {
 			bub.load_prs(pr, v);
 
-			if (doBubble) {
+			if (doBubble and hasPrefix) {
 				save_bubble(prefix+"_bubble.png", bub, v);
 			}
 
@@ -733,7 +735,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 
 			if (doBubble) {
 				FILE *fout = stdout;
-				if (prefix != "") {
+				if (hasPrefix and prefix != "") {
 					fout = fopen((prefix+"_bubbled.prs").c_str(), "w");
 				}
 				fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
@@ -751,7 +753,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		// TODO(edward.bingham) Do prs sizing
 
 		FILE *fout = stdout;
-		if (prefix != "") {
+		if (hasPrefix and prefix != "") {
 			fout = fopen((prefix+".prs").c_str(), "w");
 		}
 		fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
@@ -764,6 +766,9 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 	}
 
 	if (techPath == "") {
+		if (stage >= 6 or format == "spi" or format == "gds") {
+			cout << "please provide a python techfile." << endl;
+		}
 		if (!is_clean()) {
 			complete();
 			return 1;
