@@ -1151,21 +1151,6 @@ int sim_command(configuration &config, int argc, char **argv) {
 			prs::import_production_rule_set(syntax, pr, -1, -1, prs::attributes(), v, 0, &tokens, true);
 		}
 
-		cout << "nets " << pr.nets.size() << endl;
-		for (int i = 0; i < (int)pr.nets.size(); i++) {
-			cout << "net " << i << ": " << export_variable_name(i, v).to_string() << " gateOf=" << to_string(pr.nets[i].gateOf[0]) << to_string(pr.nets[i].gateOf[1]) << " sourceOf=" << to_string(pr.nets[i].sourceOf[0]) << to_string(pr.nets[i].sourceOf[1]) << " drainOf=" << to_string(pr.nets[i].drainOf[0]) << to_string(pr.nets[i].drainOf[1]) << " remote=" << to_string(pr.nets[i].remote) << (pr.nets[i].keep ? " keep" : "") << endl;
-		}
-
-		cout << "nodes " << pr.nodes.size() << endl;
-		for (int i = 0; i < (int)pr.nodes.size(); i++) {
-			cout << "node " << i << ": " << export_variable_name(pr.flip(i), v).to_string() << " gateOf=" << to_string(pr.nodes[i].gateOf[0]) << to_string(pr.nodes[i].gateOf[1]) << " sourceOf=" << to_string(pr.nodes[i].sourceOf[0]) << to_string(pr.nodes[i].sourceOf[1]) << " drainOf=" << to_string(pr.nodes[i].drainOf[0]) << to_string(pr.nodes[i].drainOf[1]) << " remote=" << to_string(pr.nodes[i].remote) << (pr.nodes[i].keep ? " keep" : "") << endl;
-		}
-
-		cout << "devs " << pr.devs.size() << endl;
-		for (int i = 0; i < (int)pr.devs.size(); i++) {
-			cout << "dev " << i << ": source=" << export_variable_name(pr.devs[i].source, v).to_string() << "(" << pr.devs[i].source << ") gate=" << export_variable_name(pr.devs[i].gate, v).to_string() << "(" << pr.devs[i].gate << ") drain=" << export_variable_name(pr.devs[i].drain, v).to_string() << "(" << pr.devs[i].drain << ") threshold=" << pr.devs[i].threshold << (pr.devs[i].attr.weak ? " weak" : "") << (pr.devs[i].attr.pass ? " pass" : "") << endl;
-		}
-
 		prsim(pr, v);//, steps);
 	}
 

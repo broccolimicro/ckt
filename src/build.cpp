@@ -700,15 +700,6 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 			parse_prs::production_rule_set syntax(tokens);
 			prs::import_production_rule_set(syntax, pr, -1, -1, prs::attributes(), v, 0, &tokens, true);
 		}
-
-		FILE *fout = stdout;
-		if (hasPrefix and prefix != "") {
-			fout = fopen((prefix+"_test.prs").c_str(), "w");
-		}
-		fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
-		fclose(fout);
-		complete();
-		return is_clean();
 	}
 
 	if (!is_clean()) {
@@ -719,23 +710,23 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 	if (format == "chp"
 		or format == "hse"
 		or format == "astg"
-		or format == "prs") {	
+		or format == "prs") {
 		if (not pr.cmos_implementable()) {
 			bub.load_prs(pr, v);
 
+			int step = 0;
 			if (doBubble and hasPrefix) {
-				save_bubble(prefix+"_bubble.png", bub, v);
+				save_bubble(prefix+"_bubble0.png", bub, v);
 			}
-
-			//int step = 0;
-			//if (render_steps) {
-			//	save_bubble(oformat, step++, bub, v);
-			//}
 			for (auto i = bub.net.begin(); i != bub.net.end(); i++) {
-				bub.step(i);
-				//if (render_steps && result.second) {
-				//	save_bubble(oformat, step++, bub, v);
-				//}
+				auto result = bub.step(i);
+				if (doBubble and hasPrefix and result.second) {
+					save_bubble(prefix+"_bubble" + to_string(++step) + ".png", bub, v);
+				}
+			}
+			auto result = bub.complete();
+			if (doBubble and hasPrefix and result) {
+				save_bubble(prefix+"_bubble" + to_string(++step) + ".png", bub, v);
 			}
 
 			bub.save_prs(&pr, v);
