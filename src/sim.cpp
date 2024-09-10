@@ -761,7 +761,8 @@ void hsesim(hse::graph &g, ucs::variable_set &v, vector<hse::term_index> steps =
 	}
 }
 
-void prsim(prs::production_rule_set &pr, ucs::variable_set &v, vector<prs::term_index> steps = vector<prs::term_index>()) {
+void prsim(prs::production_rule_set &pr, ucs::variable_set &v) {//, vector<prs::term_index> steps = vector<prs::term_index>()) {
+	prs::globals g(v);
 	prs::simulator sim(&pr, &v);
 
 	tokenizer assignment_parser(false);
@@ -769,8 +770,6 @@ void prsim(prs::production_rule_set &pr, ucs::variable_set &v, vector<prs::term_
 
 	int seed = 0;
 	srand(seed);
-	int enabled = 0;
-	bool uptodate = false;
 	int step = 0;
 	int n = 0, n1 = 0;
 	char command[256];
@@ -810,8 +809,8 @@ void prsim(prs::production_rule_set &pr, ucs::variable_set &v, vector<prs::term_
 			else
 				printf("error: expected seed value\n");
 		}
-		else if ((strncmp(command, "clear", 5) == 0 && length == 5) || (strncmp(command, "c", 1) == 0 && length == 1))
-			steps.resize(step);
+		//else if ((strncmp(command, "clear", 5) == 0 && length == 5) || (strncmp(command, "c", 1) == 0 && length == 1))
+		//	steps.resize(step);
 		else if (strncmp(command, "source", 6) == 0 && length > 7)
 		{
 			script = fopen(&command[7], "r");
@@ -821,7 +820,7 @@ void prsim(prs::production_rule_set &pr, ucs::variable_set &v, vector<prs::term_
 				script = stdin;
 			}
 		}
-		else if (strncmp(command, "load", 4) == 0 && length > 5)
+		/*else if (strncmp(command, "load", 4) == 0 && length > 5)
 		{
 			FILE *seq = fopen(&command[5], "r");
 			if (seq != NULL)
@@ -845,170 +844,129 @@ void prsim(prs::production_rule_set &pr, ucs::variable_set &v, vector<prs::term_
 					fprintf(seq, "%d.%d\n", steps[i].index, steps[i].term);
 				fclose(seq);
 			}
-		}
+		}*/
 		else if (strncmp(command, "run", 3) == 0 || strncmp(command, "g", 1) == 0) {
 			sim.run();
-			uptodate = false;
-		}
-		else if (strncmp(command, "reset", 5) == 0 || strncmp(command, "r", 1) == 0) {
+		} else if (strncmp(command, "reset", 5) == 0 || strncmp(command, "r", 1) == 0) {
 			sim.reset();
-			uptodate = false;
 			step = 0;
 			srand(seed);
-		}
-		else if (strncmp(command, "wait", 4) == 0 || strncmp(command, "w", 1) == 0)
-			sim.encoding = sim.global;
-		else if ((strncmp(command, "tokens", 6) == 0 && length == 6) || (strncmp(command, "t", 1) == 0 && length == 1))
+		} else if (strncmp(command, "wait", 4) == 0 || strncmp(command, "w", 1) == 0) {
+			sim.wait();
+		} else if ((strncmp(command, "tokens", 6) == 0 && length == 6) || (strncmp(command, "t", 1) == 0 && length == 1)) {
 			printf("%s\n", export_composition(sim.encoding, v).to_string().c_str());
-		else if ((strncmp(command, "enabled", 7) == 0 && length == 7) || (strncmp(command, "e", 1) == 0 && length == 1))
-		{
-			if (!uptodate)
-			{
-				enabled = sim.enabled();
-				uptodate = true;
+		} else if ((strncmp(command, "enabled", 7) == 0 && length == 7) || (strncmp(command, "e", 1) == 0 && length == 1)) {
+			for (int i = 0; i < (int)sim.nets.size(); i++) {
+				if (sim.nets[i] != nullptr) {
+					printf("(%d) %s\n", i, sim.nets[i]->value.to_string(v).c_str());
+				}
 			}
-
-			for (int i = 0; i < enabled; i++)
-				printf("(%d) T%d.%d:%s     ", i, sim.loaded[sim.ready[i].first].index, sim.ready[i].second, export_composition(pr.rules[sim.loaded[sim.ready[i].first].index].local_action[sim.ready[i].second], v).to_string().c_str());
-			printf("\n");
-		}
-		else if (strncmp(command, "set", 3) == 0)
-		{
+			for (int i = 0; i < (int)sim.nodes.size(); i++) {
+				if (sim.nodes[i] != nullptr) {
+					printf("(%d) %s\n", pr.flip(i), sim.nodes[i]->value.to_string(v).c_str());
+				}
+			}
+		} else if (strncmp(command, "set", 3) == 0) {
 			int i = 0;
-			if (sscanf(command, "set %d ", &n) != 1)
-			{
+			if (sscanf(command, "set %d ", &n) != 1) {
 				n = -1;
 				i = 4;
-			}
-			else
-			{
+			} else {
 				i = 5;
-				while (i < length && command[i-1] != ' ')
+				while (i < length && command[i-1] != ' ') {
 					i++;
+				}
 			}
 
 			assignment_parser.insert("", string(command).substr(i));
 			parse_expression::composition expr(assignment_parser);
 			boolean::cube local_action = import_cube(expr, v, 0, &assignment_parser, false);
-			boolean::cube remote_action = local_action.remote(v.get_groups());
-			if (assignment_parser.is_clean())
-			{
-				sim.encoding = boolean::local_assign(sim.encoding, local_action, true);
-				sim.global = boolean::local_assign(sim.global, remote_action, true);
-				sim.encoding = boolean::remote_assign(sim.encoding, sim.global, true);
+			if (assignment_parser.is_clean()) {
+				sim.set(local_action);
 			}
 			assignment_parser.reset();
-			uptodate = false;
-		}
-		else if (strncmp(command, "force", 5) == 0)
-		{
-			if (length <= 6)
+		} else if (strncmp(command, "force", 5) == 0) {
+			if (length <= 6) {
 				printf("error: expected expression\n");
-			else
-			{
+			} else {
 				assignment_parser.insert("", string(command).substr(6));
 				parse_expression::composition expr(assignment_parser);
 				boolean::cube local_action = import_cube(expr, v, 0, &assignment_parser, false);
 				boolean::cube remote_action = local_action.remote(v.get_groups());
-				if (assignment_parser.is_clean())
-				{
-					sim.encoding = boolean::local_assign(sim.encoding, remote_action, true);
-					sim.global = boolean::local_assign(sim.global, remote_action, true);
+				if (assignment_parser.is_clean()) {
+					sim.set(remote_action);
 				}
 				assignment_parser.reset();
-				uptodate = false;
 			}
-		}
-		else if (strncmp(command, "step", 4) == 0 || strncmp(command, "s", 1) == 0)
-		{
-			if (sscanf(command, "step %d", &n) != 1 && sscanf(command, "s%d", &n) != 1)
+		} else if (strncmp(command, "step", 4) == 0 || strncmp(command, "s", 1) == 0) {
+			if (sscanf(command, "step %d", &n) != 1 && sscanf(command, "s%d", &n) != 1) {
 				n = 1;
-
-			for (int i = 0; i < n && (enabled != 0 || !uptodate); i++)
-			{
-				if (!uptodate)
-				{
-					enabled = sim.enabled();
-					uptodate = true;
-				}
-
-				if (enabled == 0) {
-					sim.wait();
-					enabled = sim.enabled();
-				}
-
-				if (enabled != 0)
-				{
-					int firing = rand()%enabled;
-					if (step < (int)steps.size())
-					{
-						for (firing = 0; firing < (int)sim.ready.size() &&
-						(sim.loaded[sim.ready[firing].first].index != steps[step].index || sim.ready[firing].second != steps[step].term); firing++);
-
-						if (firing == (int)sim.ready.size())
-						{
-							printf("error: loaded simulation does not match PRS, please clear the simulation to continue\n");
-							break;
-						}
-					}
-					else
-						steps.push_back(prs::term_index(sim.loaded[sim.ready[firing].first].index, sim.ready[firing].second));
-
-					printf("%d\tT%d.%d\t%s -> %s\n", step, sim.loaded[sim.ready[firing].first].index, sim.ready[firing].second, export_expression(sim.loaded[sim.ready[firing].first].guard_action, v).to_string().c_str(), export_composition(pr.rules[sim.loaded[sim.ready[firing].first].index].local_action[sim.ready[firing].second], v).to_string().c_str());
-
-					//boolean::cube old = sim.encoding;
-					sim.fire(firing);
-
-					//printf("\t%s\n", export_composition(difference(old, sim.encoding), v).to_string().c_str());
-
-					uptodate = false;
-					sim.interference_errors.clear();
-					sim.instability_errors.clear();
-					sim.mutex_errors.clear();
-					step++;
-				}
 			}
-		}
-		else if (strncmp(command, "fire", 4) == 0 || strncmp(command, "f", 1) == 0)
-		{
-			if (sscanf(command, "fire %d", &n) == 1 || sscanf(command, "f%d", &n) == 1)
-			{
-				if (!uptodate)
-				{
-					enabled = sim.enabled();
-					uptodate = true;
+
+			for (int i = 0; i < n; i++) {
+				if (sim.enabled.empty()) {
+					sim.wait();
+					if (sim.enabled.empty()) {
+						break;
+					}
 				}
 
-				if (n < enabled)
+				/*if (step < (int)steps.size())
 				{
-					if (step < (int)steps.size())
-						printf("error: deviating from loaded simulation, please clear the simulation to continue\n");
-					else
+					for (firing = 0; firing < (int)sim.ready.size() &&
+					(sim.loaded[sim.ready[firing].first].index != steps[step].index || sim.ready[firing].second != steps[step].term); firing++);
+
+					if (firing == (int)sim.ready.size())
 					{
-						steps.push_back(prs::term_index(sim.loaded[sim.ready[n].first].index, sim.ready[n].second));
-
-						printf("%d\tT%d.%d\t%s -> %s\n", step, sim.loaded[sim.ready[n].first].index, sim.ready[n].second, export_expression(sim.loaded[sim.ready[n].first].guard_action, v).to_string().c_str(), export_composition(pr.rules[sim.loaded[sim.ready[n].first].index].local_action[sim.ready[n].second], v).to_string().c_str());
-
-						//boolean::cube old = sim.encoding;
-						sim.fire(n);
-
-						//printf("\t%s\n", export_composition(difference(old, sim.encoding), v).to_string().c_str());
-
-						uptodate = false;
-						sim.interference_errors.clear();
-						sim.instability_errors.clear();
-						sim.mutex_errors.clear();
-						step++;
+						printf("error: loaded simulation does not match PRS, please clear the simulation to continue\n");
+						break;
 					}
 				}
 				else
-					printf("error: must be in the range [0,%d)\n", enabled);
+					steps.push_back(prs::term_index(sim.loaded[sim.ready[firing].first].index, sim.ready[firing].second));*/
+
+				//boolean::cube old = sim.encoding;
+				auto e = sim.fire();
+				printf("%lu\t%s\n", e.fire_at, e.to_string(v).c_str());
+
+
+				//printf("\t%s\n", export_composition(difference(old, sim.encoding), v).to_string().c_str());
+
+				//sim.interference_errors.clear();
+				//sim.instability_errors.clear();
+				//sim.mutex_errors.clear();
+				step++;
 			}
-			else
-				printf("error: expected ID in the range [0,%d)\n", enabled);
-		}
-		else if (length > 0)
+		} else if (strncmp(command, "fire", 4) == 0 || strncmp(command, "f", 1) == 0) {
+			if (sscanf(command, "fire %d", &n) == 1 || sscanf(command, "f%d", &n) == 1) {
+				if (((n >= 0 and n < (int)sim.nets.size()) or (n < 0 and pr.flip(n) >= (int)sim.nodes.size())) and sim.at(n) != nullptr) {
+					/*if (step < (int)steps.size())
+						printf("error: deviating from loaded simulation, please clear the simulation to continue\n");
+					else
+					{
+						steps.push_back(prs::term_index(sim.loaded[sim.ready[n].first].index, sim.ready[n].second));*/
+
+						//boolean::cube old = sim.encoding;
+						auto e = sim.fire(n);
+						printf("%lu\t%s\n", e.fire_at, e.to_string(v).c_str());
+
+
+						//printf("\t%s\n", export_composition(difference(old, sim.encoding), v).to_string().c_str());
+
+						//sim.interference_errors.clear();
+						//sim.instability_errors.clear();
+						//sim.mutex_errors.clear();
+						step++;
+					//}
+				} else {
+					printf("error: must be in the range [0,%lu)\n", sim.enabled.size());
+				}
+			} else {
+				printf("error: expected ID in the range [0,%lu)\n", sim.enabled.size());
+			}
+		} else if (length > 0) {
 			printf("error: unrecognized command '%s'\n", command);
+		}
 	}
 }
 
@@ -1162,7 +1120,7 @@ int sim_command(configuration &config, int argc, char **argv) {
 			hsesim(hg, v, steps);
 		}
 	} else if (format == "prs") {
-		vector<prs::term_index> steps;
+		/*vector<prs::term_index> steps;
 		if (sfilename != "") {
 			FILE *seq = fopen(sfilename.c_str(), "r");
 			char command[256];
@@ -1178,7 +1136,7 @@ int sim_command(configuration &config, int argc, char **argv) {
 			}
 			else
 				printf("error: file not found '%s'\n", sfilename.c_str());
-		}
+		}*/
 
 		prs::production_rule_set pr;
 
@@ -1190,11 +1148,25 @@ int sim_command(configuration &config, int argc, char **argv) {
 		if (tokens.decrement(__FILE__, __LINE__))
 		{
 			parse_prs::production_rule_set syntax(tokens);
-			pr = prs::import_production_rule_set(syntax, v, 0, &tokens, true);
+			prs::import_production_rule_set(syntax, pr, -1, -1, prs::attributes(), v, 0, &tokens, true);
 		}
-		pr.post_process(v);
 
-		prsim(pr, v, steps);
+		cout << "nets " << pr.nets.size() << endl;
+		for (int i = 0; i < (int)pr.nets.size(); i++) {
+			cout << "net " << i << ": " << export_variable_name(i, v).to_string() << " gateOf=" << to_string(pr.nets[i].gateOf[0]) << to_string(pr.nets[i].gateOf[1]) << " sourceOf=" << to_string(pr.nets[i].sourceOf[0]) << to_string(pr.nets[i].sourceOf[1]) << " drainOf=" << to_string(pr.nets[i].drainOf[0]) << to_string(pr.nets[i].drainOf[1]) << " remote=" << to_string(pr.nets[i].remote) << (pr.nets[i].keep ? " keep" : "") << endl;
+		}
+
+		cout << "nodes " << pr.nodes.size() << endl;
+		for (int i = 0; i < (int)pr.nodes.size(); i++) {
+			cout << "node " << i << ": " << export_variable_name(pr.flip(i), v).to_string() << " gateOf=" << to_string(pr.nodes[i].gateOf[0]) << to_string(pr.nodes[i].gateOf[1]) << " sourceOf=" << to_string(pr.nodes[i].sourceOf[0]) << to_string(pr.nodes[i].sourceOf[1]) << " drainOf=" << to_string(pr.nodes[i].drainOf[0]) << to_string(pr.nodes[i].drainOf[1]) << " remote=" << to_string(pr.nodes[i].remote) << (pr.nodes[i].keep ? " keep" : "") << endl;
+		}
+
+		cout << "devs " << pr.devs.size() << endl;
+		for (int i = 0; i < (int)pr.devs.size(); i++) {
+			cout << "dev " << i << ": source=" << export_variable_name(pr.devs[i].source, v).to_string() << "(" << pr.devs[i].source << ") gate=" << export_variable_name(pr.devs[i].gate, v).to_string() << "(" << pr.devs[i].gate << ") drain=" << export_variable_name(pr.devs[i].drain, v).to_string() << "(" << pr.devs[i].drain << ") threshold=" << pr.devs[i].threshold << (pr.devs[i].attr.weak ? " weak" : "") << (pr.devs[i].attr.pass ? " pass" : "") << endl;
+		}
+
+		prsim(pr, v);//, steps);
 	}
 
 	complete();

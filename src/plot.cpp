@@ -255,9 +255,8 @@ int plot_command(configuration &config, int argc, char **argv) {
 		if (tokens.decrement(__FILE__, __LINE__))
 		{
 			parse_prs::production_rule_set syntax(tokens);
-			pr = prs::import_production_rule_set(syntax, v, 0, &tokens, true);
+			prs::import_production_rule_set(syntax, pr, -1, -1, prs::attributes(), v, 0, &tokens, true);
 		}
-		pr.post_process(v);
 	}
 
 	complete();

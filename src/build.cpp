@@ -698,8 +698,17 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		if (tokens.decrement(__FILE__, __LINE__))
 		{
 			parse_prs::production_rule_set syntax(tokens);
-			pr = prs::import_production_rule_set(syntax, v, 0, &tokens, true);
+			prs::import_production_rule_set(syntax, pr, -1, -1, prs::attributes(), v, 0, &tokens, true);
 		}
+
+		FILE *fout = stdout;
+		if (hasPrefix and prefix != "") {
+			fout = fopen((prefix+"_test.prs").c_str(), "w");
+		}
+		fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
+		fclose(fout);
+		complete();
+		return is_clean();
 	}
 
 	if (!is_clean()) {
@@ -711,8 +720,6 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		or format == "hse"
 		or format == "astg"
 		or format == "prs") {	
-		pr.post_process(v);
-
 		if (not pr.cmos_implementable()) {
 			bub.load_prs(pr, v);
 
