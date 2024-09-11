@@ -768,6 +768,8 @@ void prsim(prs::production_rule_set &pr, ucs::variable_set &v) {//, vector<prs::
 	tokenizer assignment_parser(false);
 	parse_expression::composition::register_syntax(assignment_parser);
 
+	bool debug = false;
+
 	int seed = 0;
 	srand(seed);
 	int step = 0;
@@ -908,6 +910,20 @@ void prsim(prs::production_rule_set &pr, ucs::variable_set &v) {//, vector<prs::
 					sim.wait();
 					if (sim.enabled.empty()) {
 						break;
+					}
+				}
+
+				if (debug) {
+					printf("\n\n%s\n", export_composition(sim.encoding, v).to_string().c_str());
+					for (int i = 0; i < (int)sim.nets.size(); i++) {
+						if (sim.nets[i] != nullptr) {
+							printf("(%d) %s\n", i, sim.nets[i]->value.to_string(v).c_str());
+						}
+					}
+					for (int i = 0; i < (int)sim.nodes.size(); i++) {
+						if (sim.nodes[i] != nullptr) {
+							printf("(%d) %s\n", pr.flip(i), sim.nodes[i]->value.to_string(v).c_str());
+						}
 					}
 				}
 
