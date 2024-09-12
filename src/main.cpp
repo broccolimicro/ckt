@@ -6,8 +6,8 @@
 #include "plot.h"
 
 void print_help() {
-	printf("Ckt is a high level synthesis and simulation engine for self-timed circuits.\n");
-	printf("\nUsage: ckt [options] <file>\n");
+	printf("Loom is a high level synthesis and simulation engine for self-timed circuits.\n");
+	printf("\nUsage: lm [options] <file>\n");
 	printf("Synthesize the production rules that implement the behavioral description.\n");
 
 	printf("\nOptions:\n");
@@ -28,12 +28,12 @@ void print_help() {
 	printf(" *.prs          production rules\n");
 	printf(" *.astg         asynchronous signal transition graph\n");
 
-	printf("\nUsage: ckt [options] <command> [arguments]\n");
+	printf("\nUsage: lm [options] <command> [arguments]\n");
 	printf("Execute a sub-command:\n");
 	printf("  sim           simulate the described circuit\n");
 	printf("  plot          render the described circuit in various ways\n");
 
-	printf("\nUse \"ckt help <command>\" for more information about a command.\n");
+	printf("\nUse \"lm help <command>\" for more information about a command.\n");
 
 	printf("\nGeneral Options:\n");
 	printf(" -h,--help      display this information\n");
@@ -44,7 +44,7 @@ void print_help() {
 }
 
 void print_version() {
-	printf("ckt 1.0.0\n");
+	printf("Loom 1.0.0\n");
 	printf("Copyright (C) 2020 Cornell University.\n");
 	printf("There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n");
 	printf("\n");

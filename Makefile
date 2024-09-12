@@ -1,6 +1,6 @@
 PYTHON_RELEASE = python$(shell python3 -c "import sys;sys.stdout.write('{}.{}'.format(sys.version_info[0],sys.version_info[1]))")
 
-NAME          = ckt
+NAME          = lm
 DEPEND        = interpret_phy interpret_sch interpret_prs interpret_hse interpret_chp interpret_arithmetic interpret_boolean interpret_ucs chp hse prs sch phy petri arithmetic boolean ucs parse_prs parse_chp parse_astg parse_spice parse_dot parse_expression parse_ucs parse common
 
 SRCDIR        = src
