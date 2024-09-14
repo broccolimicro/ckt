@@ -32,6 +32,8 @@
 #include <interpret_boolean/import.h>
 #include <ucs/variable.h>
 
+#include <unistd.h>
+
 void sim_help() {
 	printf("Usage: ckt sim [options] <ckt-file> [sim-file]\n");
 	printf("A simulation environment for various behavioral descriptions.\n");
@@ -109,6 +111,196 @@ void print_prsim_help() {
 	printf(" set <i> <expr>      execute a transition as if it were local to the i'th token\n");
 	printf(" set <expr>          execute a transition as if it were remote to all tokens\n");
 	printf(" force <expr>        execute a transition as if it were local to all tokens\n");
+}
+
+struct vcd {
+	vcd();
+	~vcd();
+
+	FILE *fvcd;
+	FILE *fgtk;
+	vector<string> nodes;
+	vector<string> nets;
+	vector<pair<uint64_t, string> > markers;
+	uint64_t t;
+
+	boolean::cube curr;
+
+	string &at(int net);
+
+	void create(string prefix, const ucs::variable_set &v, int nodes);
+	void append(uint64_t t, boolean::cube encoding, string error="");
+	void append(uint64_t t, boolean::cube encoding, boolean::cube strength, string error="");
+	void close();
+};
+
+vcd::vcd() {
+	fvcd = nullptr;
+	fgtk = nullptr;
+	t = 0;
+}
+
+vcd::~vcd() {
+	close();
+}
+
+string &vcd::at(int net) {
+	if (net < 0) {
+		return nodes[-net-1];
+	}
+	return nets[net];
+}
+
+void vcd::create(string prefix, const ucs::variable_set &v, int nodes) {
+	time_t rawtime;
+	tm *timeinfo;
+	char buffer[1024];
+
+	time (&rawtime);
+	timeinfo = localtime(&rawtime);
+	strftime(buffer,sizeof(buffer),"%Y-%m-%d",timeinfo);
+
+	fvcd = fopen((prefix+".vcd").c_str(), "w");
+	fprintf(fvcd, "$date\n");
+	fprintf(fvcd, "%s\n", buffer);
+	fprintf(fvcd, "$end\n");
+	fprintf(fvcd, "$timescale 1ps $end\n");
+
+	if (nodes > (int)this->nodes.size()) {
+		this->nodes.resize(nodes);
+	}
+	if ((int)v.nodes.size() > (int)nets.size()) {
+		nets.resize(v.nodes.size());
+	} 
+	string id = {33,33,33};
+	for (int i = -nodes; i < (int)v.nodes.size(); i++) {
+		string name = export_variable_name(i, v).to_string();
+		at(i) = id;
+		if (i < 0) {
+			curr.set((int)v.nodes.size()-i-1, -1);
+		} else {
+			curr.set(i, -1);
+		}
+
+		for (int j = (int)name.size(); j >= 0; j--) {
+			if (string(":.").find(name[j]) != string::npos) {
+				name[j] = '_';
+			} else if (string("[]").find(name[j]) != string::npos) {
+				name.erase(name.begin()+j);
+			}
+		}
+	
+		fprintf(fvcd, "$var wire %d %s %s $end\n", 1, id.c_str(), name.c_str());
+
+		id[2] += 1;
+		if (id[2] > 126) {
+			id[1] += 1;
+			id[2] = 33;
+		}
+		if (id[1] > 126) {
+			id[0] += 1;
+			id[1] = 33;
+		}
+	}
+
+	fprintf(fvcd, "$enddefinitions $end\n");
+
+	fprintf(fvcd, "$dumpvars\n");
+	for (int i = -nodes; i < (int)nets.size(); i++) {
+		//if (value[1] == 1) {
+			fprintf(fvcd, "x%s\n", at(i).c_str());
+		//} else {
+		//	fprintf(fvcd, "b%s %s", "x"*value[1], value[0]);
+		//}
+	}
+	fprintf(fvcd, "$end\n");
+
+	getcwd(buffer, 1024);
+
+	fgtk = fopen((prefix+".gtkw").c_str(), "w");
+	fprintf(fgtk, "[dumpfile] \"%s/%s.vcd\"\n", buffer, prefix.c_str());
+	fprintf(fgtk, "[savefile] \"%s/%s.gtkw\"\n", buffer, prefix.c_str());
+}
+
+void vcd::append(uint64_t t, boolean::cube encoding, string error) {
+	static const char values[4] = {'x','0','1','z'};
+	if (t > this->t) {
+		fprintf(fvcd, "#%lu\n", t);
+		this->t = t;
+	}
+
+	int m = (int)max(curr.values.size(), encoding.values.size());
+	for (int i = 0; i < m*16; i++) {
+		int value = encoding.get(i);
+		if (value != curr.get(i)) {
+			const char *id;
+			if (i < (int)nets.size()) {
+				id = nets[i].c_str();
+			} else {
+				id = nodes[i-(int)nets.size()].c_str();
+			}
+
+			fprintf(fvcd, "%c%s\n", values[value+1], id);
+		}
+	}
+
+	if (not error.empty()) {
+		markers.push_back(pair<uint64_t, string>(t, error));
+	}
+}
+
+void vcd::append(uint64_t t, boolean::cube encoding, boolean::cube strength, string error) {
+	static const char values[4] = {'x','0','1','z'};
+	if (t > this->t) {
+		fprintf(fvcd, "#%lu\n", t);
+		this->t = t;
+	}
+
+	int m = (int)max(curr.values.size(), encoding.values.size());
+	for (int i = 0; i < m*16; i++) {
+		int value = encoding.get(i);
+		int drive = 2-strength.get(i);
+		if (drive == 0) {
+			value = 2;
+		}
+		if (value != curr.get(i)) {
+			const char *id;
+			if (i < (int)nets.size()) {
+				id = nets[i].c_str();
+			} else {
+				id = nodes[i-(int)nets.size()].c_str();
+			}
+
+			fprintf(fvcd, "%c%s\n", values[value+1], id);
+		}
+	}
+
+	if (not error.empty()) {
+		markers.push_back(pair<uint64_t, string>(t, error));
+	}
+}
+
+
+void vcd::close() {
+	if (fvcd != nullptr) {
+		fclose(fvcd);
+		fvcd = nullptr;
+	}
+	if (fgtk != nullptr) {
+		fprintf(fgtk, "*1.0 0");
+		for (auto marker = markers.begin(); marker != markers.end(); marker++) {
+			fprintf(fgtk, " %lu", marker->first);
+		}
+		fprintf(fgtk, "\n");
+		char id = 'A';
+		for (auto marker = markers.begin(); marker != markers.end(); marker++) {
+			fprintf(fgtk, "[markername] %c %s\n", id++, marker->second.c_str());
+		}
+		markers.clear();
+
+		fclose(fgtk);
+		fgtk = nullptr;
+	}
 }
 
 void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps = vector<chp::term_index>()) {
@@ -444,7 +636,7 @@ void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps =
 
 }
 
-void hsesim(hse::graph &g, ucs::variable_set &v, vector<hse::term_index> steps = vector<hse::term_index>()) {
+void hsesim(hse::graph &g, ucs::variable_set &v, string prefix, vector<hse::term_index> steps = vector<hse::term_index>()) {
 	hse::simulator sim;
 	sim.base = &g;
 	sim.variables = &v;
@@ -455,6 +647,9 @@ void hsesim(hse::graph &g, ucs::variable_set &v, vector<hse::term_index> steps =
 	// TODO(edward.bingham) use a minheap and random event times to implement a
 	// discrete event simulator here based upon the set of enabled signals.
 	//vector<pair<uint64_t, > > events;
+
+	vcd dump;
+	dump.create(prefix, v, 0);
 
 	int seed = 0;
 	srand(seed);
@@ -632,6 +827,8 @@ void hsesim(hse::graph &g, ucs::variable_set &v, vector<hse::term_index> steps =
 			}
 			assignment_parser.reset();
 			uptodate = false;
+
+			dump.append(sim.now, sim.encoding);
 		}
 		else if (strncmp(command, "force", 5) == 0)
 		{
@@ -650,6 +847,8 @@ void hsesim(hse::graph &g, ucs::variable_set &v, vector<hse::term_index> steps =
 				}
 				assignment_parser.reset();
 				uptodate = false;
+			
+				dump.append(sim.now, sim.encoding);
 			}
 		}
 		else if (strncmp(command, "step", 4) == 0 || strncmp(command, "s", 1) == 0)
@@ -703,9 +902,15 @@ void hsesim(hse::graph &g, ucs::variable_set &v, vector<hse::term_index> steps =
 					if (vacuous) {
 						flags = " [vacuous]";
 					}
-					printf("%lu\tT%d.%d\t%s -> %s%s\n", sim.now, sim.loaded[sim.ready[firing].first].index, sim.ready[firing].second, export_expression(sim.loaded[sim.ready[firing].first].guard_action, v).to_string().c_str(), export_composition(g.transitions[sim.loaded[sim.ready[firing].first].index].local_action[sim.ready[firing].second], v).to_string().c_str(), flags.c_str());
+					boolean::cube guard = sim.loaded[sim.ready[firing].first].guard_action;
+					boolean::cube action = g.transitions[sim.loaded[sim.ready[firing].first].index].local_action[sim.ready[firing].second];
+					boolean::cube remote_action = g.transitions[sim.loaded[sim.ready[firing].first].index].remote_action[sim.ready[firing].second];
 
+					printf("%lu\tT%d.%d\t%s -> %s%s\n", sim.now, sim.loaded[sim.ready[firing].first].index, sim.ready[firing].second, export_expression(guard, v).to_string().c_str(), export_composition(action, v).to_string().c_str(), flags.c_str());
+					
 					sim.fire(firing);
+
+					dump.append(sim.now, sim.encoding);
 
 					uptodate = false;
 					sim.interference_errors.clear();
@@ -738,10 +943,15 @@ void hsesim(hse::graph &g, ucs::variable_set &v, vector<hse::term_index> steps =
 						if (vacuous) {
 							flags = " [vacuous]";
 						}
+						boolean::cube guard = sim.loaded[sim.ready[n].first].guard_action;
+						boolean::cube action = g.transitions[sim.loaded[sim.ready[n].first].index].local_action[sim.ready[n].second];
+						boolean::cube remote_action = g.transitions[sim.loaded[sim.ready[n].first].index].remote_action[sim.ready[n].second];
 
-						printf("%lu\tT%d.%d\t%s -> %s%s\n", sim.now, sim.loaded[sim.ready[n].first].index, sim.ready[n].second, export_expression(sim.loaded[sim.ready[n].first].guard_action, v).to_string().c_str(), export_composition(g.transitions[sim.loaded[sim.ready[n].first].index].local_action[sim.ready[n].second], v).to_string().c_str(), flags.c_str());
-						
+						printf("%lu\tT%d.%d\t%s -> %s%s\n", sim.now, sim.loaded[sim.ready[n].first].index, sim.ready[n].second, export_expression(guard, v).to_string().c_str(), export_composition(action, v).to_string().c_str(), flags.c_str());
+					
 						sim.fire(n);
+
+						dump.append(sim.now, sim.encoding);
 
 						uptodate = false;
 						sim.interference_errors.clear();
@@ -759,11 +969,16 @@ void hsesim(hse::graph &g, ucs::variable_set &v, vector<hse::term_index> steps =
 		else if (length > 0)
 			printf("error: unrecognized command '%s'\n", command);
 	}
+
+	dump.close();
 }
 
-void prsim(prs::production_rule_set &pr, ucs::variable_set &v) {//, vector<prs::term_index> steps = vector<prs::term_index>()) {
+void prsim(prs::production_rule_set &pr, ucs::variable_set &v, string prefix) {//, vector<prs::term_index> steps = vector<prs::term_index>()) {
 	prs::globals g(v);
 	prs::simulator sim(&pr, &v);
+
+	vcd dump;
+	dump.create(prefix, v, (int)pr.nodes.size());
 
 	tokenizer assignment_parser(false);
 	parse_expression::composition::register_syntax(assignment_parser);
@@ -886,6 +1101,9 @@ void prsim(prs::production_rule_set &pr, ucs::variable_set &v) {//, vector<prs::
 			if (assignment_parser.is_clean()) {
 				sim.set(local_action);
 			}
+
+			dump.append(sim.enabled.now, sim.encoding, sim.strength);
+
 			assignment_parser.reset();
 		} else if (strncmp(command, "force", 5) == 0) {
 			if (length <= 6) {
@@ -898,6 +1116,9 @@ void prsim(prs::production_rule_set &pr, ucs::variable_set &v) {//, vector<prs::
 				if (assignment_parser.is_clean()) {
 					sim.set(remote_action);
 				}
+
+				dump.append(sim.enabled.now, sim.encoding, sim.strength);
+				
 				assignment_parser.reset();
 			}
 		} else if (strncmp(command, "step", 4) == 0 || strncmp(command, "s", 1) == 0) {
@@ -945,6 +1166,7 @@ void prsim(prs::production_rule_set &pr, ucs::variable_set &v) {//, vector<prs::
 				auto e = sim.fire();
 				printf("%lu\t%s\n", e.fire_at, e.to_string(v).c_str());
 
+				dump.append(e.fire_at, sim.encoding, sim.strength);
 
 				//printf("\t%s\n", export_composition(difference(old, sim.encoding), v).to_string().c_str());
 
@@ -965,7 +1187,8 @@ void prsim(prs::production_rule_set &pr, ucs::variable_set &v) {//, vector<prs::
 						//boolean::cube old = sim.encoding;
 						auto e = sim.fire(n);
 						printf("%lu\t%s\n", e.fire_at, e.to_string(v).c_str());
-
+			
+						dump.append(e.fire_at, sim.encoding, sim.strength);
 
 						//printf("\t%s\n", export_composition(difference(old, sim.encoding), v).to_string().c_str());
 
@@ -984,6 +1207,8 @@ void prsim(prs::production_rule_set &pr, ucs::variable_set &v) {//, vector<prs::
 			printf("error: unrecognized command '%s'\n", command);
 		}
 	}
+
+	dump.close();
 }
 
 int sim_command(configuration &config, int argc, char **argv) {
@@ -991,6 +1216,7 @@ int sim_command(configuration &config, int argc, char **argv) {
 	tokens.register_token<parse::block_comment>(false);
 	tokens.register_token<parse::line_comment>(false);
 	
+	string prefix = "";
 	string filename = "";
 	string format = "";
 
@@ -1011,6 +1237,7 @@ int sim_command(configuration &config, int argc, char **argv) {
 				return 0;
 			}
 			format = filename.substr(dot+1);
+			prefix = filename.substr(0, dot);
 			if (format != "chp"
 				and format != "hse"
 				and format != "astg"
@@ -1133,7 +1360,7 @@ int sim_command(configuration &config, int argc, char **argv) {
 		if (full) {
 			hse::elaborate(hg, v, false, true);
 		} else {
-			hsesim(hg, v, steps);
+			hsesim(hg, v, prefix, steps);
 		}
 	} else if (format == "prs") {
 		/*vector<prs::term_index> steps;
@@ -1167,7 +1394,7 @@ int sim_command(configuration &config, int argc, char **argv) {
 			prs::import_production_rule_set(syntax, pr, -1, -1, prs::attributes(), v, 0, &tokens, true);
 		}
 
-		prsim(pr, v);//, steps);
+		prsim(pr, v, prefix);//, steps);
 	}
 
 	complete();
