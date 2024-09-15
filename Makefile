@@ -41,8 +41,8 @@ build/$(SRCDIR)/%.o: $(SRCDIR)/%.cpp
 	@$(CXX) $(CXXFLAGS) $(LDFLAGS) $(INCLUDE_PATHS) -MM -MF $(patsubst %.o,%.d,$@) -MT $@ -c $<
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(INCLUDE_PATHS) -c -o $@ $<
 
-$(TEST_TARGET): $(TEST_OBJECTS) $(filter-out build/$(SRCDIR)/main.o, $(OBJECTS))
-	$(CXX) $(LIBRARY_PATHS) $(CXXFLAGS) $(GTEST_L) $(INCLUDE_PATHS) $^ -pthread -lgtest -o $(TEST_TARGET) $(LIBRARIES)
+$(TEST_TARGET): setgv $(TEST_OBJECTS) $(filter-out build/$(SRCDIR)/main.o, $(OBJECTS))
+	$(CXX) $(LIBRARY_PATHS) $(CXXFLAGS) $(GTEST_L) $(INCLUDE_PATHS) $(filter-out $(firstword $^), $^) -o $(TEST_TARGET) -pthread -lgtest $(LIBRARIES)
 
 build/$(TESTDIR)/%.o: $(TESTDIR)/%.cpp
 	@mkdir -p $(dir $@)
