@@ -721,7 +721,8 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		if (tokens.decrement(__FILE__, __LINE__))
 		{
 			parse_prs::production_rule_set syntax(tokens);
-			prs::import_production_rule_set(syntax, pr, -1, -1, prs::attributes(), v, 0, &tokens, true);
+			map<int, int> nodemap;
+			prs::import_production_rule_set(syntax, pr, -1, -1, prs::attributes(), v, nodemap, 0, &tokens, true);
 		}
 	}
 

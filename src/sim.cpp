@@ -34,6 +34,8 @@
 
 #include <unistd.h>
 
+const bool debug = false;
+
 void sim_help() {
 	printf("Usage: ckt sim [options] <ckt-file> [sim-file]\n");
 	printf("A simulation environment for various behavioral descriptions.\n");
@@ -983,8 +985,6 @@ void prsim(prs::production_rule_set &pr, ucs::variable_set &v, string prefix) {/
 	tokenizer assignment_parser(false);
 	parse_expression::composition::register_syntax(assignment_parser);
 
-	bool debug = false;
-
 	int seed = 0;
 	srand(seed);
 	int step = 0;
@@ -1391,7 +1391,14 @@ int sim_command(configuration &config, int argc, char **argv) {
 		if (tokens.decrement(__FILE__, __LINE__))
 		{
 			parse_prs::production_rule_set syntax(tokens);
-			prs::import_production_rule_set(syntax, pr, -1, -1, prs::attributes(), v, 0, &tokens, true);
+			map<int, int> nodemap;
+			prs::import_production_rule_set(syntax, pr, -1, -1, prs::attributes(), v, nodemap, 0, &tokens, true);
+		}
+
+		if (debug) {
+			printf("\n\n%s\n\n", export_production_rule_set(pr, v).to_string().c_str());
+			pr.print(v);
+			printf("\n\n");
 		}
 
 		prsim(pr, v, prefix);//, steps);
