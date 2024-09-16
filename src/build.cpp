@@ -371,6 +371,10 @@ void save_bubble(string filename, const prs::bubble &bub, const ucs::variable_se
 	}
 }
 
+void set_stage(int &stage, int target) {
+	stage = stage < target ? target : stage;
+}
+
 int build_command(configuration &config, int argc, char **argv, bool progress) {
 	tokenizer tokens;
 	
@@ -383,11 +387,24 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 	bool cmos = true;
 	int stage = -1;
 
+	const int DO_ELAB = 0;
+	const int DO_CONFLICTS = 1;
+	const int DO_ENCODE = 2;
+	const int DO_RULES = 3;
+	const int DO_BUBBLE = 4;
+	const int DO_KEEPERS = 5;
+	const int DO_SIZE = 6;
+	const int DO_NETS = 7;
+	const int DO_CELLS = 8;
+	const int DO_PLACE = 9;
+	const int DO_ROUTE = 10;
+
 	bool doElab = false;
 	bool doConflicts = false;
 	bool doEncode = false;
 	bool doRules = false;
 	bool doBubble = false;
+	bool doKeepers = false;
 	bool doSize = false;
 	bool doNets = false;
 	bool doCells = false;
@@ -405,6 +422,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 			doEncode = true;
 			doRules = true;
 			doBubble = true;
+			doKeepers = true;
 			doSize = true;
 			doNets = true;
 			doCells = true;
@@ -412,34 +430,37 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 			doRoute = true;
 		} else if (arg == "-g" or arg == "--graph") {
 			doElab = true;
-			stage = stage < 0 ? 0 : stage;
+			set_stage(stage, DO_ELAB);
 		} else if (arg == "-c" or arg == "--conflict") {
 			doConflicts = true;
-			stage = stage < 1 ? 1 : stage;
+			set_stage(stage, DO_CONFLICTS);
 		} else if (arg == "-e" or arg == "--encode") {
 			doEncode = true;
-			stage = stage < 2 ? 2 : stage;
+			set_stage(stage, DO_ENCODE);
 		} else if (arg == "-r" or arg == "--rules") {
 			doRules = true;
-			stage = stage < 3 ? 3 : stage;
+			set_stage(stage, DO_RULES);
 		} else if (arg == "-b" or arg == "--bubble") {
 			doBubble = true;
-			stage = stage < 4 ? 4 : stage;
+			set_stage(stage, DO_BUBBLE);
+		} else if (arg == "-k" or arg == "--keepers") {
+			doKeepers = true;
+			set_stage(stage, DO_KEEPERS);
 		} else if (arg == "-s" or arg == "--size") {
 			doSize = true;
-			stage = stage < 5 ? 5 : stage;
+			set_stage(stage, DO_SIZE);
 		} else if (arg == "-n" or arg == "--nets") {
 			doNets = true;
-			stage = stage < 6 ? 6 : stage;
+			set_stage(stage, DO_NETS);
 		} else if (arg == "-l" or arg == "--cells") {
 			doCells = true;
-			stage = stage < 7 ? 7 : stage;
+			set_stage(stage, DO_CELLS);
 		} else if (arg == "-p" or arg == "--place") {
 			doPlace = true;
-			stage = stage < 8 ? 8 : stage;
+			set_stage(stage, DO_PLACE);
 		} else if (arg == "-x" or arg == "--route") {
 			doRoute = true;
-			stage = stage < 9 ? 9 : stage;
+			set_stage(stage, DO_ROUTE);
 		} else if (arg == "-o" or arg == "--out") {
 			if (++i >= argc) {
 				printf("expected output prefix\n");
@@ -595,7 +616,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 			fclose(fout);
 		}
 
-		if (stage >= 0 and stage < 1) {
+		if (stage >= 0 and stage < DO_CONFLICTS) {
 			complete();
 			return is_clean();
 		}
@@ -615,7 +636,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 			}
 		}
 
-		if (stage >= 0 and stage < 2) {
+		if (stage >= 0 and stage < DO_ENCODE) {
 			complete();
 			return is_clean();
 		}
@@ -661,7 +682,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 			fclose(fout);
 		}
 
-		if (stage >= 0 and stage < 3) {
+		if (stage >= 0 and stage < DO_RULES) {
 			complete();
 			return is_clean();
 		}
@@ -682,7 +703,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		}
 	}
 
-	if (stage >= 0 and stage < 4) {
+	if (stage >= 0 and stage < DO_BUBBLE) {
 		complete();
 		return is_clean();
 	}
@@ -702,6 +723,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		}
 	}
 
+	printf("done import\n");
 	if (!is_clean()) {
 		complete();
 		return 1;
@@ -711,6 +733,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		or format == "hse"
 		or format == "astg"
 		or format == "prs") {
+		printf("starting bubble\n");
 		if (not pr.cmos_implementable()) {
 			bub.load_prs(pr, v);
 
@@ -738,12 +761,28 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 				}
 				fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
 				fclose(fout);
-
-				// TODO(edward.bingham) emit bubble reshuffled production rules
 			}
 		}
 
-		if (stage >= 0 and stage < 5) {
+		printf("done bubble\n");
+		if (stage >= 0 and stage < DO_KEEPERS) {
+			complete();
+			return is_clean();
+		}
+
+		printf("adding keepers\n");
+		pr.add_keepers();
+
+		if (doKeepers) {
+			FILE *fout = stdout;
+			if (hasPrefix and prefix != "") {
+				fout = fopen((prefix+"_keep.prs").c_str(), "w");
+			}
+			fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
+			fclose(fout);
+		}
+
+		if (stage >= 0 and stage < DO_SIZE) {
 			complete();
 			return is_clean();
 		}
@@ -758,13 +797,13 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		fclose(fout);
 	}
 
-	if (stage >= 0 and stage < 6) {
+	if (stage >= 0 and stage < DO_NETS) {
 		complete();
 		return is_clean();
 	}
 
 	if (techPath == "") {
-		if (stage >= 6 or format == "spi" or format == "gds") {
+		if (stage >= DO_NETS or format == "spi" or format == "gds") {
 			cout << "please provide a python techfile." << endl;
 		}
 		if (!is_clean()) {
@@ -792,7 +831,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		return 0;
 	}
 
-	if (stage >= 0 and stage < 7) {
+	if (stage >= 0 and stage < DO_CELLS) {
 		complete();
 		return is_clean();
 	}
@@ -826,7 +865,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		phy::export_library(prefix, prefix+".gds", lib);
 	}
 
-	if (stage >= 0 and stage < 8) {
+	if (stage >= 0 and stage < DO_PLACE) {
 		complete();
 		return is_clean();
 	}

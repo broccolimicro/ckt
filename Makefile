@@ -12,6 +12,7 @@ GTEST_L      := -L$(GTEST)/build/lib -L.
 INCLUDE_PATHS = $(DEPEND:%=-I../../lib/%) -I../../lib/gdstk/build/include $(shell python3-config --includes) -I.
 LIBRARY_PATHS = $(DEPEND:%=-L../../lib/%) -L$(shell python3-config --prefix)/lib -L.
 LIBRARIES     = $(DEPEND:%=-l%) -l$(PYTHON_RELEASE)
+LIBFILES      = $(foreach dep,$(DEPEND),../../lib/$(dep)/lib$(dep).a)
 CXXFLAGS      = -std=c++14 -O2 -g -Wall -fmessage-length=0
 LDFLAGS	      =  
 
@@ -72,7 +73,7 @@ setgv:
 	$(eval CXXFLAGS += -DGRAPHVIZ_SUPPORTED=1)
 	$(eval LIBRARIES += -lcgraph -lgvc)
 
-$(TARGET): $(OBJECTS)
+$(TARGET): $(OBJECTS) $(LIBFILES)
 	$(CXX) $(LIBRARY_PATHS) $(CXXFLAGS) $(LDFLAGS) $(OBJECTS) -o $(TARGET) $(LIBRARIES)
 
 build/$(SRCDIR)/%.o: $(SRCDIR)/%.cpp 
