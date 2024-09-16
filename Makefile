@@ -38,7 +38,8 @@ ifeq ($(OS),Windows_NT)
 			CXXFLAGS += -D IA32
 		endif
 	endif
-	LIBRARIES += -lgdstk -lclipper -lqhullstatic_r -lz
+	LIBRARIES += -l:libgdstk.a -l:libclipper.a -l:libqhullstatic_r.a -lz
+	LIBRARY_PATHS += -L../../lib/gdstk/build/lib -L../../lib/gdstk/build/lib64
 else
 	UNAME_S := $(shell uname -s)
 	ifeq ($(UNAME_S),Linux)
