@@ -726,7 +726,6 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		}
 	}
 
-	printf("done import\n");
 	if (!is_clean()) {
 		complete();
 		return 1;
@@ -736,7 +735,6 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		or format == "hse"
 		or format == "astg"
 		or format == "prs") {
-		printf("starting bubble\n");
 		if (not pr.cmos_implementable()) {
 			bub.load_prs(pr, v);
 
@@ -767,13 +765,11 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 			}
 		}
 
-		printf("done bubble\n");
 		if (stage >= 0 and stage < DO_KEEPERS) {
 			complete();
 			return is_clean();
 		}
 
-		printf("adding keepers\n");
 		pr.add_keepers();
 
 		if (doKeepers) {
