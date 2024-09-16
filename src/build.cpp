@@ -469,12 +469,14 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 			hasPrefix = true;
 			prefix = argv[i];
 		} else {
-			size_t dot = arg.find_last_of(".");
+			string path = extractPath(arg);
+
+			size_t dot = path.find_last_of(".");
 			if (dot == string::npos) {
 				printf("unrecognized file format\n");
 				return 0;
 			}
-			string ext = arg.substr(dot+1);
+			string ext = path.substr(dot+1);
 			if (ext == "spice"
 				or ext == "sp"
 				or ext == "s") {
