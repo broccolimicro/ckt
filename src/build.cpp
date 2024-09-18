@@ -786,7 +786,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 			return is_clean();
 		}
 
-		// TODO(edward.bingham) Do prs sizing
+		pr.size_devices();
 
 		FILE *fout = stdout;
 		if (hasPrefix and prefix != "") {
