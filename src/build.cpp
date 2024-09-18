@@ -21,7 +21,7 @@
 
 #include <prs/production_rule.h>
 #include <prs/bubble.h>
-//#include <parse_prs/production_rule_set.h>
+#include <prs/synthesize.h>
 #include <interpret_prs/import.h>
 #include <interpret_prs/export.h>
 
@@ -788,12 +788,14 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 
 		pr.size_devices();
 
-		FILE *fout = stdout;
-		if (hasPrefix and prefix != "") {
-			fout = fopen((prefix+".prs").c_str(), "w");
+		if (doSize) {
+			FILE *fout = stdout;
+			if (hasPrefix and prefix != "") {
+				fout = fopen((prefix+"_sized.prs").c_str(), "w");
+			}
+			fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
+			fclose(fout);
 		}
-		fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
-		fclose(fout);
 	}
 
 	if (stage >= 0 and stage < DO_NETS) {
@@ -804,6 +806,13 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 	if (techPath == "") {
 		if (stage >= DO_NETS or format == "spi" or format == "gds") {
 			cout << "please provide a python techfile." << endl;
+		} else {
+			FILE *fout = stdout;
+			if (hasPrefix and prefix != "") {
+				fout = fopen((prefix+"_sized.prs").c_str(), "w");
+			}
+			fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
+			fclose(fout);
 		}
 		if (!is_clean()) {
 			complete();
@@ -816,18 +825,20 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 	phy::loadTech(tech, techPath);
 	sch::Netlist net(tech);
 
-
-	// TODO(edward.bingham) remove this when we have a way to convert production
-	// rules into a spice netlist
 	if (format == "chp"
 		or format == "hse"
 		or format == "astg"
 		or format == "prs") {
-		if (!is_clean()) {
-			complete();
-			return 1;
+		net.subckts.push_back(prs::build_netlist(tech, pr, v));
+
+		if (doNets) {
+			FILE *fout = stdout;
+			if (hasPrefix and prefix != "") {
+				fout = fopen((prefix+".spi").c_str(), "w");
+			}
+			fprintf(fout, "%s", sch::export_netlist(tech, net).to_string().c_str());
+			fclose(fout);
 		}
-		return 0;
 	}
 
 	if (stage >= 0 and stage < DO_CELLS) {
