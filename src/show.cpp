@@ -1,4 +1,4 @@
-#include "plot.h"
+#include "show.h"
 
 #include <common/standard.h>
 #include <parse/parse.h>
@@ -42,8 +42,8 @@ namespace graphviz
 }
 #endif
 
-void plot_help() {
-	printf("Usage: ckt plot [options] file...\n");
+void show_help() {
+	printf("Usage: ckt show [options] file...\n");
 	printf("Create visual representations of the circuit or behavior.\n");
 	printf("\nOptions:\n");
 	printf(" -o              Specify the output file name, formats other than 'dot'\n");
@@ -91,7 +91,7 @@ void render(string filename, string format, string content) {
 	}
 }
 
-int plot_command(configuration &config, int argc, char **argv) {
+int show_command(configuration &config, int argc, char **argv) {
 	tokenizer tokens;
 	tokens.register_token<parse::block_comment>(false);
 	tokens.register_token<parse::line_comment>(false);

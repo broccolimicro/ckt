@@ -3,7 +3,8 @@
 
 #include "build.h"
 #include "sim.h"
-#include "plot.h"
+#include "show.h"
+#include "verify.h"
 
 void print_help() {
 	printf("Loom is a high level synthesis and simulation engine for self-timed circuits.\n");
@@ -11,8 +12,10 @@ void print_help() {
 	printf("Synthesize the production rules that implement the behavioral description.\n");
 
 	printf("\nOptions:\n");
-	printf(" --no-cmos      uses bubble reshuffling instead of state variables\n");
-	printf("                to make it cmos implementable\n");
+	printf(" --logic <family>      pick the logic family you want to synthesize to. The following logic families are supported:\n");
+	printf("         raw           do not require inverting logic\n");
+	printf("         cmos          require inverting logic (default)\n");
+	printf("\n");
 	printf(" --all          save all intermediate stages\n");
 	printf(" -o,--out       set the filename prefix for the saved intermediate stages\n\n");
 	printf(" -g,--graph     save the elaborated astg\n");
@@ -31,8 +34,8 @@ void print_help() {
 	printf("\nUsage: lm [options] <command> [arguments]\n");
 	printf("Execute a sub-command:\n");
 	printf("  sim           simulate the described circuit\n");
-	printf("  plot          render the described circuit in various ways\n");
-
+	printf("  show          render the described circuit in various ways\n");
+	printf("  verify        elaborate the full state space to verify the circuit\n");
 	printf("\nUse \"lm help <command>\" for more information about a command.\n");
 
 	printf("\nGeneral Options:\n");
@@ -78,9 +81,12 @@ int main(int argc, char **argv) {
 		} else if (arg == "sim") {
 			++i;
 			return sim_command(config, argc-i, argv+i);
-		} else if (arg == "plot") {
+		} else if (arg == "show") {
 			++i;
-			return plot_command(config, argc-i, argv+i);
+			return show_command(config, argc-i, argv+i);
+		} else if (arg == "verify") {
+			++i;
+			return verify_command(config, argc-i, argv+i);
 		} else if (arg == "help") {
 			if (++i >= argc) {
 				print_help();
@@ -90,8 +96,8 @@ int main(int argc, char **argv) {
 			arg = argv[i];
 			if (arg == "sim") {
 				sim_help();
-			} else if (arg == "plot") {
-				plot_help();
+			} else if (arg == "show") {
+				show_help();
 			} else {
 				printf("unrecognized command '%s'\n", argv[i]);
 				return 0;

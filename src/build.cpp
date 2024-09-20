@@ -376,16 +376,9 @@ void set_stage(int &stage, int target) {
 }
 
 int build_command(configuration &config, int argc, char **argv, bool progress) {
-	tokenizer tokens;
-	
-	string filename = "";
-	string prefix = "";
-	string format = "";
-	string techPath = "";
-
-	bool hasPrefix = false;
-	bool cmos = true;
-	int stage = -1;
+	const int LOGIC_RAW = 0;
+	const int LOGIC_CMOS = 1;
+	const int LOGIC_ADIABATIC = 2;
 
 	const int DO_ELAB = 0;
 	const int DO_CONFLICTS = 1;
@@ -398,6 +391,17 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 	const int DO_CELLS = 8;
 	const int DO_PLACE = 9;
 	const int DO_ROUTE = 10;
+
+	tokenizer tokens;
+	
+	string filename = "";
+	string prefix = "";
+	string format = "";
+	string techPath = "";
+
+	bool hasPrefix = false;
+	int logic = LOGIC_CMOS;
+	int stage = -1;
 
 	bool doElab = false;
 	bool doConflicts = false;
@@ -414,8 +418,22 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 	for (int i = 0; i < argc; i++) {
 		string arg = argv[i];
 
-		if (arg == "--no-cmos") {
-			cmos = false;
+		if (arg == "--logic") {
+			if (++i >= argc) {
+				printf("expected output prefix\n");
+			}
+			arg = argv[i];
+
+			if (arg == "raw") {
+				logic = LOGIC_RAW;
+			} else if (arg == "cmos") {
+				logic = LOGIC_CMOS;
+			} else if (arg == "adiabatic") {
+				logic = LOGIC_ADIABATIC;
+			} else {
+				printf("unsupported logic family '%s'\n", argv[i]);
+				return is_clean();
+			}
 		} else if (arg == "--all") {
 			doElab = true;
 			doConflicts = true;
@@ -505,6 +523,11 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 				return 0;
 			}
 		}
+	}
+
+	bool inverting = false;
+	if (logic == LOGIC_CMOS) {
+		inverting = true;
 	}
 
 	if (filename == "") {
@@ -627,10 +650,10 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		enc.base = &hg;
 		enc.variables = &v;
 
-		enc.check(!cmos, progress);
+		enc.check(!inverting, progress);
 
 		if (doConflicts) {
-			if (!cmos) {
+			if (!inverting) {
 				print_conflicts(enc, hg, v, -1);
 			} else {
 				print_conflicts(enc, hg, v, 0);
@@ -644,7 +667,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		}
 
 		for (int i = 0; i < 10 and enc.conflicts.size() > 0; i++) {
-			//if (!cmos) {
+			//if (!inverting) {
 			//	print_conflicts(enc, g, v, -1);
 			//} else {
 			//	print_conflicts(enc, g, v, 0);
@@ -659,12 +682,12 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 				return 1;
 			}
 
-			enc.check(!cmos, progress);
+			enc.check(!inverting, progress);
 		}
 
 		if (enc.conflicts.size() > 0) {
 			// state variable insertion failed
-			if (!cmos) {
+			if (!inverting) {
 				print_conflicts(enc, hg, v, -1);
 			} else {
 				print_conflicts(enc, hg, v, 0);
@@ -690,7 +713,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		}
 
 		hse::gate_set gates(&hg, &v);
-		gates.load(!cmos);
+		gates.load(!inverting);
 		gates.weaken();
 		gates.build_reset();
 		gates.save(&pr);
@@ -735,7 +758,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		or format == "hse"
 		or format == "astg"
 		or format == "prs") {
-		if (not pr.cmos_implementable()) {
+		if (inverting and not pr.cmos_implementable()) {
 			bub.load_prs(pr, v);
 
 			int step = 0;
@@ -770,15 +793,17 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 			return is_clean();
 		}
 
-		pr.add_keepers();
+		if (logic == LOGIC_CMOS or logic == LOGIC_RAW) {
+			pr.add_keepers();
 
-		if (doKeepers) {
-			FILE *fout = stdout;
-			if (hasPrefix and prefix != "") {
-				fout = fopen((prefix+"_keep.prs").c_str(), "w");
+			if (doKeepers) {
+				FILE *fout = stdout;
+				if (hasPrefix and prefix != "") {
+					fout = fopen((prefix+"_keep.prs").c_str(), "w");
+				}
+				fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
+				fclose(fout);
 			}
-			fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
-			fclose(fout);
 		}
 
 		if (stage >= 0 and stage < DO_SIZE) {
