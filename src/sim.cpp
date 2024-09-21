@@ -784,10 +784,9 @@ void hsesim(hse::graph &g, ucs::variable_set &v, string prefix, vector<hse::term
 	dump.close();
 }
 
-void prsim(prs::production_rule_set &pr, ucs::variable_set &v, string prefix, bool backflow) {//, vector<prs::term_index> steps = vector<prs::term_index>()) {
+void prsim(prs::production_rule_set &pr, ucs::variable_set &v, string prefix) {//, vector<prs::term_index> steps = vector<prs::term_index>()) {
 	prs::globals g(v);
 	prs::simulator sim(&pr, &v);
-	sim.weak_backflow = backflow;
 
 	vcd dump;
 	dump.create(prefix, v, (int)pr.nodes.size());
@@ -1032,17 +1031,15 @@ int sim_command(configuration &config, int argc, char **argv) {
 
 	string sfilename = "";
 
-	bool backflow = true;
-
 	for (int i = 0; i < argc; i++) {
 		string arg = argv[i];
 
 		if (arg[0] == '-') {
-			if (arg == "--no-backflow") {
-				backflow = false;
-			} else {
+			//if (arg == "--myflag") {
+			//	myflag = true;
+			//} else {
 				printf("unrecognized flag '%s'\n", argv[i]);
-			}
+			//}
 		} else if (filename == "") {
 			filename = argv[i];
 			size_t dot = filename.find_last_of(".");
@@ -1211,7 +1208,7 @@ int sim_command(configuration &config, int argc, char **argv) {
 			printf("\n\n");
 		}
 
-		prsim(pr, v, prefix, backflow);//, steps);
+		prsim(pr, v, prefix);//, steps);
 	}
 
 	complete();
