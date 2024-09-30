@@ -33,7 +33,7 @@
 #include <interpret_boolean/import.h>
 #include <ucs/variable.h>
 
-const bool debug = false;
+const bool debug = true;
 
 void sim_help() {
 	printf("Usage: ckt sim [options] <ckt-file> [sim-file]\n");

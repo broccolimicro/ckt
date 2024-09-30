@@ -479,6 +479,28 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		} else if (arg == "-x" or arg == "--route") {
 			doRoute = true;
 			set_stage(stage, DO_ROUTE);
+		} else if (arg == "+g" or arg == "++graph") {
+			doElab = true;
+		} else if (arg == "+c" or arg == "++conflict") {
+			doConflicts = true;
+		} else if (arg == "+e" or arg == "++encode") {
+			doEncode = true;
+		} else if (arg == "+r" or arg == "++rules") {
+			doRules = true;
+		} else if (arg == "+b" or arg == "++bubble") {
+			doBubble = true;
+		} else if (arg == "+k" or arg == "++keepers") {
+			doKeepers = true;
+		} else if (arg == "+s" or arg == "++size") {
+			doSize = true;
+		} else if (arg == "+n" or arg == "++nets") {
+			doNets = true;
+		} else if (arg == "+l" or arg == "++cells") {
+			doCells = true;
+		} else if (arg == "+p" or arg == "++place") {
+			doPlace = true;
+		} else if (arg == "+x" or arg == "++route") {
+			doRoute = true;
 		} else if (arg == "-o" or arg == "--out") {
 			if (++i >= argc) {
 				printf("expected output prefix\n");
@@ -794,7 +816,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		}
 
 		if (logic == LOGIC_CMOS or logic == LOGIC_RAW) {
-			pr.add_keepers();
+			pr.add_keepers(v);
 
 			if (doKeepers) {
 				FILE *fout = stdout;
@@ -884,6 +906,17 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		}
 	}
 
+	net.mapCells();
+
+	//if (doCells) {
+		FILE *fout = stdout;
+		if (hasPrefix and prefix != "") {
+			fout = fopen((prefix+".spi").c_str(), "w");
+		}
+		fprintf(fout, "%s", sch::export_netlist(tech, net).to_string().c_str());
+		fclose(fout);
+	//}
+
 	phy::Library lib(&tech);
 	
 	if (format == "chp"
@@ -891,12 +924,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		or format == "astg"
 		or format == "prs"
 		or format == "spi") {
-		net.build();
-		for (auto ckt = net.subckts.begin(); ckt != net.subckts.end(); ckt++) {
-			lib.cells.push_back(Layout(tech));
-			ckt->draw(lib.cells.back());
-		}
-
+		net.build(lib);
 		phy::export_library(prefix, prefix+".gds", lib);
 	}
 
