@@ -1006,7 +1006,10 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 	}
 
 	phy::Tech tech;
-	phy::loadTech(tech, techPath);
+	if (not phy::loadTech(tech, techPath)) {
+		cout << "techfile does not exist \'" + techPath + "\'." << endl;
+		return 1;
+	}
 	sch::Netlist net(tech);
 
 	if (format == "chp"
