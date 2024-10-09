@@ -47,6 +47,13 @@
 #include <ucs/variable.h>
 
 #include <filesystem>
+#include <chrono>
+#define KNRM  "\x1B[0m"
+#define KRED  "\x1B[31m"
+#define KGRN  "\x1B[32m"
+#define KYEL  "\x1B[33m"
+#define KBLU  "\x1B[34m"
+using namespace std::chrono;
 
 //printf(" -c             check for state conflicts that occur regardless of sense\n");
 //	printf(" -cu            check for state conflicts that occur due to up-going transitions\n");
@@ -451,6 +458,8 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 	bool doPlace = false;
 	bool doRoute = false;
 
+	bool noCells = false;
+
 	for (int i = 0; i < argc; i++) {
 		string arg = argv[i];
 
@@ -537,6 +546,8 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 			doPlace = true;
 		} else if (arg == "+x" or arg == "++route") {
 			doRoute = true;
+		} else if (arg == "--no-cells") {
+			noCells = true;
 		} else if (arg == "-o" or arg == "--out") {
 			if (++i >= argc) {
 				printf("expected output prefix\n");
@@ -601,6 +612,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 	ucs::variable_set v;
 	chp::graph cg;
 	hse::graph hg;
+	hg.name = prefix;
 	prs::production_rule_set pr;
 	prs::bubble bub;
 
@@ -689,7 +701,10 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 		hg.post_process(v, true);
 		hg.check_variables(v);
 
+		if (progress) printf("Elaborate state space:\n");
 		hse::elaborate(hg, v, true, progress);
+		if (progress) printf("done\n\n");
+
 		if (not is_clean()) {
 			complete();
 			return 1;
@@ -714,7 +729,20 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 		enc.base = &hg;
 		enc.variables = &v;
 
-		enc.check(!inverting, progress);
+		if (progress) {
+			printf("Identify state conflicts:\n");
+			printf("  %s...", hg.name.c_str());
+			fflush(stdout);
+		}
+		enc.check(!inverting, false);
+		if (progress) {
+			if (enc.conflicts.empty()) {
+				printf("[%sCLEAN%s]\n", KGRN, KNRM);
+			} else {
+				printf("[%sCONFLICTS FOUND%s]\n", KYEL, KNRM);
+			}
+			printf("done\n\n");
+		}
 
 		if (doConflicts) {
 			if (!inverting) {
@@ -730,6 +758,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 			return is_clean();
 		}
 
+		if (progress) printf("Insert state variables:\n");
 		for (int i = 0; i < 10 and enc.conflicts.size() > 0; i++) {
 			//if (!inverting) {
 			//	print_conflicts(enc, g, v, -1);
@@ -738,16 +767,40 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 			//	print_conflicts(enc, g, v, 1);
 			//}
 
+			if (progress) {
+				printf("  inserting v%d...", i);
+				fflush(stdout);
+			}
 			enc.insert_state_variables();
+			if (progress) printf("[%sDONE%s]\n", KGRN, KNRM);
 
-			hse::elaborate(hg, v, true, progress);
+			if (progress) {
+				printf("  update state space...");
+				fflush(stdout);
+			}
+			hse::elaborate(hg, v, true, false);
+
+			if (progress) printf("[%sDONE%s]\n", KGRN, KNRM);
+
 			if (not is_clean()) {
 				complete();
 				return 1;
 			}
 
-			enc.check(!inverting, progress);
+			if (progress) {
+				printf("  identify new conflicts...");
+				fflush(stdout);
+			}
+			enc.check(!inverting, false);
+			if (progress) {
+				if (enc.conflicts.empty()) {
+					printf("[%sCLEAN%s]\n", KGRN, KNRM);
+				} else {
+					printf("[%sCONFLICTS FOUND%s]\n", KYEL, KNRM);
+				}
+			}
 		}
+		if (progress) printf("done\n\n");
 
 		if (enc.conflicts.size() > 0) {
 			// state variable insertion failed
@@ -778,10 +831,20 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 		}
 
 		hse::gate_set gates(&hg, &v);
+
+		if (progress) {
+			printf("Synthesize production rules:\n");
+			printf("  %s...", hg.name.c_str());
+			fflush(stdout);
+		}
 		gates.load(!inverting);
 		gates.weaken();
 		gates.build_reset();
 		gates.save(&pr);
+		if (progress) {
+			printf("[%sDONE%s]\n", KGRN, KNRM);
+			printf("done\n\n");
+		}
 
 		if (doRules) {
 			FILE *fout = stdout;
@@ -825,6 +888,11 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 		or format == "astg"
 		or format == "prs") {
 		if (inverting and not pr.cmos_implementable()) {
+			if (progress) {
+				printf("Bubble reshuffle production rules:\n");
+				printf("  %s...", prefix.c_str());
+				fflush(stdout);
+			}
 			bub.load_prs(pr, v);
 
 			int step = 0;
@@ -843,6 +911,10 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 			}
 
 			bub.save_prs(&pr, v);
+			if (progress) {
+				printf("[%sDONE%s]\n", KGRN, KNRM);
+				printf("done\n\n");
+			}
 
 			if (doBubble) {
 				FILE *fout = stdout;
@@ -861,7 +933,16 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 		}
 
 		if (logic == LOGIC_CMOS or logic == LOGIC_RAW) {
+			if (progress) {
+				printf("Insert keepers:\n");
+				printf("  %s...", prefix.c_str());
+				fflush(stdout);
+			}
 			pr.add_keepers(v);
+			if (progress) {
+				printf("[%sDONE%s]\n", KGRN, KNRM);
+				printf("done\n\n");
+			}
 
 			if (doKeepers) {
 				FILE *fout = stdout;
@@ -879,7 +960,16 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 			return is_clean();
 		}
 
+		if (progress) {
+			printf("Size production rules:\n");
+			printf("  %s...", prefix.c_str());
+			fflush(stdout);
+		}
 		pr.size_devices();
+		if (progress) {
+			printf("[%sDONE%s]\n", KGRN, KNRM);
+			printf("done\n\n");
+		}
 
 		if (doSize) {
 			FILE *fout = stdout;
@@ -923,7 +1013,16 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 		or format == "hse"
 		or format == "astg"
 		or format == "prs") {
+		if (progress) {
+			printf("Build netlist:\n");
+			printf("  %s...", prefix.c_str());
+			fflush(stdout);
+		}
 		net.subckts.push_back(prs::build_netlist(tech, pr, v));
+		if (progress) {
+			printf("[%sDONE%s]\n", KGRN, KNRM);
+			printf("done\n\n");
+		}
 
 		if (doNets) {
 			FILE *fout = stdout;
@@ -954,14 +1053,20 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 		}
 	}
 
-	net.mapCells(progress);
-
-	FILE *fout = stdout;
-	if (prefix != "") {
-		fout = fopen((prefix+".spi").c_str(), "w");
+	if (not noCells) {
+		net.mapCells(progress);
+	
+		FILE *fout = stdout;
+		if (prefix != "") {
+			fout = fopen((prefix+".spi").c_str(), "w");
+		}
+		fprintf(fout, "%s", sch::export_netlist(tech, net).to_string().c_str());
+		fclose(fout);
+	} else {
+		for (int i = 0; i < (int)net.subckts.size(); i++) {
+			net.subckts[i].isCell = true;
+		}
 	}
-	fprintf(fout, "%s", sch::export_netlist(tech, net).to_string().c_str());
-	fclose(fout);
 
 	phy::Library lib(tech, cellsDir);
 	
