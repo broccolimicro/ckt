@@ -400,7 +400,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 	string format = "";
 	string techPath = "";
 	
-	char *loom_tech = std::getenv("PATH");
+	char *loom_tech = std::getenv("LOOM_TECH");
 	string techDir;
 	if (loom_tech != nullptr) {
 		techDir = string(loom_tech);
@@ -945,6 +945,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 		or format == "prs"
 		or format == "spi") {
 		loadCells(lib, net, progress);
+		phy::export_cells(lib);
 		phy::export_library(prefix, prefix+".gds", lib);
 	}
 
