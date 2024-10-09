@@ -63,6 +63,7 @@ int main(int argc, char **argv) {
 	}
 
 	bool progress = false;
+	bool debug = false;
 	for (int i = 1; i < argc; i++)
 	{
 		string arg = argv[i];
@@ -76,6 +77,7 @@ int main(int argc, char **argv) {
 			set_verbose(true);
 		} else if (arg == "--debug" or arg == "-d") {
 			set_debug(true);
+			debug = true;
 		} else if (arg == "--progress" or arg == "-p") {
 			progress = true;
 		} else if (arg == "sim") {
@@ -103,7 +105,7 @@ int main(int argc, char **argv) {
 				return 0;
 			}
 		} else {
-			return build_command(config, argc-i, argv+i, progress);
+			return build_command(config, argc-i, argv+i, progress, debug);
 		}
 	}
 

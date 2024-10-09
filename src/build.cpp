@@ -26,6 +26,7 @@
 #include <interpret_prs/export.h>
 
 #include <sch/Netlist.h>
+#include <sch/Tapeout.h>
 #include <interpret_sch/import.h>
 #include <interpret_sch/export.h>
 
@@ -375,7 +376,7 @@ void set_stage(int &stage, int target) {
 	stage = stage < target ? target : stage;
 }
 
-int build_command(configuration &config, int argc, char **argv, bool progress) {
+int build_command(configuration &config, int argc, char **argv, bool progress, bool debug) {
 	const int LOGIC_RAW = 0;
 	const int LOGIC_CMOS = 1;
 	const int LOGIC_ADIABATIC = 2;
@@ -398,8 +399,17 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 	string prefix = "";
 	string format = "";
 	string techPath = "";
+	
+	char *loom_tech = std::getenv("PATH");
+	string techDir;
+	if (loom_tech != nullptr) {
+		techDir = string(loom_tech);
+	}
+	string cellsDir = "cells";
+	if (not techDir.empty()) {
+		cellsDir = techDir + "/cells";
+	}
 
-	bool hasPrefix = false;
 	int logic = LOGIC_CMOS;
 	int stage = -1;
 
@@ -506,7 +516,6 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 				printf("expected output prefix\n");
 			}
 
-			hasPrefix = true;
 			prefix = argv[i];
 		} else {
 			string path = extractPath(arg);
@@ -525,6 +534,12 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 
 			if (ext == "py") {
 				techPath = arg;
+			} else if (ext == "") {
+				if (not techDir.empty()) {
+					techPath = techDir + "/" + filename + "/" + filename+".py";
+				} else {
+					techPath = filename+".py";
+				}
 			} else {
 				filename = arg;
 				format = ext;
@@ -590,7 +605,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 
 		if (doElab) {
 			FILE *fout = stdout;
-			if (hasPrefix and prefix != "") {
+			if (prefix != "") {
 				fout = fopen((prefix+".astg").c_str(), "w");
 			}
 			fprintf(fout, "%s", export_astg(cg, v).to_string().c_str());
@@ -656,8 +671,9 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 
 		if (doElab) {
 			FILE *fout = stdout;
-			if (hasPrefix and prefix != "") {
-				fout = fopen((prefix+"_predicate.astg").c_str(), "w");
+			if (prefix != "") {
+				string suffix = stage == DO_ELAB ? "" : "_predicate";
+				fout = fopen((prefix+suffix+".astg").c_str(), "w");
 			}
 			fprintf(fout, "%s", export_astg(hg, v).to_string().c_str());
 			fclose(fout);
@@ -722,8 +738,9 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 
 		if (doEncode) {
 			FILE *fout = stdout;
-			if (hasPrefix and prefix != "") {
-				fout = fopen((prefix+"_complete.astg").c_str(), "w");
+			if (prefix != "") {
+				string suffix = stage == DO_ENCODE ? "" : "_complete";
+				fout = fopen((prefix+suffix+".astg").c_str(), "w");
 			}
 			fprintf(fout, "%s", export_astg(hg, v).to_string().c_str());
 			fclose(fout);
@@ -742,8 +759,9 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 
 		if (doRules) {
 			FILE *fout = stdout;
-			if (hasPrefix and prefix != "") {
-				fout = fopen((prefix+"_simple.prs").c_str(), "w");
+			if (prefix != "") {
+				string suffix = stage == DO_RULES ? "" : "_simple";
+				fout = fopen((prefix+suffix+".prs").c_str(), "w");
 			}
 			fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
 			fclose(fout);
@@ -784,17 +802,17 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 			bub.load_prs(pr, v);
 
 			int step = 0;
-			if (doBubble and hasPrefix) {
+			if (doBubble and debug) {
 				save_bubble(prefix+"_bubble0.png", bub, v);
 			}
 			for (auto i = bub.net.begin(); i != bub.net.end(); i++) {
 				auto result = bub.step(i);
-				if (doBubble and hasPrefix and result.second) {
+				if (doBubble and debug and result.second) {
 					save_bubble(prefix+"_bubble" + to_string(++step) + ".png", bub, v);
 				}
 			}
 			auto result = bub.complete();
-			if (doBubble and hasPrefix and result) {
+			if (doBubble and debug and result) {
 				save_bubble(prefix+"_bubble" + to_string(++step) + ".png", bub, v);
 			}
 
@@ -802,8 +820,9 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 
 			if (doBubble) {
 				FILE *fout = stdout;
-				if (hasPrefix and prefix != "") {
-					fout = fopen((prefix+"_bubbled.prs").c_str(), "w");
+				if (prefix != "") {
+					string suffix = stage == DO_BUBBLE ? "" : "_bubbled";
+					fout = fopen((prefix+suffix+".prs").c_str(), "w");
 				}
 				fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
 				fclose(fout);
@@ -820,8 +839,9 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 
 			if (doKeepers) {
 				FILE *fout = stdout;
-				if (hasPrefix and prefix != "") {
-					fout = fopen((prefix+"_keep.prs").c_str(), "w");
+				if (prefix != "") {
+					string suffix = stage == DO_KEEPERS ? "" : "_keep";
+					fout = fopen((prefix+suffix+".prs").c_str(), "w");
 				}
 				fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
 				fclose(fout);
@@ -837,8 +857,9 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 
 		if (doSize) {
 			FILE *fout = stdout;
-			if (hasPrefix and prefix != "") {
-				fout = fopen((prefix+"_sized.prs").c_str(), "w");
+			if (prefix != "") {
+				string suffix = stage == DO_SIZE ? "" : "_sized";
+				fout = fopen((prefix+suffix+".prs").c_str(), "w");
 			}
 			fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
 			fclose(fout);
@@ -850,13 +871,13 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		return is_clean();
 	}
 
-	if (techPath == "") {
+	if (techPath.empty()) {
 		if (stage >= DO_NETS or format == "spi" or format == "gds") {
 			cout << "please provide a python techfile." << endl;
 		} else {
 			FILE *fout = stdout;
-			if (hasPrefix and prefix != "") {
-				fout = fopen((prefix+"_sized.prs").c_str(), "w");
+			if (prefix != "") {
+				fout = fopen((prefix+".prs").c_str(), "w");
 			}
 			fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
 			fclose(fout);
@@ -880,7 +901,8 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 
 		if (doNets) {
 			FILE *fout = stdout;
-			if (hasPrefix and prefix != "") {
+			if (prefix != "") {
+				string suffix = stage == DO_NETS ? "" : "_simple";
 				fout = fopen((prefix+".spi").c_str(), "w");
 			}
 			fprintf(fout, "%s", sch::export_netlist(tech, net).to_string().c_str());
@@ -906,25 +928,23 @@ int build_command(configuration &config, int argc, char **argv, bool progress) {
 		}
 	}
 
-	net.mapCells();
+	net.mapCells(progress);
 
-	//if (doCells) {
-		FILE *fout = stdout;
-		if (hasPrefix and prefix != "") {
-			fout = fopen((prefix+".spi").c_str(), "w");
-		}
-		fprintf(fout, "%s", sch::export_netlist(tech, net).to_string().c_str());
-		fclose(fout);
-	//}
+	FILE *fout = stdout;
+	if (prefix != "") {
+		fout = fopen((prefix+".spi").c_str(), "w");
+	}
+	fprintf(fout, "%s", sch::export_netlist(tech, net).to_string().c_str());
+	fclose(fout);
 
-	phy::Library lib(&tech);
+	phy::Library lib(tech, cellsDir);
 	
 	if (format == "chp"
 		or format == "hse"
 		or format == "astg"
 		or format == "prs"
 		or format == "spi") {
-		net.build(lib);
+		loadCells(lib, net, progress);
 		phy::export_library(prefix, prefix+".gds", lib);
 	}
 
