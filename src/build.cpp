@@ -46,6 +46,8 @@
 #include <interpret_arithmetic/import.h>
 #include <ucs/variable.h>
 
+#include <filesystem>
+
 //printf(" -c             check for state conflicts that occur regardless of sense\n");
 //	printf(" -cu            check for state conflicts that occur due to up-going transitions\n");
 //	printf(" -cd            check for state conflicts that occur due to down-going transitions\n");
@@ -369,6 +371,30 @@ void save_bubble(string filename, const prs::bubble &bub, const ucs::variable_se
 		else if (system(("rm -f " + tfilename).c_str()) != 0)
 			warning("", "Temporary files not cleaned up", __FILE__, __LINE__);
 #endif
+	}
+}
+
+void export_spi(string filename, const sch::Netlist &net, const sch::Subckt &ckt) {
+	FILE *fout = fopen(filename.c_str(), "w");
+	fprintf(fout, "%s", sch::export_subckt(net.tech, net, ckt).to_string().c_str());
+	fclose(fout);
+}
+
+void export_cells(const phy::Library &lib, const sch::Netlist &net) {
+	if (not filesystem::exists(lib.libPath)) {
+		filesystem::create_directory(lib.libPath);
+	}
+	for (int i = 0; i < (int)lib.macros.size(); i++) {
+		if (lib.macros[i].name.rfind("cell_", 0) == 0) {
+			string cellPath = lib.libPath + "/" + lib.macros[i].name;
+			if (not filesystem::exists(cellPath+".gds")) {
+				export_layout(cellPath+".gds", lib.macros[i]);
+				export_lef(cellPath+".lef", lib.macros[i]);
+				if (i < (int)net.subckts.size()) {
+					export_spi(cellPath+".spi", net, net.subckts[i]);
+				}
+			}
+		}
 	}
 }
 
@@ -945,7 +971,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 		or format == "prs"
 		or format == "spi") {
 		loadCells(lib, net, progress);
-		phy::export_cells(lib);
+		export_cells(lib, net);
 		phy::export_library(prefix, prefix+".gds", lib);
 	}
 
