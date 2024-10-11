@@ -383,7 +383,7 @@ void save_bubble(string filename, const prs::bubble &bub, const ucs::variable_se
 
 void export_spi(string filename, const sch::Netlist &net, const sch::Subckt &ckt) {
 	FILE *fout = fopen(filename.c_str(), "w");
-	fprintf(fout, "%s", sch::export_subckt(net.tech, net, ckt).to_string().c_str());
+	fprintf(fout, "%s", sch::export_subckt(net, ckt).to_string().c_str());
 	fclose(fout);
 }
 
@@ -1033,7 +1033,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 				string suffix = stage == DO_NETS ? "" : "_simple";
 				fout = fopen((prefix+".spi").c_str(), "w");
 			}
-			fprintf(fout, "%s", sch::export_netlist(tech, net).to_string().c_str());
+			fprintf(fout, "%s", sch::export_netlist(net).to_string().c_str());
 			fclose(fout);
 		}
 	}
@@ -1063,7 +1063,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 		if (prefix != "") {
 			fout = fopen((prefix+".spi").c_str(), "w");
 		}
-		fprintf(fout, "%s", sch::export_netlist(tech, net).to_string().c_str());
+		fprintf(fout, "%s", sch::export_netlist(net).to_string().c_str());
 		fclose(fout);
 	} else {
 		for (int i = 0; i < (int)net.subckts.size(); i++) {
