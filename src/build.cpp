@@ -405,6 +405,75 @@ void export_cells(const phy::Library &lib, const sch::Netlist &net) {
 	}
 }
 
+// returns whether the cell was imported
+bool loadCell(phy::Library &lib, const sch::Netlist &lst, int idx, bool progress=false, bool debug=false) {
+	if (idx >= (int)lib.macros.size()) {
+		lib.macros.resize(idx+1, Layout(*lib.tech));
+	}
+	lib.macros[idx].name = lst.subckts[idx].name;
+	string cellPath = lib.libPath + "/" + lib.macros[idx].name+".gds";
+	if (progress) {
+		printf("  %s...", lib.macros[idx].name.c_str());
+		fflush(stdout);
+	}
+	printf("[");
+	bool imported = false;
+	if (filesystem::exists(cellPath)) {
+		imported = import_layout(lib.macros[idx], cellPath, lib.macros[idx].name);
+		if (progress) {
+			if (imported) {
+				printf("%sFOUND%s]\n", KGRN, KNRM);
+			} else {
+				printf("%sFAILED IMPORT%s, ", KRED, KNRM);
+			}
+		}
+	}
+
+	if (not imported) {
+		int result = sch::routeCell(lib, lst, idx);
+		if (progress) {
+			switch (result) {
+			case 1: printf("%sFAILED PLACEMENT%s]\n", KRED, KNRM); return false;
+			case 2: printf("%sFAILED ROUTING%s]\n", KRED, KNRM); return false;
+			default: printf("%sGENERATED%s]\n", KGRN, KNRM); return false;
+			}
+		}
+	}
+	return true;
+}
+
+void loadCells(phy::Library &lib, const sch::Netlist &lst, gdstk::GdsWriter *out=nullptr, bool progress=false, bool debug=false) {
+	bool libFound = filesystem::exists(lib.libPath);
+	if (progress) {
+		printf("Load cell layouts:\n");
+	}
+	steady_clock::time_point start = steady_clock::now();
+	lib.macros.reserve(lst.subckts.size()+lib.macros.size());
+	for (int i = 0; i < (int)lst.subckts.size(); i++) {
+		if (lst.subckts[i].isCell) {
+			if (not loadCell(lib, lst, i, progress)) {
+				// We generated a new cell, save this to the cell library
+				if (not libFound) {
+					filesystem::create_directory(lib.libPath);
+					libFound = true;
+				}
+				string cellPath = lib.libPath + "/" + lib.macros[i].name;
+				export_layout(cellPath+".gds", lib.macros[i]);
+				export_lef(cellPath+".lef", lib.macros[i]);
+				export_spi(cellPath+".spi", lst, lst.subckts[i]);
+			}
+			if (out != nullptr) {
+				out->write_cell(*phy::export_layout(lib.macros[i]));
+			}
+		}
+	}
+	steady_clock::time_point finish = steady_clock::now();
+	if (progress) {
+		printf("done [%gs]\n\n", ((float)duration_cast<milliseconds>(finish - start).count())/1000.0);
+	}
+}
+
+
 void set_stage(int &stage, int target) {
 	stage = stage < target ? target : stage;
 }
@@ -1072,22 +1141,24 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 	}
 
 	phy::Library lib(tech, cellsDir);
-	
+	gdstk::GdsWriter gds = {};
+	gds = gdstk::gdswriter_init((prefix+".gds").c_str(), prefix.c_str(), ((double)tech.dbunit)*1e-6, ((double)tech.dbunit)*1e-6, 4, nullptr, nullptr);
+
 	if (format == "chp"
 		or format == "hse"
 		or format == "astg"
 		or format == "prs"
 		or format == "spi") {
-		loadCells(lib, net, progress);
-		export_cells(lib, net);
-		phy::export_library(prefix, prefix+".gds", lib);
+		loadCells(lib, net, &gds, progress);
 	}
 
 	if (stage >= 0 and stage < DO_PLACE) {
+		gds.close();
 		complete();
 		return is_clean();
 	}
-		
+	
+	gds.close();
 
 	if (!is_clean()) {
 		complete();
