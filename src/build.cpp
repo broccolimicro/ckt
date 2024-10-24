@@ -406,7 +406,7 @@ void export_cells(const phy::Library &lib, const sch::Netlist &net) {
 }
 
 // returns whether the cell was imported
-bool loadCell(phy::Library &lib, const sch::Netlist &lst, int idx, bool progress=false, bool debug=false) {
+bool loadCell(phy::Library &lib, sch::Netlist &lst, int idx, bool progress=false, bool debug=false) {
 	if (idx >= (int)lib.macros.size()) {
 		lib.macros.resize(idx+1, Layout(*lib.tech));
 	}
@@ -442,7 +442,7 @@ bool loadCell(phy::Library &lib, const sch::Netlist &lst, int idx, bool progress
 	return true;
 }
 
-void loadCells(phy::Library &lib, const sch::Netlist &lst, gdstk::GdsWriter *out=nullptr, bool progress=false, bool debug=false) {
+void loadCells(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *out=nullptr, bool progress=false, bool debug=false) {
 	bool libFound = filesystem::exists(lib.libPath);
 	if (progress) {
 		printf("Load cell layouts:\n");
