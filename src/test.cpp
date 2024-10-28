@@ -36,8 +36,8 @@
 
 const bool debug = false;
 
-void verify_help() {
-	printf("Usage: ckt verify [options] <ckt-file>\n");
+void test_help() {
+	printf("Usage: lm test [options] <ckt-file>\n");
 	printf("Do a full state space exploration to look for errors.\n");
 
 	printf("\nSupported file formats:\n");
@@ -47,7 +47,7 @@ void verify_help() {
 	printf(" *.astg          asynchronous signal transition graph\n");
 }
 
-int verify_command(configuration &config, int argc, char **argv) {
+int test_command(configuration &config, int argc, char **argv) {
 	tokenizer tokens;
 	tokens.register_token<parse::block_comment>(false);
 	tokens.register_token<parse::line_comment>(false);

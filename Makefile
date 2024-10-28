@@ -26,6 +26,10 @@ TEST_OBJECTS := $(TESTS:%.cpp=build/%.o) build/$(TESTDIR)/gtest_main.o
 TEST_DEPS    := $(shell mkdir -p build/$(TESTDIR); find build/$(TESTDIR) -name '*.d')
 TEST_TARGET   = test
 
+ifndef VERSION
+override VERSION = "develop"
+endif
+
 ifeq ($(OS),Windows_NT)
 	CXXFLAGS += -D WIN32
 	ifeq ($(PROCESSOR_ARCHITEW6432),AMD64)
@@ -66,13 +70,16 @@ else
 	endif
 endif
 
-all: setgv $(TARGET)
+all: version setgv $(TARGET)
 
 nogv: $(TARGET)
 
 setgv:
 	$(eval CXXFLAGS += -DGRAPHVIZ_SUPPORTED=1)
 	$(eval LIBRARIES += -lcgraph -lgvc)
+
+version:
+	echo "const char *version = \"${VERSION}\";" > src/version.h
 
 $(TARGET): $(OBJECTS) $(LIBFILES)
 	$(CXX) $(LIBRARY_PATHS) $(CXXFLAGS) $(LDFLAGS) $(OBJECTS) -o $(TARGET) $(LIBRARIES)

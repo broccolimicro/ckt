@@ -415,11 +415,10 @@ bool loadCell(phy::Library &lib, sch::Netlist &lst, int idx, bool progress=false
 	if (progress) {
 		printf("  %s...", lib.macros[idx].name.c_str());
 		fflush(stdout);
+		printf("[");
 	}
-	printf("[");
-	bool imported = false;
 	if (filesystem::exists(cellPath)) {
-		imported = import_layout(lib.macros[idx], cellPath, lib.macros[idx].name);
+		bool imported = import_layout(lib.macros[idx], cellPath, lib.macros[idx].name);
 		if (progress) {
 			if (imported) {
 				printf("%sFOUND%s]\n", KGRN, KNRM);
@@ -427,19 +426,20 @@ bool loadCell(phy::Library &lib, sch::Netlist &lst, int idx, bool progress=false
 				printf("%sFAILED IMPORT%s, ", KRED, KNRM);
 			}
 		}
-	}
-
-	if (not imported) {
-		int result = sch::routeCell(lib, lst, idx);
-		if (progress) {
-			switch (result) {
-			case 1: printf("%sFAILED PLACEMENT%s]\n", KRED, KNRM); return false;
-			case 2: printf("%sFAILED ROUTING%s]\n", KRED, KNRM); return false;
-			default: printf("%sGENERATED%s]\n", KGRN, KNRM); return false;
-			}
+		if (imported) {
+			return true;
 		}
 	}
-	return true;
+
+	int result = sch::routeCell(lib, lst, idx);
+	if (progress) {
+		switch (result) {
+		case 1: printf("%sFAILED PLACEMENT%s]\n", KRED, KNRM); break;
+		case 2: printf("%sFAILED ROUTING%s]\n", KRED, KNRM); break;
+		default: printf("%sGENERATED%s]\n", KGRN, KNRM); break;
+		}
+	}
+	return false;
 }
 
 void loadCells(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *out=nullptr, bool progress=false, bool debug=false) {
@@ -451,7 +451,7 @@ void loadCells(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *out=nullp
 	lib.macros.reserve(lst.subckts.size()+lib.macros.size());
 	for (int i = 0; i < (int)lst.subckts.size(); i++) {
 		if (lst.subckts[i].isCell) {
-			if (not loadCell(lib, lst, i, progress)) {
+			if (not loadCell(lib, lst, i, progress, debug)) {
 				// We generated a new cell, save this to the cell library
 				if (not libFound) {
 					filesystem::create_directory(lib.libPath);
@@ -473,6 +473,30 @@ void loadCells(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *out=nullp
 	}
 }
 
+void build_help() {
+	printf("\nUsage: lm build [options] <file>\n");
+	printf("Synthesize the production rules that implement the behavioral description.\n");
+
+	printf("\nOptions:\n");
+	printf(" --logic <family>      pick the logic family you want to synthesize to. The following logic families are supported:\n");
+	printf("         raw           do not require inverting logic\n");
+	printf("         cmos          require inverting logic (default)\n");
+	printf("\n");
+	printf(" --all          save all intermediate stages\n");
+	printf(" -o,--out       set the filename prefix for the saved intermediate stages\n\n");
+	printf(" -g,--graph     save the elaborated astg\n");
+	printf(" -c,--conflicts print the conflicts to stdout\n");
+	printf(" -e,--encode    save the complete state encoded astg\n");
+	printf(" -r,--rules     save the synthesized production rules\n");
+	printf(" -b,--bubble    save the bubble reshuffled production rules\n");
+	printf(" -s,--size      save the sized production rules\n");
+
+	printf("\nSupported file formats:\n");
+	printf(" *.chp          communicating hardware processes\n");
+	printf(" *.hse          handshaking expansions\n");
+	printf(" *.prs          production rules\n");
+	printf(" *.astg         asynchronous signal transition graph\n");
+}
 
 void set_stage(int &stage, int target) {
 	stage = stage < target ? target : stage;
@@ -508,9 +532,6 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 		techDir = string(loom_tech);
 	}
 	string cellsDir = "cells";
-	if (not techDir.empty()) {
-		cellsDir = techDir + "/cells";
-	}
 
 	int logic = LOGIC_CMOS;
 	int stage = -1;
@@ -534,7 +555,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 
 		if (arg == "--logic") {
 			if (++i >= argc) {
-				printf("expected output prefix\n");
+				printf("expected logic family (raw, cmos)\n");
 			}
 			arg = argv[i];
 
@@ -543,6 +564,8 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 			} else if (arg == "cmos") {
 				logic = LOGIC_CMOS;
 			} else if (arg == "adiabatic") {
+				// This is not an officially supported logic family
+				// It is here for experimental purposes
 				logic = LOGIC_ADIABATIC;
 			} else {
 				printf("unsupported logic family '%s'\n", argv[i]);
@@ -625,45 +648,45 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 			prefix = argv[i];
 		} else {
 			string path = extractPath(arg);
+			string opt = (arg.size() > path.size() ? arg.substr(path.size()+1) : "");
 
 			size_t dot = path.find_last_of(".");
-			if (dot == string::npos) {
-				printf("unrecognized file format\n");
-				return 0;
-			}
-			string ext = path.substr(dot+1);
-			if (ext == "spice"
-				or ext == "sp"
-				or ext == "s") {
-				ext = "spi";
+			string ext = "";
+			if (dot != string::npos) {
+				ext = path.substr(dot+1);
+				if (ext == "spice"
+					or ext == "sp"
+					or ext == "s") {
+					ext = "spi";
+				}
 			}
 
 			if (ext == "py") {
 				techPath = arg;
 			} else if (ext == "") {
 				if (not techDir.empty()) {
-					techPath = techDir + "/" + filename + "/" + filename+".py";
+					techPath = techDir + "/" + path + "/" + path+".py" + opt;
+					cellsDir = techDir + "/" + path + "/cells";
 				} else {
-					techPath = filename+".py";
+					techPath = path+".py" + opt;
 				}
 			} else {
-				filename = arg;
+				filename = path;
 				format = ext;
 
 				if (prefix == "") {
-					prefix = filename.substr(0, dot);
+					prefix = dot != string::npos ? filename.substr(0, dot) : filename;
 				}
-			}
 
-			if (ext != "chp"
-				and ext != "hse"
-				and ext != "astg"
-				and ext != "prs"
-				and ext != "spi"
-				and ext != "gds"
-				and ext != "py") {
-				printf("unrecognized file format '%s'\n", ext.c_str());
-				return 0;
+				if (ext != "chp"
+					and ext != "hse"
+					and ext != "astg"
+					and ext != "prs"
+					and ext != "spi"
+					and ext != "gds") {
+					printf("unrecognized file format '%s'\n", ext.c_str());
+					return 0;
+				}
 			}
 		}
 	}
@@ -1095,6 +1118,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 			printf("[%sDONE%s]\n", KGRN, KNRM);
 			printf("done\n\n");
 		}
+		net.subckts.back().print();
 
 		if (doNets) {
 			FILE *fout = stdout;
@@ -1149,7 +1173,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 		or format == "astg"
 		or format == "prs"
 		or format == "spi") {
-		loadCells(lib, net, &gds, progress);
+		loadCells(lib, net, &gds, progress, debug);
 	}
 
 	if (stage >= 0 and stage < DO_PLACE) {

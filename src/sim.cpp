@@ -36,7 +36,7 @@
 const bool debug = true;
 
 void sim_help() {
-	printf("Usage: ckt sim [options] <ckt-file> [sim-file]\n");
+	printf("Usage: lm sim [options] <ckt-file> [sim-file]\n");
 	printf("A simulation environment for various behavioral descriptions.\n");
 
 	printf("\nSupported file formats:\n");

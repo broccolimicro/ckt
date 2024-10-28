@@ -43,7 +43,7 @@ namespace graphviz
 #endif
 
 void show_help() {
-	printf("Usage: ckt show [options] file...\n");
+	printf("Usage: lm show [options] file...\n");
 	printf("Create visual representations of the circuit or behavior.\n");
 	printf("\nOptions:\n");
 	printf(" -o              Specify the output file name, formats other than 'dot'\n");
