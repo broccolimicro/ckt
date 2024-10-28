@@ -70,7 +70,7 @@ void compare_help() {
 	printf(" *.spice,*.spi,*.sp,*.s  spice netlist\n");
 }
 
-int compare_command(configuration &config, int argc, char **argv) {
+int compare_command(configuration &config, int argc, char **argv, bool progress, bool debug) {
 	string techPath = "";
 	
 	char *loom_tech = std::getenv("LOOM_TECH");
@@ -129,10 +129,6 @@ int compare_command(configuration &config, int argc, char **argv) {
 		}
 	}
 
-	if ((int)files.size() < 2) {
-		printf("expected at least two files at different levels of abstraction\n");
-		return 0;
-	}
 	if (techPath.empty()) {
 		printf("please provide a python techfile.\n");
 		return 0;
@@ -148,19 +144,12 @@ int compare_command(configuration &config, int argc, char **argv) {
 		}
 	}
 
-	phy::Library gdsLib(tech, cellsDir);
-	if (gdsFiles != files.end()) {
-		for (auto path = gdsFiles->second.begin(); path != gdsFiles->second.end(); path++) {
-			import_library(gdsLib, *path);
-		}
-	}
-
-	sch::Netlist spiNet(tech);
+	vector<sch::Netlist> spiNet;
 	if (spiFiles != files.end()) {
+		spiNet.resize(spiFiles->second.size(), sch::Netlist(tech));
 		tokenizer tokens;
-		tokens.register_token<parse::block_comment>(false);
-		tokens.register_token<parse::line_comment>(false);
 		parse_spice::netlist::register_syntax(tokens);
+		int idx = 0;
 		for (auto path = spiFiles->second.begin(); path != spiFiles->second.end(); path++) {
 			config.load(tokens, *path, "");
 			tokens.increment(false);
@@ -168,43 +157,86 @@ int compare_command(configuration &config, int argc, char **argv) {
 			if (tokens.decrement(__FILE__, __LINE__))
 			{
 				parse_spice::netlist syntax(tokens);
-				sch::import_netlist(syntax, spiNet, &tokens);
+				sch::import_netlist(syntax, spiNet[idx], &tokens);
 			}
 			tokens.reset();
-		}
-		for (auto spi = spiNet.subckts.begin(); spi != spiNet.subckts.end(); spi++) {
-			spi->canonicalize();
-		}
-	}
-
-	sch::Netlist gdsNet(tech);
-	if (not gdsLib.macros.empty()) {
-		extract(gdsNet, gdsLib);
-		for (auto gds = gdsNet.subckts.begin(); gds != gdsNet.subckts.end(); gds++) {
-			gds->canonicalize();
+			printf("Canonicalizing Netlists...\n");
+			for (auto spi = spiNet[idx].subckts.begin(); spi != spiNet[idx].subckts.end(); spi++) {
+				printf("\t%s...", spi->name.c_str());
+				fflush(stdout);
+				spi->canonicalize();
+				printf("[%sDONE%s]\n", KGRN, KNRM);
+			}
+			printf("done...\n");
+			idx++;
 		}
 	}
 
-	printf("Layout Versus Schematic...\n");
-	for (auto gds = gdsNet.subckts.begin(); gds != gdsNet.subckts.end(); gds++) {
-		printf("\t%s...[", gds->name.c_str());
-		bool found = false;
-		for (auto spi = spiNet.subckts.begin(); spi != spiNet.subckts.end(); spi++) {
-			if (spi->name == gds->name) {
-				if (gds->compare(*spi) == 0) {
-					printf("%sMATCH%s]\n", KGRN, KNRM);
-				} else {
-					printf("%sDIFFER%s]\n", KRED, KNRM);
+	if (gdsFiles != files.end()) {
+		printf("GDS vs Spice...\n");
+		for (auto path = gdsFiles->second.begin(); path != gdsFiles->second.end(); path++) {
+			phy::Library gdsLib(tech, cellsDir);
+			import_library(gdsLib, *path);
+			if (gdsLib.macros.empty()) {
+				continue;
+			}
+
+			sch::Netlist gdsNet(tech);
+			extract(gdsNet, gdsLib);
+			for (auto gds = gdsNet.subckts.begin(); gds != gdsNet.subckts.end(); gds++) {
+				gds->canonicalize();
+
+				bool found = false;
+				for (auto net = spiNet.begin(); net != spiNet.end(); net++) {
+					for (auto spi = net->subckts.begin(); spi != net->subckts.end(); spi++) {
+						if (spi->name == gds->name) {
+							printf("\t%s(%s=%s)...[", gds->name.c_str(), path->c_str(), spiFiles->second[net-spiNet.begin()].c_str());
+							if (gds->compare(*spi) == 0) {
+								printf("%sMATCH%s]\n", KGRN, KNRM);
+							} else {
+								printf("%sMISMATCH%s]\n", KRED, KNRM);
+								if (debug) {
+									spi->print();
+									gds->print();
+								}
+							}
+							found = true;
+							break;
+						}
+					}
 				}
-				found = true;
-				break;
+				if (not found) {
+					printf("\t%s...[%sNOT FOUND%s]\n", gds->name.c_str(), KYEL, KNRM);
+				}
 			}
 		}
-		if (not found) {
-			printf("%sNOT FOUND%s]\n", KYEL, KNRM);
-		}
+		printf("done\n\n");
 	}
-	printf("done\n\n");
+
+	if ((int)spiNet.size() > 1) {
+		printf("Spice vs Spice...\n");
+		for (auto n0 = spiNet.begin(); n0 != spiNet.end(); n0++) {
+			for (auto n1 = std::next(n0); n1 != spiNet.end(); n1++) {
+				for (auto s0 = n0->subckts.begin(); s0 != n0->subckts.end(); s0++) {
+					for (auto s1 = n1->subckts.begin(); s1 != n1->subckts.end(); s1++) {
+						if (s0->name == s1->name) {
+							printf("\t%s(%s=%s)...[", s0->name.c_str(), spiFiles->second[n0-spiNet.begin()].c_str(), spiFiles->second[n1-spiNet.begin()].c_str());
+							if (s0->compare(*s1) == 0) {
+								printf("%sMATCH%s]\n", KGRN, KNRM);
+							} else {
+								printf("%sMISMATCH%s]\n", KRED, KNRM);
+								if (debug) {
+									s0->print();
+									s1->print();
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		printf("done\n\n");
+	}
 
 	complete();
 	return is_clean();

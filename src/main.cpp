@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
 			return test_command(config, argc-i, argv+i);
 		} else if (arg == "compare") {
 			++i;
-			return compare_command(config, argc-i, argv+i);
+			return compare_command(config, argc-i, argv+i, progress, debug);
 		} else if (arg == "show") {
 			++i;
 			return show_command(config, argc-i, argv+i);
