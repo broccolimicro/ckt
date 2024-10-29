@@ -145,8 +145,10 @@ int compare_command(configuration &config, int argc, char **argv, bool progress,
 	}
 
 	vector<sch::Netlist> spiNet;
+	vector<vector<bool> > spiCanon;
 	if (spiFiles != files.end()) {
 		spiNet.resize(spiFiles->second.size(), sch::Netlist(tech));
+		spiCanon.resize(spiFiles->second.size(), vector<bool>());
 		tokenizer tokens;
 		parse_spice::netlist::register_syntax(tokens);
 		int idx = 0;
@@ -160,14 +162,7 @@ int compare_command(configuration &config, int argc, char **argv, bool progress,
 				sch::import_netlist(syntax, spiNet[idx], &tokens);
 			}
 			tokens.reset();
-			printf("Canonicalizing Netlists...\n");
-			for (auto spi = spiNet[idx].subckts.begin(); spi != spiNet[idx].subckts.end(); spi++) {
-				printf("\t%s...", spi->name.c_str());
-				fflush(stdout);
-				spi->canonicalize();
-				printf("[%sDONE%s]\n", KGRN, KNRM);
-			}
-			printf("done...\n");
+			spiCanon[idx].resize(spiNet[idx].subckts.size(), false);
 			idx++;
 		}
 	}
@@ -184,13 +179,22 @@ int compare_command(configuration &config, int argc, char **argv, bool progress,
 			sch::Netlist gdsNet(tech);
 			extract(gdsNet, gdsLib);
 			for (auto gds = gdsNet.subckts.begin(); gds != gdsNet.subckts.end(); gds++) {
+				gds->combineDevices();
 				gds->canonicalize();
 
 				bool found = false;
 				for (auto net = spiNet.begin(); net != spiNet.end(); net++) {
+					int neti = net-spiNet.begin();
 					for (auto spi = net->subckts.begin(); spi != net->subckts.end(); spi++) {
+						int spii = spi-net->subckts.begin();
 						if (spi->name == gds->name) {
 							printf("\t%s(%s=%s)...[", gds->name.c_str(), path->c_str(), spiFiles->second[net-spiNet.begin()].c_str());
+							fflush(stdout);
+							if (not spiCanon[neti][spii]) {
+								spi->combineDevices();
+								spi->canonicalize();
+								spiCanon[neti][spii] = true;
+							}
 							if (gds->compare(*spi) == 0) {
 								printf("%sMATCH%s]\n", KGRN, KNRM);
 							} else {
@@ -216,11 +220,26 @@ int compare_command(configuration &config, int argc, char **argv, bool progress,
 	if ((int)spiNet.size() > 1) {
 		printf("Spice vs Spice...\n");
 		for (auto n0 = spiNet.begin(); n0 != spiNet.end(); n0++) {
+			int n0i = n0-spiNet.begin();
 			for (auto n1 = std::next(n0); n1 != spiNet.end(); n1++) {
+				int n1i = n1-spiNet.begin();
 				for (auto s0 = n0->subckts.begin(); s0 != n0->subckts.end(); s0++) {
+					int s0i = s0-n0->subckts.begin();
 					for (auto s1 = n1->subckts.begin(); s1 != n1->subckts.end(); s1++) {
+						int s1i = s1-n1->subckts.begin();
 						if (s0->name == s1->name) {
 							printf("\t%s(%s=%s)...[", s0->name.c_str(), spiFiles->second[n0-spiNet.begin()].c_str(), spiFiles->second[n1-spiNet.begin()].c_str());
+							fflush(stdout);
+							if (not spiCanon[n0i][s0i]) {
+								s0->combineDevices();
+								s0->canonicalize();
+								spiCanon[n0i][s0i] = true;
+							}
+							if (not spiCanon[n1i][s1i]) {
+								s1->combineDevices();
+								s1->canonicalize();
+								spiCanon[n1i][s1i] = true;
+							}
 							if (s0->compare(*s1) == 0) {
 								printf("%sMATCH%s]\n", KGRN, KNRM);
 							} else {
