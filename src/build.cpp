@@ -1149,19 +1149,21 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 		}
 	}
 
-	if (not noCells) {
-		net.mapCells(progress);
-	
+	if (noCells) {
+		for (int i = 0; i < (int)net.subckts.size(); i++) {
+			net.subckts[i].isCell = true;
+		}
+	}
+
+	net.mapCells(progress);
+
+	if (format != "spi") {
 		FILE *fout = stdout;
 		if (prefix != "") {
 			fout = fopen((prefix+".spi").c_str(), "w");
 		}
 		fprintf(fout, "%s", sch::export_netlist(net).to_string().c_str());
 		fclose(fout);
-	} else {
-		for (int i = 0; i < (int)net.subckts.size(); i++) {
-			net.subckts[i].isCell = true;
-		}
 	}
 
 	phy::Library lib(tech, cellsDir);
