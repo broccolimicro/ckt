@@ -418,25 +418,48 @@ bool loadCell(phy::Library &lib, sch::Netlist &lst, int idx, bool progress=false
 		printf("[");
 	}
 	if (filesystem::exists(cellPath)) {
+		sch::Subckt net(true);
 		bool imported = import_layout(lib.macros[idx], cellPath, lib.macros[idx].name);
 		if (progress) {
 			if (imported) {
-				printf("%sFOUND%s]\n", KGRN, KNRM);
+				extract(net, lib.macros[idx]);
+				net.cleanDangling(true);
+				net.combineDevices();
+				net.canonicalize();
+				if (net.compare(lst.subckts[idx]) == 0) {
+					printf("%sFOUND%s]\n", KGRN, KNRM);
+				} else {
+					printf("%sFAILED LVS%s, ", KRED, KNRM);
+					imported = false;
+				}
 			} else {
 				printf("%sFAILED IMPORT%s, ", KRED, KNRM);
 			}
 		}
 		if (imported) {
 			return true;
+		} else {
+			lib.macros[idx].clear();
 		}
 	}
 
 	int result = sch::routeCell(lib, lst, idx);
 	if (progress) {
-		switch (result) {
-		case 1: printf("%sFAILED PLACEMENT%s]\n", KRED, KNRM); break;
-		case 2: printf("%sFAILED ROUTING%s]\n", KRED, KNRM); break;
-		default: printf("%sGENERATED%s]\n", KGRN, KNRM); break;
+		if (result == 1) {
+			printf("%sFAILED PLACEMENT%s]\n", KRED, KNRM);
+		} else if (result == 2) {
+			printf("%sFAILED ROUTING%s]\n", KRED, KNRM);
+		} else {
+			sch::Subckt net(true);
+			extract(net, lib.macros[idx]);
+			net.cleanDangling(true);
+			net.combineDevices();
+			net.canonicalize();
+			if (net.compare(lst.subckts[idx]) == 0) {
+				printf("%sGENERATED%s]\n", KGRN, KNRM);
+			} else {
+				printf("%sFAILED LVS%s]\n", KRED, KNRM);
+			}
 		}
 	}
 	return false;
@@ -1118,7 +1141,9 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 			printf("[%sDONE%s]\n", KGRN, KNRM);
 			printf("done\n\n");
 		}
-		net.subckts.back().print();
+		if (debug) {
+			net.subckts.back().print();
+		}
 
 		if (doNets) {
 			FILE *fout = stdout;

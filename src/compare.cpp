@@ -179,6 +179,7 @@ int compare_command(configuration &config, int argc, char **argv, bool progress,
 			sch::Netlist gdsNet(tech);
 			extract(gdsNet, gdsLib);
 			for (auto gds = gdsNet.subckts.begin(); gds != gdsNet.subckts.end(); gds++) {
+				gds->cleanDangling(true);
 				gds->combineDevices();
 				gds->canonicalize();
 
@@ -191,6 +192,7 @@ int compare_command(configuration &config, int argc, char **argv, bool progress,
 							printf("\t%s(%s=%s)...[", gds->name.c_str(), path->c_str(), spiFiles->second[net-spiNet.begin()].c_str());
 							fflush(stdout);
 							if (not spiCanon[neti][spii]) {
+								spi->cleanDangling(true);
 								spi->combineDevices();
 								spi->canonicalize();
 								spiCanon[neti][spii] = true;
