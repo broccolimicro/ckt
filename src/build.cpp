@@ -417,16 +417,22 @@ bool loadCell(phy::Library &lib, sch::Netlist &lst, int idx, bool progress=false
 		fflush(stdout);
 		printf("[");
 	}
+
+	sch::Subckt spiNet = lst.subckts[idx];
+	spiNet.cleanDangling(true);
+	spiNet.combineDevices();
+	spiNet.canonicalize();
+
 	if (filesystem::exists(cellPath)) {
-		sch::Subckt net(true);
 		bool imported = import_layout(lib.macros[idx], cellPath, lib.macros[idx].name);
 		if (progress) {
 			if (imported) {
-				extract(net, lib.macros[idx]);
-				net.cleanDangling(true);
-				net.combineDevices();
-				net.canonicalize();
-				if (net.compare(lst.subckts[idx]) == 0) {
+				sch::Subckt gdsNet(true);
+				extract(gdsNet, lib.macros[idx], true);
+				gdsNet.cleanDangling(true);
+				gdsNet.combineDevices();
+				gdsNet.canonicalize();
+				if (gdsNet.compare(spiNet) == 0) {
 					printf("%sFOUND%s]\n", KGRN, KNRM);
 				} else {
 					printf("%sFAILED LVS%s, ", KRED, KNRM);
@@ -450,15 +456,20 @@ bool loadCell(phy::Library &lib, sch::Netlist &lst, int idx, bool progress=false
 		} else if (result == 2) {
 			printf("%sFAILED ROUTING%s]\n", KRED, KNRM);
 		} else {
-			sch::Subckt net(true);
-			extract(net, lib.macros[idx]);
-			net.cleanDangling(true);
-			net.combineDevices();
-			net.canonicalize();
-			if (net.compare(lst.subckts[idx]) == 0) {
+			sch::Subckt gdsNet(true);
+			extract(gdsNet, lib.macros[idx], true);
+			gdsNet.cleanDangling(true);
+			gdsNet.combineDevices();
+			gdsNet.canonicalize();
+
+			if (gdsNet.compare(spiNet) == 0) {
 				printf("%sGENERATED%s]\n", KGRN, KNRM);
 			} else {
 				printf("%sFAILED LVS%s]\n", KRED, KNRM);
+				if (debug) {
+					gdsNet.print();
+					spiNet.print();
+				}
 			}
 		}
 	}
