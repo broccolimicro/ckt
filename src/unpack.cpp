@@ -1,4 +1,4 @@
-#include "undo.h"
+#include "unpack.h"
 
 #include <common/standard.h>
 #include <parse/parse.h>
@@ -68,8 +68,8 @@ namespace graphviz
 }
 #endif
 
-void undo_help() {
-	printf("Usage: lm undo [options] <file>\n");
+void unpack_help() {
+	printf("Usage: lm unpack [options] <file>\n");
 	printf("Reverse the synthesis process.\n");
 
 	printf("\nSupported file formats:\n");
@@ -77,21 +77,13 @@ void undo_help() {
 	printf(" *.spice,*.spi,*.sp,*.s   spice netlist\n");
 }
 
-int undo_command(configuration &config, int argc, char **argv, bool progress, bool debug) {
+int unpack_command(configuration &config, string techPath, string cellsDir, int argc, char **argv, bool progress, bool debug) {
 	tokenizer tokens;
 	
 	string filename = "";
 	string prefix = "";
 	string format = "";
-	string techPath = "";
 	
-	char *loom_tech = std::getenv("LOOM_TECH");
-	string techDir;
-	if (loom_tech != nullptr) {
-		techDir = string(loom_tech);
-	}
-	string cellsDir = "cells";
-
 	for (int i = 0; i < argc; i++) {
 		string arg = argv[i];
 
@@ -115,32 +107,21 @@ int undo_command(configuration &config, int argc, char **argv, bool progress, bo
 				}
 			}
 
-			if (ext == "py") {
-				techPath = arg;
-			} else if (ext == "") {
-				if (not techDir.empty()) {
-					techPath = techDir + "/" + arg + "/" + arg+".py";
-					cellsDir = techDir + "/" + arg + "/cells";
-				} else {
-					techPath = arg+".py";
-				}
-			} else {
-				filename = arg;
-				format = ext;
+			filename = arg;
+			format = ext;
 
-				if (prefix == "") {
-					prefix = filename.substr(0, dot);
-				}
+			if (prefix == "") {
+				prefix = filename.substr(0, dot);
+			}
 
-				if (ext != "chp"
-					and ext != "hse"
-					and ext != "astg"
-					and ext != "prs"
-					and ext != "spi"
-					and ext != "gds") {
-					printf("unrecognized file format '%s'\n", ext.c_str());
-					return 0;
-				}
+			if (ext != "chp"
+				and ext != "hse"
+				and ext != "astg"
+				and ext != "prs"
+				and ext != "spi"
+				and ext != "gds") {
+				printf("unrecognized file format '%s'\n", ext.c_str());
+				return 0;
 			}
 		}
 	}
@@ -151,11 +132,11 @@ int undo_command(configuration &config, int argc, char **argv, bool progress, bo
 	}
 
 	phy::Tech tech;
-	if (not phy::loadTech(tech, techPath)) {
+	if (not phy::loadTech(tech, techPath, cellsDir)) {
 		cout << "techfile does not exist \'" + techPath + "\'." << endl;
 		return 1;
 	}
-	phy::Library lib(tech, cellsDir);
+	phy::Library lib(tech);
 	sch::Netlist net(tech);
 
 	if (format == "gds") {

@@ -70,16 +70,7 @@ void compare_help() {
 	printf(" *.spice,*.spi,*.sp,*.s  spice netlist\n");
 }
 
-int compare_command(configuration &config, int argc, char **argv, bool progress, bool debug) {
-	string techPath = "";
-	
-	char *loom_tech = std::getenv("LOOM_TECH");
-	string techDir;
-	if (loom_tech != nullptr) {
-		techDir = string(loom_tech);
-	}
-	string cellsDir = "cells";
-
+int compare_command(configuration &config, string techPath, string cellsDir, int argc, char **argv, bool progress, bool debug) {
 	map<string, vector<string> > files;
 
 	for (int i = 0; i < argc; i++) {
@@ -102,30 +93,19 @@ int compare_command(configuration &config, int argc, char **argv, bool progress,
 				}
 			}
 
-			if (ext == "py") {
-				techPath = arg;
-			} else if (ext == "") {
-				if (not techDir.empty()) {
-					techPath = techDir + "/" + path + "/" + path+".py" + opt;
-					cellsDir = techDir + "/" + path + "/cells";
-				} else {
-					techPath = path+".py" + opt;
-				}
-			} else {
-				//string prefix = dot != string::npos ? arg.substr(0, dot) : arg;
+			//string prefix = dot != string::npos ? arg.substr(0, dot) : arg;
 
-				if (/*ext != "chp"
-					and ext != "hse"
-					and ext != "astg"
-					and ext != "prs"
-					and */ext != "spi"
-					and ext != "gds") {
-					printf("unsupported file format '%s'\n", ext.c_str());
-					return 0;
-				}
-				auto pos = files.insert(pair<string, vector<string> >(ext, vector<string>()));
-				pos.first->second.push_back(arg);
+			if (/*ext != "chp"
+				and ext != "hse"
+				and ext != "astg"
+				and ext != "prs"
+				and */ext != "spi"
+				and ext != "gds") {
+				printf("unsupported file format '%s'\n", ext.c_str());
+				return 0;
 			}
+			auto pos = files.insert(pair<string, vector<string> >(ext, vector<string>()));
+			pos.first->second.push_back(arg);
 		}
 	}
 
@@ -138,7 +118,7 @@ int compare_command(configuration &config, int argc, char **argv, bool progress,
 	auto gdsFiles = files.find("gds");
 	auto spiFiles = files.find("spi");
 	if (gdsFiles != files.end() or spiFiles != files.end()) {
-		if (not phy::loadTech(tech, techPath)) {
+		if (not phy::loadTech(tech, techPath, cellsDir)) {
 			cout << "techfile does not exist \'" + techPath + "\'." << endl;
 			return 1;
 		}
@@ -170,7 +150,7 @@ int compare_command(configuration &config, int argc, char **argv, bool progress,
 	if (gdsFiles != files.end()) {
 		printf("GDS vs Spice...\n");
 		for (auto path = gdsFiles->second.begin(); path != gdsFiles->second.end(); path++) {
-			phy::Library gdsLib(tech, cellsDir);
+			phy::Library gdsLib(tech);
 			import_library(gdsLib, *path);
 			if (gdsLib.macros.empty()) {
 				continue;

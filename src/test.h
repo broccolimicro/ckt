@@ -4,4 +4,4 @@
 #include <parse/parse.h>
 
 void test_help();
-int test_command(configuration &config, int argc, char **argv);
+int test_command(configuration &config, string techPath, string cellsDir, int argc, char **argv);

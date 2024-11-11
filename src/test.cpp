@@ -47,7 +47,7 @@ void test_help() {
 	printf(" *.astg          asynchronous signal transition graph\n");
 }
 
-int test_command(configuration &config, int argc, char **argv) {
+int test_command(configuration &config, string techPath, string cellsDir, int argc, char **argv) {
 	tokenizer tokens;
 	tokens.register_token<parse::block_comment>(false);
 	tokens.register_token<parse::line_comment>(false);

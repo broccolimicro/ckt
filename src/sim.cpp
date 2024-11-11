@@ -1020,7 +1020,7 @@ void prsim(prs::production_rule_set &pr, ucs::variable_set &v, string prefix) {/
 	dump.close();
 }
 
-int sim_command(configuration &config, int argc, char **argv) {
+int sim_command(configuration &config, string techPath, string cellsDir, int argc, char **argv) {
 	tokenizer tokens;
 	tokens.register_token<parse::block_comment>(false);
 	tokens.register_token<parse::line_comment>(false);

@@ -381,19 +381,13 @@ void save_bubble(string filename, const prs::bubble &bub, const ucs::variable_se
 	}
 }
 
-void export_spi(string filename, const sch::Netlist &net, const sch::Subckt &ckt) {
-	FILE *fout = fopen(filename.c_str(), "w");
-	fprintf(fout, "%s", sch::export_subckt(net, ckt).to_string().c_str());
-	fclose(fout);
-}
-
 void export_cells(const phy::Library &lib, const sch::Netlist &net) {
-	if (not filesystem::exists(lib.libPath)) {
-		filesystem::create_directory(lib.libPath);
+	if (not filesystem::exists(lib.tech->lib)) {
+		filesystem::create_directory(lib.tech->lib);
 	}
 	for (int i = 0; i < (int)lib.macros.size(); i++) {
 		if (lib.macros[i].name.rfind("cell_", 0) == 0) {
-			string cellPath = lib.libPath + "/" + lib.macros[i].name;
+			string cellPath = lib.tech->lib + "/" + lib.macros[i].name;
 			if (not filesystem::exists(cellPath+".gds")) {
 				export_layout(cellPath+".gds", lib.macros[i]);
 				export_lef(cellPath+".lef", lib.macros[i]);
@@ -411,7 +405,7 @@ bool loadCell(phy::Library &lib, sch::Netlist &lst, int idx, bool progress=false
 		lib.macros.resize(idx+1, Layout(*lib.tech));
 	}
 	lib.macros[idx].name = lst.subckts[idx].name;
-	string cellPath = lib.libPath + "/" + lib.macros[idx].name+".gds";
+	string cellPath = lib.tech->lib + "/" + lib.macros[idx].name+".gds";
 	if (progress) {
 		printf("  %s...", lib.macros[idx].name.c_str());
 		fflush(stdout);
@@ -477,7 +471,7 @@ bool loadCell(phy::Library &lib, sch::Netlist &lst, int idx, bool progress=false
 }
 
 void loadCells(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *out=nullptr, bool progress=false, bool debug=false) {
-	bool libFound = filesystem::exists(lib.libPath);
+	bool libFound = filesystem::exists(lib.tech->lib);
 	if (progress) {
 		printf("Load cell layouts:\n");
 	}
@@ -488,10 +482,10 @@ void loadCells(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *out=nullp
 			if (not loadCell(lib, lst, i, progress, debug)) {
 				// We generated a new cell, save this to the cell library
 				if (not libFound) {
-					filesystem::create_directory(lib.libPath);
+					filesystem::create_directory(lib.tech->lib);
 					libFound = true;
 				}
-				string cellPath = lib.libPath + "/" + lib.macros[i].name;
+				string cellPath = lib.tech->lib + "/" + lib.macros[i].name;
 				export_layout(cellPath+".gds", lib.macros[i]);
 				export_lef(cellPath+".lef", lib.macros[i]);
 				export_spi(cellPath+".spi", lst, lst.subckts[i]);
@@ -536,7 +530,7 @@ void set_stage(int &stage, int target) {
 	stage = stage < target ? target : stage;
 }
 
-int build_command(configuration &config, int argc, char **argv, bool progress, bool debug) {
+int build_command(configuration &config, string techPath, string cellsDir, int argc, char **argv, bool progress, bool debug) {
 	const int LOGIC_RAW = 0;
 	const int LOGIC_CMOS = 1;
 	const int LOGIC_ADIABATIC = 2;
@@ -558,15 +552,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 	string filename = "";
 	string prefix = "";
 	string format = "";
-	string techPath = "";
 	
-	char *loom_tech = std::getenv("LOOM_TECH");
-	string techDir;
-	if (loom_tech != nullptr) {
-		techDir = string(loom_tech);
-	}
-	string cellsDir = "cells";
-
 	int logic = LOGIC_CMOS;
 	int stage = -1;
 
@@ -695,32 +681,21 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 				}
 			}
 
-			if (ext == "py") {
-				techPath = arg;
-			} else if (ext == "") {
-				if (not techDir.empty()) {
-					techPath = techDir + "/" + path + "/" + path+".py" + opt;
-					cellsDir = techDir + "/" + path + "/cells";
-				} else {
-					techPath = path+".py" + opt;
-				}
-			} else {
-				filename = path;
-				format = ext;
+			filename = path;
+			format = ext;
 
-				if (prefix == "") {
-					prefix = dot != string::npos ? filename.substr(0, dot) : filename;
-				}
+			if (prefix == "") {
+				prefix = dot != string::npos ? filename.substr(0, dot) : filename;
+			}
 
-				if (ext != "chp"
-					and ext != "hse"
-					and ext != "astg"
-					and ext != "prs"
-					and ext != "spi"
-					and ext != "gds") {
-					printf("unrecognized file format '%s'\n", ext.c_str());
-					return 0;
-				}
+			if (ext != "chp"
+				and ext != "hse"
+				and ext != "astg"
+				and ext != "prs"
+				and ext != "spi"
+				and ext != "gds") {
+				printf("unrecognized file format '%s'\n", ext.c_str());
+				return 0;
 			}
 		}
 	}
@@ -1132,7 +1107,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 	}
 
 	phy::Tech tech;
-	if (not phy::loadTech(tech, techPath)) {
+	if (not phy::loadTech(tech, techPath, cellsDir)) {
 		cout << "techfile does not exist \'" + techPath + "\'." << endl;
 		return 1;
 	}
@@ -1202,7 +1177,7 @@ int build_command(configuration &config, int argc, char **argv, bool progress, b
 		fclose(fout);
 	}
 
-	phy::Library lib(tech, cellsDir);
+	phy::Library lib(tech);
 	gdstk::GdsWriter gds = {};
 	gds = gdstk::gdswriter_init((prefix+".gds").c_str(), prefix.c_str(), ((double)tech.dbunit)*1e-6, ((double)tech.dbunit)*1e-6, 4, nullptr, nullptr);
 

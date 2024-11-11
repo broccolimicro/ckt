@@ -4,4 +4,4 @@
 #include <parse/parse.h>
 
 void build_help();
-int build_command(configuration &config, int argc, char **argv, bool progress, bool debug);
+int build_command(configuration &config, string techPath, string cellsDir, int argc, char **argv, bool progress, bool debug);
