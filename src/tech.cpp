@@ -194,6 +194,7 @@ int tech_cells_command(configuration &config, string techDir, string techPath, s
 			spi->combineDevices();
 			spi->canonicalize();
 			spi->name = "cell_" + sch::idToString(spi->id);
+			gds->name = spi->name;
 			printf("%s\n", spi->name.c_str());	
 
 			if (not libFound) {
