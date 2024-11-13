@@ -98,7 +98,8 @@ int tech_set_command(configuration &config, string techDir, int argc, char **arg
 	std::filesystem::path search = current;
 	while (not search.empty()) {
 		if (std::filesystem::exists(search / "lm.mod") or std::filesystem::exists(search / ".git")) {
-			FILE *fptr = fopen((search / "lm.mod").c_str(), "w");
+			string path = (search / "lm.mod").string();
+			FILE *fptr = fopen(path.c_str(), "w");
 			if (fptr != nullptr) {
 				fprintf(fptr, "%s\n", tech.c_str());
 				fclose(fptr);
