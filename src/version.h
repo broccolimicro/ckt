@@ -1,1 +1,1 @@
-const char *version = "v0.10.2";
+const char *version = "v0.10.3";
