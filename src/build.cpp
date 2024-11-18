@@ -1,4 +1,5 @@
 #include "build.h"
+#include "cli.h"
 
 #include <common/standard.h>
 #include <parse/parse.h>
@@ -517,17 +518,16 @@ void build_help() {
 	printf(" -e,--encode    save the complete state encoded astg\n");
 	printf(" -r,--rules     save the synthesized production rules\n");
 	printf(" -b,--bubble    save the bubble reshuffled production rules\n");
+	printf(" -k,--keepers   save the production rules with added state-holding elements\n");
 	printf(" -s,--size      save the sized production rules\n");
+	printf(" -n,--nets      save the generated netlist\n");
+	printf(" -l,--cells     save the netlist split into cells\n");
 
 	printf("\nSupported file formats:\n");
 	printf(" *.chp          communicating hardware processes\n");
 	printf(" *.hse          handshaking expansions\n");
 	printf(" *.prs          production rules\n");
 	printf(" *.astg         asynchronous signal transition graph\n");
-}
-
-void set_stage(int &stage, int target) {
-	stage = stage < target ? target : stage;
 }
 
 int build_command(configuration &config, string techPath, string cellsDir, int argc, char **argv, bool progress, bool debug) {
