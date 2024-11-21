@@ -8,3 +8,4 @@ tmp*
 ckt
 test
 build
+src/version.h
