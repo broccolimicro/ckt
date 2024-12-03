@@ -639,7 +639,7 @@ void hsesim(hse::graph &g, ucs::variable_set &v, string prefix, vector<hse::term
 			assignment_parser.reset();
 			uptodate = false;
 
-			dump.append(sim.now, sim.encoding);
+			dump.append(sim.now, sim.stripped_encoding());
 		}
 		else if (strncmp(command, "force", 5) == 0)
 		{
@@ -659,7 +659,7 @@ void hsesim(hse::graph &g, ucs::variable_set &v, string prefix, vector<hse::term
 				assignment_parser.reset();
 				uptodate = false;
 			
-				dump.append(sim.now, sim.encoding);
+				dump.append(sim.now, sim.stripped_encoding());
 			}
 		}
 		else if (strncmp(command, "step", 4) == 0 || strncmp(command, "s", 1) == 0)
@@ -721,7 +721,7 @@ void hsesim(hse::graph &g, ucs::variable_set &v, string prefix, vector<hse::term
 					
 					sim.fire(firing);
 
-					dump.append(sim.now, sim.encoding);
+					dump.append(sim.now, sim.stripped_encoding());
 
 					uptodate = false;
 					sim.interference_errors.clear();
@@ -762,7 +762,7 @@ void hsesim(hse::graph &g, ucs::variable_set &v, string prefix, vector<hse::term
 					
 						sim.fire(n);
 
-						dump.append(sim.now, sim.encoding);
+						dump.append(sim.now, sim.stripped_encoding());
 
 						uptodate = false;
 						sim.interference_errors.clear();

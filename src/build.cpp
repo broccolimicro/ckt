@@ -301,7 +301,7 @@ void real_time(hse::graph &g, ucs::variable_set &v, string filename)
 		else if ((strncmp(command, "quit", 4) == 0 && length == 4) || (strncmp(command, "q", 1) == 0 && length == 1))
 			done = true;
 		else if ((strncmp(command, "elaborate", 9) == 0 && length == 9) || (strncmp(command, "e", 1) == 0 && length == 1))
-			hse::elaborate(g, v, true, true);
+			hse::elaborate(g, v, true, true, true);
 		else if ((strncmp(command, "conflicts", 9) == 0 && length == 9) || (strncmp(command, "c", 1) == 0 && length == 1))
 		{
 			enc.check(true, true);
@@ -569,6 +569,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 	bool doRoute = false;
 
 	bool noCells = false;
+	bool noGhosts = false;
 
 	for (int i = 0; i < argc; i++) {
 		string arg = argv[i];
@@ -660,6 +661,8 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 			doRoute = true;
 		} else if (arg == "--no-cells") {
 			noCells = true;
+		} else if (arg == "--no-ghosts") {
+			noGhosts = true;
 		} else if (arg == "-o" or arg == "--out") {
 			if (++i >= argc) {
 				printf("expected output prefix\n");
@@ -803,7 +806,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		hg.check_variables(v);
 
 		if (progress) printf("Elaborate state space:\n");
-		hse::elaborate(hg, v, true, progress);
+		hse::elaborate(hg, v, stage >= DO_ENCODE or not noGhosts, true, progress);
 		if (progress) printf("done\n\n");
 
 		if (not is_clean()) {
@@ -860,7 +863,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		}
 
 		if (progress) printf("Insert state variables:\n");
-		for (int i = 0; i < 10 and enc.conflicts.size() > 0; i++) {
+		for (int i = 0; i < 20 and enc.conflicts.size() > 0; i++) {
 			//if (!inverting) {
 			//	print_conflicts(enc, g, v, -1);
 			//} else {
@@ -879,7 +882,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 				printf("  update state space...");
 				fflush(stdout);
 			}
-			hse::elaborate(hg, v, true, false);
+			hse::elaborate(hg, v, true, true, false);
 
 			if (progress) printf("[%sDONE%s]\n", KGRN, KNRM);
 
@@ -903,6 +906,16 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		}
 		if (progress) printf("done\n\n");
 
+		if (doEncode) {
+			FILE *fout = stdout;
+			if (prefix != "") {
+				string suffix = stage == DO_ENCODE ? "" : "_complete";
+				fout = fopen((prefix+suffix+".astg").c_str(), "w");
+			}
+			fprintf(fout, "%s", export_astg(hg, v).to_string().c_str());
+			fclose(fout);
+		}
+
 		if (enc.conflicts.size() > 0) {
 			// state variable insertion failed
 			if (!inverting) {
@@ -914,16 +927,6 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 
 			complete();
 			return is_clean();
-		}
-
-		if (doEncode) {
-			FILE *fout = stdout;
-			if (prefix != "") {
-				string suffix = stage == DO_ENCODE ? "" : "_complete";
-				fout = fopen((prefix+suffix+".astg").c_str(), "w");
-			}
-			fprintf(fout, "%s", export_astg(hg, v).to_string().c_str());
-			fclose(fout);
 		}
 
 		if (stage >= 0 and stage < DO_RULES) {

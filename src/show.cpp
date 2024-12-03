@@ -52,6 +52,7 @@ void show_help() {
 	printf(" -lr,--leftright Render the graph from left to right\n");
 	printf(" -e,--effective  Show the effective encoding of each place\n");
 	printf(" -p,--predicate  Show the predicate of each place\n");
+	printf(" -g,--ghost      Show the state annotations for the conditional branches\n");
 	printf(" -r,--raw        Do not post-process the graph\n");
 	printf(" -s,--sync       Render half synchronization actions\n");
 }
@@ -112,7 +113,8 @@ int show_command(configuration &config, string techPath, string cellsDir, int ar
 	bool horiz = false;
 	bool states = false;
 	bool petri = false;
-
+	bool ghost = false;
+	
 	for (int i = 0; i < argc; i++) {
 		string arg = argv[i];
 		if (arg == "--labels" || arg == "-l") {
@@ -125,6 +127,8 @@ int show_command(configuration &config, string techPath, string cellsDir, int ar
 			encodings = 1;
 		} else if (arg == "--predicate" || arg == "-p") {
 			encodings = 0;
+		} else if (arg == "--ghost" || arg == "-g") {
+			ghost = true;
 		} else if (arg == "--raw" || arg == "-r") {
 			process = false;
 		} else if (arg == "--nest" || arg == "-n") {
@@ -236,12 +240,12 @@ int show_command(configuration &config, string techPath, string cellsDir, int ar
 		if (is_clean()) {
 			if (states) {
 				hse::graph sg = hse::to_state_graph(hg, v, true);
-				render(ofilename, oformat, export_graph(sg, v, horiz, labels, notations, encodings).to_string());
+				render(ofilename, oformat, export_graph(sg, v, horiz, labels, notations, ghost, encodings).to_string());
 			} else if (petri) {
 				hse::graph pn = hse::to_petri_net(hg, v, true);
-				render(ofilename, oformat, export_graph(hg, v, horiz, labels, notations, encodings).to_string());
+				render(ofilename, oformat, export_graph(hg, v, horiz, labels, notations, ghost, encodings).to_string());
 			} else {
-				render(ofilename, oformat, export_graph(hg, v, horiz, labels, notations, encodings).to_string());
+				render(ofilename, oformat, export_graph(hg, v, horiz, labels, notations, ghost, encodings).to_string());
 			}
 		}
 	} else if (format == "prs") {
