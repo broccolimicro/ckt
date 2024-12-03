@@ -875,7 +875,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 				printf("  inserting v%d...", i);
 				fflush(stdout);
 			}
-			enc.insert_state_variables();
+			enc.insert_state_variables(debug);
 			if (progress) printf("[%sDONE%s]\n", KGRN, KNRM);
 
 			if (progress) {

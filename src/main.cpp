@@ -157,7 +157,7 @@ int main(int argc, char **argv) {
 			return unpack_command(config, techPath, cellsDir, argc-i, argv+i, progress, debug);
 		} else if (arg == "sim") {
 			++i;
-			return sim_command(config, techPath, cellsDir, argc-i, argv+i);
+			return sim_command(config, techPath, cellsDir, argc-i, argv+i, debug);
 		} else if (arg == "test") {
 			++i;
 			return test_command(config, techPath, cellsDir, argc-i, argv+i);

@@ -33,8 +33,6 @@
 #include <interpret_boolean/import.h>
 #include <ucs/variable.h>
 
-const bool debug = true;
-
 void sim_help() {
 	printf("Usage: lm sim [options] <ckt-file> [sim-file]\n");
 	printf("A simulation environment for various behavioral descriptions.\n");
@@ -784,9 +782,9 @@ void hsesim(hse::graph &g, ucs::variable_set &v, string prefix, vector<hse::term
 	dump.close();
 }
 
-void prsim(prs::production_rule_set &pr, ucs::variable_set &v, string prefix) {//, vector<prs::term_index> steps = vector<prs::term_index>()) {
+void prsim(prs::production_rule_set &pr, ucs::variable_set &v, string prefix, bool debug) {//, vector<prs::term_index> steps = vector<prs::term_index>()) {
 	prs::globals g(v);
-	prs::simulator sim(&pr, &v);
+	prs::simulator sim(&pr, &v, debug);
 
 	vcd dump;
 	dump.create(prefix, v, (int)pr.nodes.size());
@@ -1020,7 +1018,7 @@ void prsim(prs::production_rule_set &pr, ucs::variable_set &v, string prefix) {/
 	dump.close();
 }
 
-int sim_command(configuration &config, string techPath, string cellsDir, int argc, char **argv) {
+int sim_command(configuration &config, string techPath, string cellsDir, int argc, char **argv, bool debug) {
 	tokenizer tokens;
 	tokens.register_token<parse::block_comment>(false);
 	tokens.register_token<parse::line_comment>(false);
@@ -1208,7 +1206,7 @@ int sim_command(configuration &config, string techPath, string cellsDir, int arg
 			printf("\n\n");
 		}
 
-		prsim(pr, v, prefix);//, steps);
+		prsim(pr, v, prefix, debug);//, steps);
 	}
 
 	complete();
