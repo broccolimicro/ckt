@@ -1111,7 +1111,14 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 
 	phy::Tech tech;
 	if (not phy::loadTech(tech, techPath, cellsDir)) {
-		cout << "techfile does not exist \'" + techPath + "\'." << endl;
+		cout << "Unable to load techfile \'" + techPath + "\'." << endl;
+		FILE *fout = stdout;
+		if (prefix != "") {
+			fout = fopen((prefix+".prs").c_str(), "w");
+		}
+		fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
+		fclose(fout);
+		complete();
 		return 1;
 	}
 	sch::Netlist net(tech);

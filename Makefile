@@ -1,5 +1,3 @@
-PYTHON_RELEASE = python$(shell python3 -c "import sys;sys.stdout.write('{}.{}'.format(sys.version_info[0],sys.version_info[1]))")
-
 NAME          = lm
 DEPEND        = interpret_sch interpret_prs interpret_hse interpret_chp interpret_arithmetic interpret_boolean interpret_ucs chp hse prs sch interpret_phy phy petri arithmetic boolean ucs parse_prs parse_chp parse_astg parse_spice parse_dot parse_expression parse_ucs parse common
 
@@ -11,7 +9,7 @@ GTEST_L      := -L$(GTEST)/build/lib -L.
 
 INCLUDE_PATHS = $(DEPEND:%=-I../../lib/%) -I../../lib/gdstk/build/include $(shell python3-config --includes) -I.
 LIBRARY_PATHS = $(DEPEND:%=-L../../lib/%) -L$(shell python3-config --prefix)/lib -L.
-LIBRARIES     = $(DEPEND:%=-l%) -l$(PYTHON_RELEASE)
+LIBRARIES     = $(DEPEND:%=-l%) -ldl
 LIBFILES      = $(foreach dep,$(DEPEND),../../lib/$(dep)/lib$(dep).a)
 CXXFLAGS      = -std=c++17 -O2 -g -Wall -fmessage-length=0
 LDFLAGS	      =  
