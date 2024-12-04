@@ -13,6 +13,8 @@
 #include <filesystem>
 #include <fstream>
 
+namespace fs = std::filesystem;
+
 void print_help() {
 	printf("Loom is a high level synthesis and simulation engine for self-timed circuits.\n");
 	printf("\nUsage: lm [options] <command> [arguments]\n");
@@ -61,7 +63,11 @@ int main(int argc, char **argv) {
 	}
 
 	char *loom_tech = std::getenv("LOOM_TECH");
+#if defined(_WIN32) || defined(_WIN64)
+	string techDir = "C:\\Program Files (x86)\\Loom\\share\\tech";
+#else
 	string techDir = "/usr/local/share/tech";
+#endif
 	if (loom_tech != nullptr) {
 		techDir = string(loom_tech);
 		if ((int)techDir.size() > 1 and techDir.back() == '/') {
@@ -88,8 +94,8 @@ int main(int argc, char **argv) {
 			search = search.parent_path();
 		}
 
-		techPath = techDir + "/" + tech + "/tech.py";
-		cellsDir = techDir + "/" + tech + "/cells";
+		techPath = escapePath((fs::path(techDir) / tech / "tech.py").string());
+		cellsDir = (fs::path(techDir) / tech / "cells").string();
 	} else {
 		techPath = "";
 		cellsDir = "cells";
@@ -130,9 +136,9 @@ int main(int argc, char **argv) {
 				}
 			} else if (ext == "") {
 				if (not techDir.empty()) {
-					techPath = techDir + "/" + path + "/tech.py" + opt;
+					techPath = escapePath((fs::path(techDir) / path / "tech.py").string()) + opt;
 					if (not manualCells) {
-						cellsDir = techDir + "/" + path + "/cells";
+						cellsDir = (fs::path(techDir) / path / "cells").string();
 					}
 				} else {
 					techPath = path+".py" + opt;
