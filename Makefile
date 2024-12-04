@@ -8,11 +8,11 @@ GTEST_I      := -I$(GTEST)/googletest/include -I.
 GTEST_L      := -L$(GTEST)/build/lib -L.
 
 INCLUDE_PATHS = $(DEPEND:%=-I../../lib/%) -I../../lib/gdstk/build/include $(shell python3-config --includes) -I.
-LIBRARY_PATHS = $(DEPEND:%=-L../../lib/%) -L$(shell python3-config --prefix)/lib -L.
+LIBRARY_PATHS = $(DEPEND:%=-L../../lib/%) -L.
 LIBRARIES     = $(DEPEND:%=-l%) -ldl
 LIBFILES      = $(foreach dep,$(DEPEND),../../lib/$(dep)/lib$(dep).a)
 CXXFLAGS      = -std=c++17 -O2 -g -Wall -fmessage-length=0
-LDFLAGS	      =  
+LDFLAGS       = 
 
 SOURCES	     := $(shell mkdir -p $(SRCDIR); find $(SRCDIR) -name '*.cpp')
 OBJECTS	     := $(SOURCES:%.cpp=build/%.o)
@@ -55,6 +55,15 @@ else
 		LIBRARY_PATHS += -L$(shell brew --prefix qhull)/lib -L$(shell brew --prefix graphviz)/lib
 		LIBRARIES += -lgdstk -lclipper -lqhullstatic_r -lz
 		LIBRARY_PATHS += -L../../lib/gdstk/build/lib
+		LDFLAGS	      += -Wl,-rpath,/opt/homebrew/opt/python@3.15/Frameworks/Python.framework/Versions/Current/lib \
+-Wl,-rpath,/opt/homebrew/opt/python@3.14/Frameworks/Python.framework/Versions/Current/lib \
+-Wl,-rpath,/opt/homebrew/opt/python@3.13/Frameworks/Python.framework/Versions/Current/lib \
+-Wl,-rpath,/opt/homebrew/opt/python@3.12/Frameworks/Python.framework/Versions/Current/lib \
+-Wl,-rpath,/opt/homebrew/opt/python@3.11/Frameworks/Python.framework/Versions/Current/lib \
+-Wl,-rpath,/opt/homebrew/opt/python@3.10/Frameworks/Python.framework/Versions/Current/lib \
+-Wl,-rpath,/opt/homebrew/opt/python@3.09/Frameworks/Python.framework/Versions/Current/lib \
+-Wl,-rpath,/opt/homebrew/opt/python@3/Frameworks/Python.framework/Versions/Current/lib \
+-Wl,-rpath,/opt/homebrew/opt/python/Frameworks/Python.framework/Versions/Current/lib
 	endif
 	UNAME_P := $(shell uname -p)
 	ifeq ($(UNAME_P),x86_64)
