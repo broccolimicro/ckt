@@ -1,5 +1,5 @@
 NAME          = lm
-DEPEND        = interpret_sch interpret_prs interpret_hse interpret_chp interpret_arithmetic interpret_boolean interpret_ucs chp hse prs sch interpret_phy phy petri arithmetic boolean ucs parse_prs parse_chp parse_astg parse_spice parse_dot parse_expression parse_ucs parse common
+DEPEND        = interpret_sch interpret_prs interpret_hse interpret_chp interpret_arithmetic interpret_boolean interpret_ucs chp hse prs sch interpret_phy phy petri arithmetic boolean ucs parse_prs parse_cog parse_chp parse_astg parse_spice parse_dot parse_expression parse_ucs parse common
 
 SRCDIR        = src
 TESTDIR       = tests

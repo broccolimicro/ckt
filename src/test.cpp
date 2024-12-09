@@ -41,8 +41,9 @@ void test_help() {
 	printf("Do a full state space exploration to look for errors.\n");
 
 	printf("\nSupported file formats:\n");
-	printf(" *.chp           communicating hardware processes\n");
-	printf(" *.hse           handshaking expansions\n");
+	printf(" *.cog           a wire-level programming language\n");
+	printf(" *.chp           a data-level process calculi called Communicating Hardware Processes\n");
+	printf(" *.hse           a wire-level process calculi called Hand-Shaking Expansions\n");
 	printf(" *.prs           production rule set\n");
 	printf(" *.astg          asynchronous signal transition graph\n");
 }
@@ -76,6 +77,7 @@ int test_command(configuration &config, string techPath, string cellsDir, int ar
 			prefix = filename.substr(0, dot);
 			if (format != "chp"
 				and format != "hse"
+				and format != "cog"
 				and format != "astg"
 				and format != "prs") {
 				printf("unrecognized file format '%s'\n", format.c_str());
@@ -152,11 +154,27 @@ int test_command(configuration &config, string techPath, string cellsDir, int ar
 				tokens.increment(false);
 				tokens.expect<parse_astg::graph>();
 			}
+		} else if (format == "cog") {
+			parse_cog::composition::register_syntax(tokens);
+			config.load(tokens, filename, "");
+
+			tokens.increment(false);
+			tokens.expect<parse_cog::composition>();
+			while (tokens.decrement(__FILE__, __LINE__))
+			{
+				parse_cog::composition syntax(tokens);
+				boolean::cover covered;
+				bool hasRepeat = false;
+				hg.merge(hse::parallel, hse::import_hse(syntax, v, covered, hasRepeat, 0, &tokens, true));
+
+				tokens.increment(false);
+				tokens.expect<parse_cog::composition>();
+			}
 		}
 		hg.post_process(v, true);
 		hg.check_variables(v);
 
-		hse::elaborate(hg, v, false, true);
+		hse::elaborate(hg, v, false, false, true);
 	} else if (format == "prs") {
 		prs::production_rule_set pr;
 
@@ -177,7 +195,6 @@ int test_command(configuration &config, string techPath, string cellsDir, int ar
 			pr.print(v);
 			printf("\n\n");
 		}
-
 	}
 
 	complete();

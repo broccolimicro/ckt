@@ -162,6 +162,7 @@ int show_command(configuration &config, string techPath, string cellsDir, int ar
 			format = filename.substr(dot+1);
 			if (format != "chp"
 				and format != "hse"
+				and format != "cog"
 				and format != "astg"
 				and format != "prs") {
 				printf("unrecognized file format '%s'\n", format.c_str());
@@ -200,7 +201,7 @@ int show_command(configuration &config, string techPath, string cellsDir, int ar
 		if (is_clean()) {
 			render(ofilename, oformat, export_graph(cg, v, labels).to_string());
 		}
-	} else if (format == "hse" or format == "astg") {
+	} else if (format == "hse" or format == "astg" or format == "cog") {
 		hse::graph hg;
 
 		if (format == "hse") {
@@ -230,6 +231,22 @@ int show_command(configuration &config, string techPath, string cellsDir, int ar
 
 				tokens.increment(false);
 				tokens.expect<parse_astg::graph>();
+			}
+		} else if (format == "cog") {
+			parse_cog::composition::register_syntax(tokens);
+			config.load(tokens, filename, "");
+
+			tokens.increment(false);
+			tokens.expect<parse_cog::composition>();
+			while (tokens.decrement(__FILE__, __LINE__))
+			{
+				parse_cog::composition syntax(tokens);
+				boolean::cover covered;
+				bool hasRepeat = false;
+				hg.merge(hse::parallel, hse::import_hse(syntax, v, covered, hasRepeat, 0, &tokens, true));
+
+				tokens.increment(false);
+				tokens.expect<parse_cog::composition>();
 			}
 		}
 		if (process) {

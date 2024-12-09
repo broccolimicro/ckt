@@ -102,14 +102,16 @@ void vcd::append(uint64_t t, boolean::cube encoding, string error) {
 	for (int i = 0; i < m*16; i++) {
 		int value = encoding.get(i);
 		if (value != curr.get(i)) {
-			const char *id;
+			const char *id = nullptr;
 			if (i < (int)nets.size()) {
 				id = nets[i].c_str();
-			} else {
+			} else if (i-(int)nets.size() < (int)nodes.size()) {
 				id = nodes[i-(int)nets.size()].c_str();
 			}
 
-			fprintf(fvcd, "%c%s\n", values[value+1], id);
+			if (id != nullptr) {
+				fprintf(fvcd, "%c%s\n", values[value+1], id);
+			}
 		}
 	}
 

@@ -38,8 +38,9 @@ void sim_help() {
 	printf("A simulation environment for various behavioral descriptions.\n");
 
 	printf("\nSupported file formats:\n");
-	printf(" *.chp           communicating hardware processes\n");
-	printf(" *.hse           handshaking expansions\n");
+	printf(" *.cog           a wire-level programming language\n");
+	printf(" *.chp           a data-level process calculi called Communicating Hardware Processes\n");
+	printf(" *.hse           a wire-level process calculi called Hand-Shaking Expansions\n");
 	printf(" *.prs           production rule set\n");
 	printf(" *.astg          asynchronous signal transition graph\n");
 	printf(" *.sim           Load a sequence of transitions to operate on\n");
@@ -1049,6 +1050,7 @@ int sim_command(configuration &config, string techPath, string cellsDir, int arg
 			prefix = filename.substr(0, dot);
 			if (format != "chp"
 				and format != "hse"
+				and format != "cog"
 				and format != "astg"
 				and format != "prs") {
 				printf("unrecognized file format '%s'\n", format.c_str());
@@ -1113,7 +1115,7 @@ int sim_command(configuration &config, string techPath, string cellsDir, int arg
 		cg.post_process(v, true);
 
 		chpsim(cg, v, steps);
-	} else if (format == "hse" or format == "astg") {
+	} else if (format == "hse" or format == "astg" or format == "cog") {
 		vector<hse::term_index> steps;
 		if (sfilename != "") {
 			FILE *seq = fopen(sfilename.c_str(), "r");
@@ -1161,6 +1163,22 @@ int sim_command(configuration &config, string techPath, string cellsDir, int arg
 
 				tokens.increment(false);
 				tokens.expect<parse_astg::graph>();
+			}
+		} else if (format == "cog") {
+			parse_cog::composition::register_syntax(tokens);
+			config.load(tokens, filename, "");
+
+			tokens.increment(false);
+			tokens.expect<parse_cog::composition>();
+			while (tokens.decrement(__FILE__, __LINE__))
+			{
+				parse_cog::composition syntax(tokens);
+				boolean::cover covered;
+				bool hasRepeat = false;
+				hg.merge(hse::parallel, hse::import_hse(syntax, v, covered, hasRepeat, 0, &tokens, true));
+
+				tokens.increment(false);
+				tokens.expect<parse_cog::composition>();
 			}
 		}
 		hg.post_process(v, true);

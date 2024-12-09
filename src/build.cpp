@@ -524,8 +524,9 @@ void build_help() {
 	printf(" -l,--cells     save the netlist split into cells\n");
 
 	printf("\nSupported file formats:\n");
-	printf(" *.chp          communicating hardware processes\n");
-	printf(" *.hse          handshaking expansions\n");
+	printf(" *.cog          a wire-level programming language\n");
+	printf(" *.chp          a data-level process calculi called Communicating Hardware Processes\n");
+	printf(" *.hse          a wire-level process calculi called Hand-Shaking Expansions\n");
 	printf(" *.prs          production rules\n");
 	printf(" *.astg         asynchronous signal transition graph\n");
 }
@@ -555,6 +556,9 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 	
 	int logic = LOGIC_CMOS;
 	int stage = -1;
+
+	bool doPreprocess = false;
+	bool doPostprocess = false;
 
 	bool doElab = false;
 	bool doConflicts = false;
@@ -604,6 +608,10 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 			doCells = true;
 			doPlace = true;
 			doRoute = true;
+		} else if (arg == "--pre") {
+			doPreprocess = true;
+		} else if (arg == "--post") {
+			doPostprocess = true;
 		} else if (arg == "-g" or arg == "--graph") {
 			doElab = true;
 			set_stage(stage, DO_ELAB);
@@ -693,6 +701,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 
 			if (ext != "chp"
 				and ext != "hse"
+				and ext != "cog"
 				and ext != "astg"
 				and ext != "prs"
 				and ext != "spi"
@@ -792,6 +801,33 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 			tokens.increment(false);
 			tokens.expect<parse_astg::graph>();
 		}
+	} else if (format == "cog") {
+		tokens.register_token<parse::block_comment>(false);
+		tokens.register_token<parse::line_comment>(false);
+		parse_cog::composition::register_syntax(tokens);
+		config.load(tokens, filename, "");
+
+		tokens.increment(false);
+		tokens.expect<parse_cog::composition>();
+		while (tokens.decrement(__FILE__, __LINE__))
+		{
+			parse_cog::composition syntax(tokens);
+			boolean::cover covered;
+			bool hasRepeat = false;
+			hg.merge(hse::parallel, hse::import_hse(syntax, v, covered, hasRepeat, 0, &tokens, true));
+
+			tokens.increment(false);
+			tokens.expect<parse_cog::composition>();
+		}
+	}
+
+	if (doPreprocess) {
+		FILE *fout = stdout;
+		if (prefix != "") {
+			fout = fopen((prefix+"_pre.astg").c_str(), "w");
+		}
+		fprintf(fout, "%s", export_astg(hg, v).to_string().c_str());
+		fclose(fout);
 	}
 
 	if (!is_clean()) {
@@ -801,9 +837,19 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 
 	if (format == "chp"
 		or format == "hse"
+		or format == "cog"
 		or format == "astg") {
 		hg.post_process(v, true);
 		hg.check_variables(v);
+
+		if (doPostprocess) {
+			FILE *fout = stdout;
+			if (prefix != "") {
+				fout = fopen((prefix+"_post.astg").c_str(), "w");
+			}
+			fprintf(fout, "%s", export_astg(hg, v).to_string().c_str());
+			fclose(fout);
+		}
 
 		if (progress) printf("Elaborate state space:\n");
 		hse::elaborate(hg, v, stage >= DO_ENCODE or not noGhosts, true, progress);
@@ -989,6 +1035,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 
 	if (format == "chp"
 		or format == "hse"
+		or format == "cog"
 		or format == "astg"
 		or format == "prs") {
 		if (inverting and not pr.cmos_implementable()) {
@@ -1125,6 +1172,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 
 	if (format == "chp"
 		or format == "hse"
+		or format == "cog"
 		or format == "astg"
 		or format == "prs") {
 		if (progress) {
@@ -1193,6 +1241,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 
 	if (format == "chp"
 		or format == "hse"
+		or format == "cog"
 		or format == "astg"
 		or format == "prs"
 		or format == "spi") {
