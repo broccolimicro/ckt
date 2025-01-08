@@ -426,7 +426,7 @@ bool loadCell(phy::Library &lib, sch::Netlist &lst, int idx, bool progress=false
 				gdsNet.canonicalize();
 				searchDelay = tmr.since();
 				if (gdsNet.compare(spiNet) == 0) {
-					printf("%sFOUND%s]\t%gs\n", KGRN, KNRM, searchDelay);
+					printf("%sFOUND %d DBUNIT2 AREA%s]\t%gs\n", KGRN, lib.macros[idx].box.area(), KNRM, searchDelay);
 				} else {
 					printf("%sFAILED LVS%s, ", KRED, KNRM);
 					imported = false;
@@ -462,7 +462,7 @@ bool loadCell(phy::Library &lib, sch::Netlist &lst, int idx, bool progress=false
 
 			genDelay = tmr.since();
 			if (gdsNet.compare(spiNet) == 0) {
-				printf("%sGENERATED%s]\t(%gs %gs)\n", KGRN, KNRM, searchDelay, genDelay);
+				printf("%sGENERATED %d DBUNIT2 AREA%s]\t(%gs %gs)\n", KGRN, lib.macros[idx].box.area(), KNRM, searchDelay, genDelay);
 			} else {
 				printf("%sFAILED LVS%s]\t(%gs %gs)\n", KRED, KNRM, searchDelay, genDelay);
 				if (debug) {
