@@ -2,6 +2,8 @@
 #include "cli.h"
 
 #include <common/standard.h>
+#include <common/timer.h>
+#include <common/text.h>
 #include <parse/parse.h>
 #include <parse/default/block_comment.h>
 #include <parse/default/line_comment.h>
@@ -48,13 +50,6 @@
 #include <ucs/variable.h>
 
 #include <filesystem>
-#include <chrono>
-#define KNRM  "\x1B[0m"
-#define KRED  "\x1B[31m"
-#define KGRN  "\x1B[32m"
-#define KYEL  "\x1B[33m"
-#define KBLU  "\x1B[34m"
-using namespace std::chrono;
 
 //printf(" -c             check for state conflicts that occur regardless of sense\n");
 //	printf(" -cu            check for state conflicts that occur due to up-going transitions\n");
@@ -68,23 +63,6 @@ namespace graphviz
 	#include <graphviz/gvc.h>
 }
 #endif
-
-void print_conflicts(hse::encoder &enc, hse::graph &g, ucs::variable_set &v, int sense)
-{
-	for (int i = 0; i < (int)enc.conflicts.size(); i++)
-	{
-		if (enc.conflicts[i].sense == sense)
-		{
-			printf("T%d.%d\t...%s...   conflicts with:\n", enc.conflicts[i].index.index, enc.conflicts[i].index.term, export_node(hse::iterator(hse::transition::type, enc.conflicts[i].index.index), g, v).c_str());
-
-			for (int j = 0; j < (int)enc.conflicts[i].region.size(); j++) {
-				printf("\t%s\t...%s...\n", enc.conflicts[i].region[j].to_string().c_str(), export_node(enc.conflicts[i].region[j], g, v).c_str());
-			}
-			printf("\n");
-		}
-	}
-	printf("\n");
-}
 
 void print_command_help()
 {
@@ -116,6 +94,21 @@ void print_location_help()
 	printf(" up, u                         back out of the current hse block\n");
 }
 
+void print_conflicts(const hse::encoder &enc) {
+	for (int sense = -1; sense < 2; sense++) {
+		for (auto i = enc.conflicts.begin(); i != enc.conflicts.end(); i++) {
+			if (i->sense == sense) {
+				printf("T%d.%d\t...%s...   conflicts with:\n", i->index.index, i->index.term, export_node(i->index.iter(), *enc.base, *enc.variables).c_str());
+
+				for (auto j = i->region.begin(); j != i->region.end(); j++) {
+					printf("\t%s\t...%s...\n", j->to_string().c_str(), export_node(*j, *enc.base, *enc.variables).c_str());
+				}
+				printf("\n");
+			}
+		}
+		printf("\n");
+	}
+}
 
 vector<pair<hse::iterator, int> > get_locations(FILE *script, hse::graph &g, ucs::variable_set &v)
 {
@@ -305,17 +298,17 @@ void real_time(hse::graph &g, ucs::variable_set &v, string filename)
 		else if ((strncmp(command, "conflicts", 9) == 0 && length == 9) || (strncmp(command, "c", 1) == 0 && length == 1))
 		{
 			enc.check(true, true);
-			print_conflicts(enc, g, v, -1);
+			print_conflicts(enc);
 		}
 		else if ((strncmp(command, "conflicts up", 12) == 0 && length == 12) || (strncmp(command, "cu", 2) == 0 && length == 2))
 		{
 			enc.check(false, true);
-			print_conflicts(enc, g, v, 0);
+			print_conflicts(enc);
 		}
 		else if ((strncmp(command, "conflicts down", 14) == 0 && length == 14) || (strncmp(command, "cd", 2) == 0 && length == 2))
 		{
 			enc.check(false, true);
-			print_conflicts(enc, g, v, 1);
+			print_conflicts(enc);
 		}
 		else if (strncmp(command, "insert", 6) == 0)
 		{
@@ -413,6 +406,10 @@ bool loadCell(phy::Library &lib, sch::Netlist &lst, int idx, bool progress=false
 		printf("[");
 	}
 
+	Timer tmr;
+	float searchDelay = 0.0;
+	float genDelay = 0.0;
+
 	sch::Subckt spiNet = lst.subckts[idx];
 	spiNet.cleanDangling(true);
 	spiNet.combineDevices();
@@ -427,13 +424,15 @@ bool loadCell(phy::Library &lib, sch::Netlist &lst, int idx, bool progress=false
 				gdsNet.cleanDangling(true);
 				gdsNet.combineDevices();
 				gdsNet.canonicalize();
+				searchDelay = tmr.since();
 				if (gdsNet.compare(spiNet) == 0) {
-					printf("%sFOUND%s]\n", KGRN, KNRM);
+					printf("%sFOUND%s]\t%gs\n", KGRN, KNRM, searchDelay);
 				} else {
 					printf("%sFAILED LVS%s, ", KRED, KNRM);
 					imported = false;
 				}
 			} else {
+				searchDelay = tmr.since();
 				printf("%sFAILED IMPORT%s, ", KRED, KNRM);
 			}
 		}
@@ -444,12 +443,16 @@ bool loadCell(phy::Library &lib, sch::Netlist &lst, int idx, bool progress=false
 		}
 	}
 
+	tmr.reset();
+
 	int result = sch::routeCell(lib, lst, idx);
 	if (progress) {
 		if (result == 1) {
-			printf("%sFAILED PLACEMENT%s]\n", KRED, KNRM);
+			genDelay = tmr.since();
+			printf("%sFAILED PLACEMENT%s]\t(%gs %gs)\n", KRED, KNRM, searchDelay, genDelay);
 		} else if (result == 2) {
-			printf("%sFAILED ROUTING%s]\n", KRED, KNRM);
+			genDelay = tmr.since();
+			printf("%sFAILED ROUTING%s]\t(%gs %gs)\n", KRED, KNRM, searchDelay, genDelay);
 		} else {
 			sch::Subckt gdsNet(true);
 			extract(gdsNet, lib.macros[idx], true);
@@ -457,10 +460,11 @@ bool loadCell(phy::Library &lib, sch::Netlist &lst, int idx, bool progress=false
 			gdsNet.combineDevices();
 			gdsNet.canonicalize();
 
+			genDelay = tmr.since();
 			if (gdsNet.compare(spiNet) == 0) {
-				printf("%sGENERATED%s]\n", KGRN, KNRM);
+				printf("%sGENERATED%s]\t(%gs %gs)\n", KGRN, KNRM, searchDelay, genDelay);
 			} else {
-				printf("%sFAILED LVS%s]\n", KRED, KNRM);
+				printf("%sFAILED LVS%s]\t(%gs %gs)\n", KRED, KNRM, searchDelay, genDelay);
 				if (debug) {
 					gdsNet.print();
 					spiNet.print();
@@ -476,7 +480,7 @@ void loadCells(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *out=nullp
 	if (progress) {
 		printf("Load cell layouts:\n");
 	}
-	steady_clock::time_point start = steady_clock::now();
+	Timer tmr;
 	lib.macros.reserve(lst.subckts.size()+lib.macros.size());
 	for (int i = 0; i < (int)lst.subckts.size(); i++) {
 		if (lst.subckts[i].isCell) {
@@ -496,9 +500,8 @@ void loadCells(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *out=nullp
 			}
 		}
 	}
-	steady_clock::time_point finish = steady_clock::now();
 	if (progress) {
-		printf("done [%gs]\n\n", ((float)duration_cast<milliseconds>(finish - start).count())/1000.0);
+		printf("done\t%gs\n\n", tmr.since());
 	}
 }
 
@@ -881,26 +884,14 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 
 		if (progress) {
 			printf("Identify state conflicts:\n");
-			printf("  %s...", hg.name.c_str());
-			fflush(stdout);
 		}
-		enc.check(!inverting, false);
+		enc.check(!inverting, progress);
 		if (progress) {
-			if (enc.conflicts.empty()) {
-				printf("[%sCLEAN%s]\n", KGRN, KNRM);
-			} else {
-				printf("[%sCONFLICTS FOUND%s]\n", KYEL, KNRM);
-			}
 			printf("done\n\n");
 		}
 
 		if (doConflicts) {
-			if (!inverting) {
-				print_conflicts(enc, hg, v, -1);
-			} else {
-				print_conflicts(enc, hg, v, 0);
-				print_conflicts(enc, hg, v, 1);
-			}
+			print_conflicts(enc);
 		}
 
 		if (stage >= 0 and stage < DO_ENCODE) {
@@ -909,46 +900,9 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		}
 
 		if (progress) printf("Insert state variables:\n");
-		for (int i = 0; i < 20 and enc.conflicts.size() > 0; i++) {
-			//if (!inverting) {
-			//	print_conflicts(enc, g, v, -1);
-			//} else {
-			//	print_conflicts(enc, g, v, 0);
-			//	print_conflicts(enc, g, v, 1);
-			//}
-
-			if (progress) {
-				printf("  inserting v%d...", i);
-				fflush(stdout);
-			}
-			enc.insert_state_variables(debug);
-			if (progress) printf("[%sDONE%s]\n", KGRN, KNRM);
-
-			if (progress) {
-				printf("  update state space...");
-				fflush(stdout);
-			}
-			hse::elaborate(hg, v, true, true, false);
-
-			if (progress) printf("[%sDONE%s]\n", KGRN, KNRM);
-
-			if (not is_clean()) {
-				complete();
-				return 1;
-			}
-
-			if (progress) {
-				printf("  identify new conflicts...");
-				fflush(stdout);
-			}
-			enc.check(!inverting, false);
-			if (progress) {
-				if (enc.conflicts.empty()) {
-					printf("[%sCLEAN%s]\n", KGRN, KNRM);
-				} else {
-					printf("[%sCONFLICTS FOUND%s]\n", KYEL, KNRM);
-				}
-			}
+		if (not enc.insert_state_variables(20, !inverting, progress, false)) {
+			complete();
+			return 1;
 		}
 		if (progress) printf("done\n\n");
 
@@ -964,13 +918,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 
 		if (enc.conflicts.size() > 0) {
 			// state variable insertion failed
-			if (!inverting) {
-				print_conflicts(enc, hg, v, -1);
-			} else {
-				print_conflicts(enc, hg, v, 0);
-				print_conflicts(enc, hg, v, 1);
-			}
-
+			print_conflicts(enc);
 			complete();
 			return is_clean();
 		}
@@ -980,21 +928,9 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 			return is_clean();
 		}
 
-		hse::gate_set gates(&hg, &v);
-
-		if (progress) {
-			printf("Synthesize production rules:\n");
-			printf("  %s...", hg.name.c_str());
-			fflush(stdout);
-		}
-		gates.load(!inverting);
-		gates.weaken();
-		gates.build_reset();
-		gates.save(&pr);
-		if (progress) {
-			printf("[%sDONE%s]\n", KGRN, KNRM);
-			printf("done\n\n");
-		}
+		if (progress) printf("Synthesize production rules:\n");
+		hse::synthesize_rules(&pr, &hg, &v, !inverting, progress);
+		if (progress) printf("done\n\n");
 
 		if (doRules) {
 			FILE *fout = stdout;
@@ -1084,16 +1020,9 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		}
 
 		if (logic == LOGIC_CMOS or logic == LOGIC_RAW) {
-			if (progress) {
-				printf("Insert keepers:\n");
-				printf("  %s...", prefix.c_str());
-				fflush(stdout);
-			}
-			pr.add_keepers(v);
-			if (progress) {
-				printf("[%sDONE%s]\n", KGRN, KNRM);
-				printf("done\n\n");
-			}
+			if (progress) printf("Insert keepers:\n");
+			pr.add_keepers(v, true, false, 1, progress);
+			if (progress) printf("done\n\n");
 
 			if (doKeepers) {
 				FILE *fout = stdout;
@@ -1111,16 +1040,9 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 			return is_clean();
 		}
 
-		if (progress) {
-			printf("Size production rules:\n");
-			printf("  %s...", prefix.c_str());
-			fflush(stdout);
-		}
-		pr.size_devices();
-		if (progress) {
-			printf("[%sDONE%s]\n", KGRN, KNRM);
-			printf("done\n\n");
-		}
+		if (progress) printf("Size production rules:\n");
+		pr.size_devices(0.1, progress);
+		if (progress) printf("done\n\n");
 
 		if (doSize) {
 			FILE *fout = stdout;
@@ -1175,16 +1097,9 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		or format == "cog"
 		or format == "astg"
 		or format == "prs") {
-		if (progress) {
-			printf("Build netlist:\n");
-			printf("  %s...", prefix.c_str());
-			fflush(stdout);
-		}
-		net.subckts.push_back(prs::build_netlist(tech, pr, v));
-		if (progress) {
-			printf("[%sDONE%s]\n", KGRN, KNRM);
-			printf("done\n\n");
-		}
+		if (progress) printf("Build netlist:\n");
+		net.subckts.push_back(prs::build_netlist(tech, pr, v, progress));
+		if (progress) printf("done\n\n");
 		if (debug) {
 			net.subckts.back().print();
 		}
@@ -1224,7 +1139,10 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		}
 	}
 
+	if (progress) printf("Break subckts into cells:\n");
+	Timer cellsTmr;
 	net.mapCells(progress);
+	if (progress) printf("done\t%gs\n\n", cellsTmr.since());
 
 	if (format != "spi") {
 		FILE *fout = stdout;
