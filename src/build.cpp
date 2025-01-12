@@ -505,6 +505,30 @@ void loadCells(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *out=nullp
 	}
 }
 
+void doPlacement(phy::Library &lib, sch::Netlist &lst, bool report_progress) {
+	if (report_progress) {
+		printf("Computing total area:\n");
+	}
+
+	for (auto i = lst.subckts.begin(); i != lst.subckts.end(); i++) {
+		if (not i->isCell) {
+			if (report_progress) {
+				int area = 0;
+				for (auto j = i->inst.begin(); j != i->inst.end(); j++) {
+					if (lst.subckts[j->subckt].isCell) {
+						area += lib.macros[j->subckt].box.area();
+					}
+				}
+				printf("  %s...[%d TOTAL AREA]\n", i->name.c_str(), area);
+			}
+		}
+	}
+
+	if (report_progress) {
+		printf("done\n\n");
+	}
+}
+
 void build_help() {
 	printf("\nUsage: lm build [options] <file>\n");
 	printf("Synthesize the production rules that implement the behavioral description.\n");
@@ -725,6 +749,8 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		return 0;
 	}
 
+	Timer totalTime;
+
 	ucs::variable_set v;
 	chp::graph cg;
 	hse::graph hg;
@@ -751,6 +777,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 	}
 
 	if (!is_clean()) {
+		if (progress) printf("compiled in %gs\n\n", totalTime.since());
 		complete();
 		return 1;
 	}
@@ -834,6 +861,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 	}
 
 	if (!is_clean()) {
+		if (progress) printf("compiled in %gs\n\n", totalTime.since());
 		complete();
 		return 1;
 	}
@@ -859,6 +887,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		if (progress) printf("done\n\n");
 
 		if (not is_clean()) {
+			if (progress) printf("compiled in %gs\n\n", totalTime.since());
 			complete();
 			return 1;
 		}
@@ -874,6 +903,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		}
 
 		if (stage >= 0 and stage < DO_CONFLICTS) {
+			if (progress) printf("compiled in %gs\n\n", totalTime.since());
 			complete();
 			return is_clean();
 		}
@@ -895,12 +925,14 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		}
 
 		if (stage >= 0 and stage < DO_ENCODE) {
+			if (progress) printf("compiled in %gs\n\n", totalTime.since());
 			complete();
 			return is_clean();
 		}
 
 		if (progress) printf("Insert state variables:\n");
 		if (not enc.insert_state_variables(20, !inverting, progress, false)) {
+			if (progress) printf("compiled in %gs\n\n", totalTime.since());
 			complete();
 			return 1;
 		}
@@ -919,11 +951,13 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		if (enc.conflicts.size() > 0) {
 			// state variable insertion failed
 			print_conflicts(enc);
+			if (progress) printf("compiled in %gs\n\n", totalTime.since());
 			complete();
 			return is_clean();
 		}
 
 		if (stage >= 0 and stage < DO_RULES) {
+			if (progress) printf("compiled in %gs\n\n", totalTime.since());
 			complete();
 			return is_clean();
 		}
@@ -944,6 +978,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 	}
 
 	if (stage >= 0 and stage < DO_BUBBLE) {
+		if (progress) printf("compiled in %gs\n\n", totalTime.since());
 		complete();
 		return is_clean();
 	}
@@ -965,6 +1000,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 	}
 
 	if (!is_clean()) {
+		if (progress) printf("compiled in %gs\n\n", totalTime.since());
 		complete();
 		return 1;
 	}
@@ -1015,6 +1051,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		}
 
 		if (stage >= 0 and stage < DO_KEEPERS) {
+			if (progress) printf("compiled in %gs\n\n", totalTime.since());
 			complete();
 			return is_clean();
 		}
@@ -1036,6 +1073,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		}
 
 		if (stage >= 0 and stage < DO_SIZE) {
+			if (progress) printf("compiled in %gs\n\n", totalTime.since());
 			complete();
 			return is_clean();
 		}
@@ -1056,6 +1094,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 	}
 
 	if (stage >= 0 and stage < DO_NETS) {
+		if (progress) printf("compiled in %gs\n\n", totalTime.since());
 		complete();
 		return is_clean();
 	}
@@ -1072,6 +1111,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 			fclose(fout);
 		}
 		if (!is_clean()) {
+			if (progress) printf("compiled in %gs\n\n", totalTime.since());
 			complete();
 			return 1;
 		}
@@ -1087,6 +1127,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		}
 		fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
 		fclose(fout);
+		if (progress) printf("compiled in %gs\n\n", totalTime.since());
 		complete();
 		return 1;
 	}
@@ -1116,6 +1157,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 	}
 
 	if (stage >= 0 and stage < DO_CELLS) {
+		if (progress) printf("compiled in %gs\n\n", totalTime.since());
 		complete();
 		return is_clean();
 	}
@@ -1164,15 +1206,19 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		or format == "prs"
 		or format == "spi") {
 		loadCells(lib, net, &gds, progress, debug);
+		doPlacement(lib, net, progress);
 	}
 
 	if (stage >= 0 and stage < DO_PLACE) {
 		gds.close();
+		if (progress) printf("compiled in %gs\n\n", totalTime.since());
 		complete();
 		return is_clean();
 	}
 	
 	gds.close();
+
+	if (progress) printf("compiled in %gs\n\n", totalTime.since());
 
 	if (!is_clean()) {
 		complete();
