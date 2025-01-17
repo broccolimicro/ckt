@@ -997,6 +997,8 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 			map<int, int> nodemap;
 			prs::import_production_rule_set(syntax, pr, -1, -1, prs::attributes(), v, nodemap, 0, &tokens, true);
 		}
+
+		pr.name = prefix;
 	}
 
 	if (!is_clean()) {
