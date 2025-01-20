@@ -9,7 +9,7 @@ GTEST_L      := -L$(GTEST)/build/lib -L.
 
 INCLUDE_PATHS = $(DEPEND:%=-I../../lib/%) -I../../lib/gdstk/build/include $(shell python3-config --includes) -I.
 LIBRARY_PATHS = $(DEPEND:%=-L../../lib/%) -L.
-LIBRARIES     = $(DEPEND:%=-l%) -ldl
+LIBRARIES     = $(DEPEND:%=-l%) -ldl -lOpenCL
 LIBFILES      = $(foreach dep,$(DEPEND),../../lib/$(dep)/lib$(dep).a)
 CXXFLAGS      = -std=c++17 -O2 -g -Wall -fmessage-length=0
 LDFLAGS       = 

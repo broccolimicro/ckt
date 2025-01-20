@@ -445,7 +445,7 @@ bool loadCell(phy::Library &lib, sch::Netlist &lst, int idx, bool progress=false
 
 	tmr.reset();
 
-	int result = sch::routeCell(lib, lst, idx);
+	int result = sch::buildCell(lib, lst, idx);
 	if (progress) {
 		if (result == 1) {
 			genDelay = tmr.since();
@@ -521,6 +521,7 @@ void doPlacement(phy::Library &lib, sch::Netlist &lst, bool report_progress) {
 				}
 				printf("  %s...[%d TOTAL AREA]\n", i->name.c_str(), area);
 			}
+			buildProcess(lib, lst, i-lst.subckts.begin(), report_progress, true);
 		}
 	}
 
@@ -601,6 +602,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 
 	bool noCells = false;
 	bool noGhosts = false;
+	bool streamLayout = false;
 
 	for (int i = 0; i < argc; i++) {
 		string arg = argv[i];
@@ -698,6 +700,8 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 			noCells = true;
 		} else if (arg == "--no-ghosts") {
 			noGhosts = true;
+		} else if (arg == "--stream") {
+			streamLayout = true;
 		} else if (arg == "-o" or arg == "--out") {
 			if (++i >= argc) {
 				printf("expected output prefix\n");
@@ -1198,27 +1202,35 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 	}
 
 	phy::Library lib(tech);
-	gdstk::GdsWriter gds = {};
-	gds = gdstk::gdswriter_init((prefix+".gds").c_str(), prefix.c_str(), ((double)tech.dbunit)*1e-6, ((double)tech.dbunit)*1e-6, 4, nullptr, nullptr);
 
-	if (format == "chp"
-		or format == "hse"
-		or format == "cog"
-		or format == "astg"
-		or format == "prs"
-		or format == "spi") {
+	if (streamLayout) {
+		gdstk::GdsWriter gds = {};
+		gds = gdstk::gdswriter_init((prefix+".gds").c_str(), prefix.c_str(), ((double)tech.dbunit)*1e-6, ((double)tech.dbunit)*1e-6, 4, nullptr, nullptr);
 		loadCells(lib, net, &gds, progress, debug);
-		doPlacement(lib, net, progress);
+		gds.close();
+	} else {
+		loadCells(lib, net, nullptr, progress, debug);
 	}
 
 	if (stage >= 0 and stage < DO_PLACE) {
-		gds.close();
+		if (not streamLayout) {
+			export_library(prefix, (prefix+".gds"), lib);
+		}
 		if (progress) printf("compiled in %gs\n\n", totalTime.since());
 		complete();
 		return is_clean();
 	}
-	
-	gds.close();
+
+	doPlacement(lib, net, progress);
+
+	if (stage >= 0 and stage < DO_ROUTE) {
+		export_library(prefix, (prefix+".gds"), lib);
+		if (progress) printf("compiled in %gs\n\n", totalTime.since());
+		complete();
+		return is_clean();
+	}
+
+	export_library(prefix, (prefix+".gds"), lib);
 
 	if (progress) printf("compiled in %gs\n\n", totalTime.since());
 
