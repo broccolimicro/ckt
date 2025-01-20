@@ -606,7 +606,6 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 
 	bool noCells = false;
 	bool noGhosts = false;
-	bool streamLayout = false;
 
 	for (int i = 0; i < argc; i++) {
 		string arg = argv[i];
@@ -704,8 +703,6 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 			noCells = true;
 		} else if (arg == "--no-ghosts") {
 			noGhosts = true;
-		} else if (arg == "--stream") {
-			streamLayout = true;
 		} else if (arg == "-o" or arg == "--out") {
 			if (++i >= argc) {
 				printf("expected output prefix\n");
