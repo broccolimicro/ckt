@@ -475,11 +475,12 @@ bool loadCell(phy::Library &lib, sch::Netlist &lst, int idx, bool progress=false
 	return false;
 }
 
-void loadCells(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *out=nullptr, bool progress=false, bool debug=false) {
+void loadCells(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=nullptr, map<int, gdstk::Cell*> *cells=nullptr, bool progress=false, bool debug=false) {
 	bool libFound = filesystem::exists(lib.tech->lib);
 	if (progress) {
 		printf("Load cell layouts:\n");
 	}
+
 	Timer tmr;
 	lib.macros.reserve(lst.subckts.size()+lib.macros.size());
 	for (int i = 0; i < (int)lst.subckts.size(); i++) {
@@ -495,8 +496,8 @@ void loadCells(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *out=nullp
 				export_lef(cellPath+".lef", lib.macros[i]);
 				export_spi(cellPath+".spi", lst, lst.subckts[i]);
 			}
-			if (out != nullptr) {
-				out->write_cell(*phy::export_layout(lib.macros[i]));
+			if (stream != nullptr and cells != nullptr) {
+				export_layout(*stream, lib, i, *cells);
 			}
 		}
 	}
@@ -505,23 +506,26 @@ void loadCells(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *out=nullp
 	}
 }
 
-void doPlacement(phy::Library &lib, sch::Netlist &lst, bool report_progress) {
+void doPlacement(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=nullptr, map<int, gdstk::Cell*> *cells=nullptr, bool report_progress=false) {
 	if (report_progress) {
 		printf("Computing total area:\n");
 	}
 
-	for (auto i = lst.subckts.begin(); i != lst.subckts.end(); i++) {
-		if (not i->isCell) {
+	for (int i = 0; i < (int)lst.subckts.size(); i++) {
+		if (not lst.subckts[i].isCell) {
 			if (report_progress) {
 				int area = 0;
-				for (auto j = i->inst.begin(); j != i->inst.end(); j++) {
+				for (auto j = lst.subckts[i].inst.begin(); j != lst.subckts[i].inst.end(); j++) {
 					if (lst.subckts[j->subckt].isCell) {
 						area += lib.macros[j->subckt].box.area();
 					}
 				}
-				printf("  %s...[%d TOTAL AREA]\n", i->name.c_str(), area);
+				printf("  %s...[%d TOTAL AREA]\n", lst.subckts[i].name.c_str(), area);
 			}
-			buildProcess(lib, lst, i-lst.subckts.begin(), report_progress, true);
+			buildProcess(lib, lst, i, report_progress, true);
+			if (stream != nullptr and cells != nullptr) {
+				export_layout(*stream, lib, i, *cells);
+			}
 		}
 	}
 
@@ -1203,34 +1207,30 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 
 	phy::Library lib(tech);
 
-	if (streamLayout) {
-		gdstk::GdsWriter gds = {};
-		gds = gdstk::gdswriter_init((prefix+".gds").c_str(), prefix.c_str(), ((double)tech.dbunit)*1e-6, ((double)tech.dbunit)*1e-6, 4, nullptr, nullptr);
-		loadCells(lib, net, &gds, progress, debug);
-		gds.close();
-	} else {
-		loadCells(lib, net, nullptr, progress, debug);
-	}
+	map<int, gdstk::Cell*> cells;
+
+	gdstk::GdsWriter gds = {};
+	gds = gdstk::gdswriter_init((prefix+".gds").c_str(), prefix.c_str(), ((double)tech.dbunit)*1e-6, ((double)tech.dbunit)*1e-6, 4, nullptr, nullptr);
+	
+	loadCells(lib, net, &gds, &cells, progress, debug);
 
 	if (stage >= 0 and stage < DO_PLACE) {
-		if (not streamLayout) {
-			export_library(prefix, (prefix+".gds"), lib);
-		}
+		gds.close();
 		if (progress) printf("compiled in %gs\n\n", totalTime.since());
 		complete();
 		return is_clean();
 	}
 
-	doPlacement(lib, net, progress);
+	doPlacement(lib, net, &gds, &cells, progress);
 
 	if (stage >= 0 and stage < DO_ROUTE) {
-		export_library(prefix, (prefix+".gds"), lib);
+		gds.close();
 		if (progress) printf("compiled in %gs\n\n", totalTime.since());
 		complete();
 		return is_clean();
 	}
 
-	export_library(prefix, (prefix+".gds"), lib);
+	gds.close();
 
 	if (progress) printf("compiled in %gs\n\n", totalTime.since());
 
