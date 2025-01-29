@@ -89,11 +89,13 @@ int unpack_command(configuration &config, string techPath, string cellsDir, int 
 	string prefix = "";
 	string format = "";
 
-	const int DO_NETS = 0;
-	const int DO_SIZED = 1;
+	const int DO_LAYOUT = 0;
+	const int DO_NETS = 1;
+	const int DO_SIZED = 2;
 
 	int stage = -1;
 
+	bool doLayout = false;
 	bool doNets = false;
 	bool doSized = false;
 	
@@ -103,6 +105,10 @@ int unpack_command(configuration &config, string techPath, string cellsDir, int 
 		if (arg == "--all") {
 			doNets = true;
 			doSized = true;
+		} else if (arg == "-l" or arg == "--layout") {
+			// This is really only for debugging
+			doLayout = true;
+			set_stage(stage, DO_LAYOUT);
 		} else if (arg == "-n" or arg == "--nets") {
 			doNets = true;
 			set_stage(stage, DO_NETS);
@@ -163,17 +169,30 @@ int unpack_command(configuration &config, string techPath, string cellsDir, int 
 
 	if (format == "gds") {
 		import_library(lib, filename);
+
+		if (doLayout) {
+			export_library(prefix, prefix+"_ext.gds", lib);;
+		}
+
+		if (stage >= 0 and stage < DO_NETS) {
+			complete();
+			return 0;
+		}
+
 		extract(net, lib);
 
-		if (doNets) {
-			FILE *fout = stdout;
-			if (prefix != "") {
-				fout = fopen((prefix+"_ext.spi").c_str(), "w");
-			}
+		if (doNets or stage < 0) {
+			FILE *fout = fopen((prefix+"_ext.spi").c_str(), "w");
 			fprintf(fout, "%s", sch::export_netlist(net).to_string().c_str());
 			fclose(fout);
 		}
 	}
+
+	if (stage >= 0 and stage < DO_SIZED) {
+		complete();
+		return 0;
+	}
+
 
 	if (format == "spi") {
 		parse_spice::netlist::register_syntax(tokens);
@@ -195,10 +214,7 @@ int unpack_command(configuration &config, string techPath, string cellsDir, int 
 			prs::production_rule_set pr = prs::extract_rules(v, tech, *ckt);
 
 			if (doSized or stage < 0) {
-				FILE *fout = stdout;
-				if (prefix != "") {
-					fout = fopen((prefix+"_"+ckt->name+"_ext.prs").c_str(), "w");
-				}
+				FILE *fout = fopen((prefix+"_"+ckt->name+"_ext.prs").c_str(), "w");
 				fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
 				fclose(fout);
 			}
