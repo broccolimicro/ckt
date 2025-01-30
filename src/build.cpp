@@ -560,7 +560,9 @@ void build_help() {
 	printf(" -k,--keepers   save the production rules with added state-holding elements\n");
 	printf(" -s,--size      save the sized production rules\n");
 	printf(" -n,--nets      save the generated netlist\n");
-	printf(" -l,--cells     save the netlist split into cells\n");
+	printf(" -m,--map       save the netlist split into cells\n");
+	printf(" -l,--cells     save the cell layouts\n");
+	printf(" -p,--place     save the cell placements\n");
 
 	printf("\nSupported file formats:\n");
 	printf(" *.cog          a wire-level programming language\n");
@@ -583,9 +585,10 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 	const int DO_KEEPERS = 5;
 	const int DO_SIZE = 6;
 	const int DO_NETS = 7;
+	const int DO_MAP = 8;
 	const int DO_CELLS = 8;
-	const int DO_PLACE = 9;
-	const int DO_ROUTE = 10;
+	const int DO_PLACE = 10;
+	const int DO_ROUTE = 11;
 
 	tokenizer tokens;
 	
@@ -607,6 +610,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 	bool doKeepers = false;
 	bool doSize = false;
 	bool doNets = false;
+	bool doMap = false;
 	bool doCells = false;
 	bool doPlace = false;
 	bool doRoute = false;
@@ -675,6 +679,9 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		} else if (arg == "-n" or arg == "--nets") {
 			doNets = true;
 			set_stage(stage, DO_NETS);
+		} else if (arg == "-m" or arg == "--map") {
+			doMap = true;
+			set_stage(stage, DO_MAP);
 		} else if (arg == "-l" or arg == "--cells") {
 			doCells = true;
 			set_stage(stage, DO_CELLS);
@@ -700,6 +707,8 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 			doSize = true;
 		} else if (arg == "+n" or arg == "++nets") {
 			doNets = true;
+		} else if (arg == "+m" or arg == "++map") {
+			doMap = true;
 		} else if (arg == "+l" or arg == "++cells") {
 			doCells = true;
 		} else if (arg == "+p" or arg == "++place") {
@@ -1170,7 +1179,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		}
 	}
 
-	if (stage >= 0 and stage < DO_CELLS) {
+	if (stage >= 0 and stage < DO_MAP) {
 		if (progress) printf("compiled in %gs\n\n", totalTime.since());
 		complete();
 		return is_clean();
@@ -1201,12 +1210,19 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 	if (progress) printf("done\t%gs\n\n", cellsTmr.since());
 
 	if (format != "spi") {
+		// This spice netlist is always exported
 		FILE *fout = stdout;
 		if (prefix != "") {
 			fout = fopen((prefix+".spi").c_str(), "w");
 		}
 		fprintf(fout, "%s", sch::export_netlist(net).to_string().c_str());
 		fclose(fout);
+	}
+
+	if (stage >= 0 and stage < DO_CELLS) {
+		if (progress) printf("compiled in %gs\n\n", totalTime.since());
+		complete();
+		return is_clean();
 	}
 
 	phy::Library lib(tech);
