@@ -499,6 +499,7 @@ void loadCells(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=nu
 			if (stream != nullptr and cells != nullptr) {
 				export_layout(*stream, lib, i, *cells);
 			}
+			lst.mapToLayout(i, lib.macros[i]);
 		}
 	}
 	if (progress) {
@@ -508,11 +509,18 @@ void loadCells(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=nu
 
 void doPlacement(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=nullptr, map<int, gdstk::Cell*> *cells=nullptr, bool report_progress=false) {
 	if (report_progress) {
-		printf("Computing total area:\n");
+		printf("Placing Cells:\n");
 	}
 
+	Timer total;
 	for (int i = 0; i < (int)lst.subckts.size(); i++) {
 		if (not lst.subckts[i].isCell) {
+			if (report_progress) {
+				printf("  %s...", lst.subckts[i].name.c_str());
+				fflush(stdout);
+			}
+			Timer tmr;
+			buildProcess(lib, lst, i, report_progress);
 			if (report_progress) {
 				int area = 0;
 				for (auto j = lst.subckts[i].inst.begin(); j != lst.subckts[i].inst.end(); j++) {
@@ -520,9 +528,8 @@ void doPlacement(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=
 						area += lib.macros[j->subckt].box.area();
 					}
 				}
-				printf("  %s...[%d TOTAL AREA]\n", lst.subckts[i].name.c_str(), area);
+				printf("[%s%d DBUNIT2 AREA%s]\t%gs\n", KGRN, area, KNRM, tmr.since());
 			}
-			buildProcess(lib, lst, i, report_progress, true);
 			if (stream != nullptr and cells != nullptr) {
 				export_layout(*stream, lib, i, *cells);
 			}
@@ -530,7 +537,7 @@ void doPlacement(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=
 	}
 
 	if (report_progress) {
-		printf("done\n\n");
+		printf("done\t%gs\n\n", total.since());
 	}
 }
 
