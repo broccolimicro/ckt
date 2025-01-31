@@ -9,7 +9,7 @@ GTEST_L      := -L$(GTEST)/build/lib -L.
 
 INCLUDE_PATHS = $(DEPEND:%=-I../../lib/%) -I../../lib/gdstk/build/include $(shell python3-config --includes) -I.
 LIBRARY_PATHS = $(DEPEND:%=-L../../lib/%) -L.
-LIBRARIES     = $(DEPEND:%=-l%) -ldl -lOpenCL
+LIBRARIES     = $(DEPEND:%=-l%) -ldl
 LIBFILES      = $(foreach dep,$(DEPEND),../../lib/$(dep)/lib$(dep).a)
 CXXFLAGS      = -std=c++17 -O2 -g -Wall -fmessage-length=0
 LDFLAGS       = 
@@ -40,20 +40,20 @@ ifeq ($(OS),Windows_NT)
 			CXXFLAGS += -D IA32
 		endif
 	endif
-	LIBRARIES += -l:libgdstk.a -l:libclipper.a -l:libqhullstatic_r.a -lz
+	LIBRARIES += -l:libgdstk.a -l:libclipper.a -l:libqhullstatic_r.a -lz -lOpenCL
 	LIBRARY_PATHS += -L../../lib/gdstk/build/lib -L../../lib/gdstk/build/lib64
 else
 	UNAME_S := $(shell uname -s)
 	ifeq ($(UNAME_S),Linux)
 		CXXFLAGS += -D LINUX
-		LIBRARIES += -l:libgdstk.a -l:libclipper.a -l:libqhullstatic_r.a -lz
+		LIBRARIES += -l:libgdstk.a -l:libclipper.a -l:libqhullstatic_r.a -lz -lOpenCL
 		LIBRARY_PATHS += -L../../lib/gdstk/build/lib -L../../lib/gdstk/build/lib64
 	endif
 	ifeq ($(UNAME_S),Darwin)
 		CXXFLAGS += -D OSX -mmacos-version-min=12.0 -Wno-missing-braces
 		INCLUDE_PATHS += -I$(shell brew --prefix qhull)/include -I$(shell brew --prefix graphviz)/include
 		LIBRARY_PATHS += -L$(shell brew --prefix qhull)/lib -L$(shell brew --prefix graphviz)/lib
-		LIBRARIES += -lgdstk -lclipper -lqhullstatic_r -lz
+		LIBRARIES += -lgdstk -lclipper -lqhullstatic_r -lz -framework OpenCL
 		LIBRARY_PATHS += -L../../lib/gdstk/build/lib
 		LDFLAGS	      += -Wl,-rpath,/opt/homebrew/opt/python@3.15/Frameworks/Python.framework/Versions/Current/lib \
 -Wl,-rpath,/opt/homebrew/opt/python@3.14/Frameworks/Python.framework/Versions/Current/lib \
