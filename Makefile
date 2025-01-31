@@ -11,7 +11,7 @@ INCLUDE_PATHS = $(DEPEND:%=-I../../lib/%) -I../../lib/gdstk/build/include $(shel
 LIBRARY_PATHS = $(DEPEND:%=-L../../lib/%) -L.
 LIBRARIES     = $(DEPEND:%=-l%) -ldl
 LIBFILES      = $(foreach dep,$(DEPEND),../../lib/$(dep)/lib$(dep).a)
-CXXFLAGS      = -std=c++17 -O2 -g -Wall -fmessage-length=0
+CXXFLAGS      = -std=c++17 -O2 -g -Wall -fmessage-length=0 -D CL_HPP_MINIMUM_OPENCL_VERSION=120 -D CL_HPP_TARGET_OPENCL_VERSION=120 -D CL_HPP_ENABLE_EXCEPTIONS 
 LDFLAGS       = 
 
 SOURCES	     := $(shell mkdir -p $(SRCDIR); find $(SRCDIR) -name '*.cpp')

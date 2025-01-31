@@ -30,6 +30,7 @@
 
 #include <sch/Netlist.h>
 #include <sch/Tapeout.h>
+#include <sch/Placer.h>
 #include <interpret_sch/import.h>
 #include <interpret_sch/export.h>
 
@@ -512,6 +513,12 @@ void doPlacement(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=
 		printf("Placing Cells:\n");
 	}
 
+	if (lib.macros.size() < lst.subckts.size()) {
+		lib.macros.resize(lst.subckts.size(), Layout(*lst.tech));
+	}
+
+	sch::Placer placer(lib, lst);
+
 	Timer total;
 	for (int i = 0; i < (int)lst.subckts.size(); i++) {
 		if (not lst.subckts[i].isCell) {
@@ -520,7 +527,8 @@ void doPlacement(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=
 				fflush(stdout);
 			}
 			Timer tmr;
-			buildProcess(lib, lst, i, report_progress);
+			lib.macros[i].name = lst.subckts[i].name;
+			placer.place(i);
 			if (report_progress) {
 				int area = 0;
 				for (auto j = lst.subckts[i].inst.begin(); j != lst.subckts[i].inst.end(); j++) {
