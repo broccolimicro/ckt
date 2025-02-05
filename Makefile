@@ -51,7 +51,7 @@ else
 	endif
 	ifeq ($(UNAME_S),Darwin)
 		CXXFLAGS += -D OSX -mmacos-version-min=12.0 -Wno-missing-braces
-		INCLUDE_PATHS += -I$(shell brew --prefix qhull)/include -I$(shell brew --prefix graphviz)/include
+		INCLUDE_PATHS += -I$(shell brew --prefix qhull)/include -I$(shell brew --prefix graphviz)/include -I$(shell brew --prefix opencl-headers)/include -I$(shell brew --prefix opencl-clhpp-headers)/include
 		LIBRARY_PATHS += -L$(shell brew --prefix qhull)/lib -L$(shell brew --prefix graphviz)/lib
 		LIBRARIES += -lgdstk -lclipper -lqhullstatic_r -lz -framework OpenCL
 		LIBRARY_PATHS += -L../../lib/gdstk/build/lib
