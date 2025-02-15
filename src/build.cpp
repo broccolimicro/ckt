@@ -7,6 +7,10 @@
 #include <parse/parse.h>
 #include <parse/default/block_comment.h>
 #include <parse/default/line_comment.h>
+#include <parse/default/new_line.h>
+
+#include <parse_ucs/source.h>
+#include <parse_cog/factory.h>
 
 #include <chp/graph.h>
 //#include <chp/simulator.h>
@@ -755,7 +759,8 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 				prefix = dot != string::npos ? filename.substr(0, dot) : filename;
 			}
 
-			if (ext != "chp"
+			if (ext != "ucs"
+				and ext != "chp"
 				and ext != "hse"
 				and ext != "cog"
 				and ext != "astg"
@@ -779,6 +784,27 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 	}
 
 	Timer totalTime;
+
+	if (format == "ucs") {
+		cout << "parsing ucs" << endl;
+		parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
+
+		tokens.register_token<parse::block_comment>(false);
+		tokens.register_token<parse::line_comment>(false);
+		parse_ucs::source::register_syntax(tokens);
+		config.load(tokens, filename, "");
+
+		tokens.increment(true);
+		tokens.expect<parse_ucs::source>();
+		if (tokens.decrement(__FILE__, __LINE__)) {
+			parse_ucs::source syntax(tokens);
+			cout << syntax.to_string() << endl;
+		}
+
+		cout << "done" << endl;
+		return 0;
+	}
+
 
 	ucs::variable_set v;
 	chp::graph cg;
