@@ -584,23 +584,113 @@ void build_help() {
 	printf(" *.astg         asynchronous signal transition graph\n");
 }
 
-int build_command(configuration &config, string techPath, string cellsDir, int argc, char **argv, bool progress, bool debug) {
-	const int LOGIC_RAW = 0;
-	const int LOGIC_CMOS = 1;
-	const int LOGIC_ADIABATIC = 2;
+struct Process {
+	Process() {}
+	Process(string prefix) {
+		this->prefix = prefix;
+	}
+	~Process() {}
 
-	const int DO_ELAB = 0;
-	const int DO_CONFLICTS = 1;
-	const int DO_ENCODE = 2;
-	const int DO_RULES = 3;
-	const int DO_BUBBLE = 4;
-	const int DO_KEEPERS = 5;
-	const int DO_SIZE = 6;
-	const int DO_NETS = 7;
-	const int DO_MAP = 8;
-	const int DO_CELLS = 8;
-	const int DO_PLACE = 10;
-	const int DO_ROUTE = 11;
+	string prefix;
+
+	ucs::variable_set v;
+	unique_ptr<chp::graph> cg;
+	unique_ptr<hse::graph> hg;
+	unique_ptr<prs::production_rule_set> pr;
+	unique_ptr<sch::Netlist> sp;
+};
+
+struct SymbolTable {
+	map<string, Process> procs;
+
+	bool load(string path);
+};
+
+struct Build {
+	Build() {
+		logic = LOGIC_CMOS;
+		stage = -1;
+
+		doPreprocess = false;
+		doPostprocess = false;
+
+		noCells = false;
+		noGhosts = false;
+		
+		targets.resize(ROUTE+1, false);
+	}
+
+	~Build() {
+	}
+
+	enum {
+		LOGIC_RAW = 0,
+		LOGIC_CMOS = 1,
+		LOGIC_ADIABATIC = 2
+	};
+
+	enum {
+		ELAB = 0,
+		CONFLICTS = 1,
+		ENCODE = 2,
+		RULES = 3,
+		BUBBLE = 4,
+		KEEPERS = 5,
+		SIZE = 6,
+		NETS = 7,
+		MAP = 8,
+		CELLS = 9,
+		PLACE = 10,
+		ROUTE = 11
+	};
+
+	int logic;
+	int stage;
+
+	bool doPreprocess;
+	bool doPostprocess;
+
+	bool noCells;
+	bool noGhosts;
+	
+	vector<bool> targets;
+
+	void set(int target);
+	bool get(int target);
+
+	void inclAll();
+	void incl(int target);
+	void excl(int target);
+	bool has(int target);
+};
+
+void Build::set(int target) {
+	stage = stage < target ? target : stage;
+	targets[target] = true;
+}
+
+bool Build::get(int target) {
+	return stage < 0 or stage >= target;
+}
+
+void Build::inclAll() {
+	targets = vector<bool>(ROUTE+1, true);
+}
+
+void Build::incl(int target) {
+	targets[target] = true;
+}
+
+void Build::excl(int target) {
+	targets[target] = false;
+}
+
+bool Build::has(int target) {
+	return targets[target];
+}
+
+int build_command(configuration &config, string techPath, string cellsDir, int argc, char **argv, bool progress, bool debug) {
+	Build builder;
 
 	tokenizer tokens;
 	
@@ -608,28 +698,6 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 	string prefix = "";
 	string format = "";
 	
-	int logic = LOGIC_CMOS;
-	int stage = -1;
-
-	bool doPreprocess = false;
-	bool doPostprocess = false;
-
-	bool doElab = false;
-	bool doConflicts = false;
-	bool doEncode = false;
-	bool doRules = false;
-	bool doBubble = false;
-	bool doKeepers = false;
-	bool doSize = false;
-	bool doNets = false;
-	bool doMap = false;
-	bool doCells = false;
-	bool doPlace = false;
-	bool doRoute = false;
-
-	bool noCells = false;
-	bool noGhosts = false;
-
 	for (int i = 0; i < argc; i++) {
 		string arg = argv[i];
 
@@ -640,97 +708,75 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 			arg = argv[i];
 
 			if (arg == "raw") {
-				logic = LOGIC_RAW;
+				builder.logic = Build::LOGIC_RAW;
 			} else if (arg == "cmos") {
-				logic = LOGIC_CMOS;
+				builder.logic = Build::LOGIC_CMOS;
 			} else if (arg == "adiabatic") {
 				// This is not an officially supported logic family
 				// It is here for experimental purposes
-				logic = LOGIC_ADIABATIC;
+				builder.logic = Build::LOGIC_ADIABATIC;
 			} else {
 				printf("unsupported logic family '%s'\n", argv[i]);
 				return is_clean();
 			}
 		} else if (arg == "--all") {
-			doElab = true;
-			doConflicts = true;
-			doEncode = true;
-			doRules = true;
-			doBubble = true;
-			doKeepers = true;
-			doSize = true;
-			doNets = true;
-			doCells = true;
-			doPlace = true;
-			doRoute = true;
+			builder.inclAll();
 		} else if (arg == "--pre") {
-			doPreprocess = true;
+			builder.doPreprocess = true;
 		} else if (arg == "--post") {
-			doPostprocess = true;
+			builder.doPostprocess = true;
 		} else if (arg == "-g" or arg == "--graph") {
-			doElab = true;
-			set_stage(stage, DO_ELAB);
+			builder.set(Build::ELAB);
 		} else if (arg == "-c" or arg == "--conflict") {
-			doConflicts = true;
-			set_stage(stage, DO_CONFLICTS);
+			builder.set(Build::CONFLICTS);
 		} else if (arg == "-e" or arg == "--encode") {
-			doEncode = true;
-			set_stage(stage, DO_ENCODE);
+			builder.set(Build::ENCODE);
 		} else if (arg == "-r" or arg == "--rules") {
-			doRules = true;
-			set_stage(stage, DO_RULES);
+			builder.set(Build::RULES);
 		} else if (arg == "-b" or arg == "--bubble") {
-			doBubble = true;
-			set_stage(stage, DO_BUBBLE);
+			builder.set(Build::BUBBLE);
 		} else if (arg == "-k" or arg == "--keepers") {
-			doKeepers = true;
-			set_stage(stage, DO_KEEPERS);
+			builder.set(Build::KEEPERS);
 		} else if (arg == "-s" or arg == "--size") {
-			doSize = true;
-			set_stage(stage, DO_SIZE);
+			builder.set(Build::SIZE);
 		} else if (arg == "-n" or arg == "--nets") {
-			doNets = true;
-			set_stage(stage, DO_NETS);
+			builder.set(Build::NETS);
 		} else if (arg == "-m" or arg == "--map") {
-			doMap = true;
-			set_stage(stage, DO_MAP);
+			builder.set(Build::MAP);
 		} else if (arg == "-l" or arg == "--cells") {
-			doCells = true;
-			set_stage(stage, DO_CELLS);
+			builder.set(Build::CELLS);
 		} else if (arg == "-p" or arg == "--place") {
-			doPlace = true;
-			set_stage(stage, DO_PLACE);
+			builder.set(Build::PLACE);
 		} else if (arg == "-x" or arg == "--route") {
-			doRoute = true;
-			set_stage(stage, DO_ROUTE);
+			builder.set(Build::ROUTE);
 		} else if (arg == "+g" or arg == "++graph") {
-			doElab = true;
+			builder.incl(Build::ELAB);
 		} else if (arg == "+c" or arg == "++conflict") {
-			doConflicts = true;
+			builder.incl(Build::CONFLICTS);
 		} else if (arg == "+e" or arg == "++encode") {
-			doEncode = true;
+			builder.incl(Build::ENCODE);
 		} else if (arg == "+r" or arg == "++rules") {
-			doRules = true;
+			builder.incl(Build::RULES);
 		} else if (arg == "+b" or arg == "++bubble") {
-			doBubble = true;
+			builder.incl(Build::BUBBLE);
 		} else if (arg == "+k" or arg == "++keepers") {
-			doKeepers = true;
+			builder.incl(Build::KEEPERS);
 		} else if (arg == "+s" or arg == "++size") {
-			doSize = true;
+			builder.incl(Build::SIZE);
 		} else if (arg == "+n" or arg == "++nets") {
-			doNets = true;
+			builder.incl(Build::NETS);
 		} else if (arg == "+m" or arg == "++map") {
-			doMap = true;
+			builder.incl(Build::MAP);
 		} else if (arg == "+l" or arg == "++cells") {
-			doCells = true;
+			builder.incl(Build::CELLS);
 		} else if (arg == "+p" or arg == "++place") {
-			doPlace = true;
+			builder.incl(Build::PLACE);
 		} else if (arg == "+x" or arg == "++route") {
-			doRoute = true;
+			builder.incl(Build::ROUTE);
 		} else if (arg == "--no-cells") {
-			noCells = true;
+			builder.noCells = true;
 		} else if (arg == "--no-ghosts") {
-			noGhosts = true;
+			builder.noGhosts = true;
 		} else if (arg == "-o" or arg == "--out") {
 			if (++i >= argc) {
 				printf("expected output prefix\n");
@@ -774,7 +820,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 	}
 
 	bool inverting = false;
-	if (logic == LOGIC_CMOS) {
+	if (builder.logic == Build::LOGIC_CMOS) {
 		inverting = true;
 	}
 
@@ -839,7 +885,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 
 	if (format == "chp") {
 
-		if (doElab) {
+		if (builder.has(Build::ELAB)) {
 			FILE *fout = stdout;
 			if (prefix != "") {
 				fout = fopen((prefix+".astg").c_str(), "w");
@@ -906,7 +952,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		}
 	}
 
-	if (doPreprocess) {
+	if (builder.doPreprocess) {
 		FILE *fout = stdout;
 		if (prefix != "") {
 			fout = fopen((prefix+"_pre.astg").c_str(), "w");
@@ -928,7 +974,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		hg.post_process(v, true);
 		hg.check_variables(v);
 
-		if (doPostprocess) {
+		if (builder.doPostprocess) {
 			FILE *fout = stdout;
 			if (prefix != "") {
 				fout = fopen((prefix+"_post.astg").c_str(), "w");
@@ -938,7 +984,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		}
 
 		if (progress) printf("Elaborate state space:\n");
-		hse::elaborate(hg, v, stage >= DO_ENCODE or not noGhosts, true, progress);
+		hse::elaborate(hg, v, builder.stage >= Build::ENCODE or not builder.noGhosts, true, progress);
 		if (progress) printf("done\n\n");
 
 		if (not is_clean()) {
@@ -947,17 +993,17 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 			return 1;
 		}
 
-		if (doElab) {
+		if (builder.has(Build::ELAB)) {
 			FILE *fout = stdout;
 			if (prefix != "") {
-				string suffix = stage == DO_ELAB ? "" : "_predicate";
+				string suffix = builder.stage == Build::ELAB ? "" : "_predicate";
 				fout = fopen((prefix+suffix+".astg").c_str(), "w");
 			}
 			fprintf(fout, "%s", export_astg(hg, v).to_string().c_str());
 			fclose(fout);
 		}
 
-		if (stage >= 0 and stage < DO_CONFLICTS) {
+		if (not builder.get(Build::CONFLICTS)) {
 			if (progress) printf("compiled in %gs\n\n", totalTime.since());
 			complete();
 			return is_clean();
@@ -975,11 +1021,11 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 			printf("done\n\n");
 		}
 
-		if (doConflicts) {
+		if (builder.has(Build::CONFLICTS)) {
 			print_conflicts(enc);
 		}
 
-		if (stage >= 0 and stage < DO_ENCODE) {
+		if (not builder.get(Build::ENCODE)) {
 			if (progress) printf("compiled in %gs\n\n", totalTime.since());
 			complete();
 			return is_clean();
@@ -993,10 +1039,10 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		}
 		if (progress) printf("done\n\n");
 
-		if (doEncode) {
+		if (builder.has(Build::ENCODE)) {
 			FILE *fout = stdout;
 			if (prefix != "") {
-				string suffix = stage == DO_ENCODE ? "" : "_complete";
+				string suffix = builder.stage == Build::ENCODE ? "" : "_complete";
 				fout = fopen((prefix+suffix+".astg").c_str(), "w");
 			}
 			fprintf(fout, "%s", export_astg(hg, v).to_string().c_str());
@@ -1011,7 +1057,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 			return is_clean();
 		}
 
-		if (stage >= 0 and stage < DO_RULES) {
+		if (not builder.get(Build::RULES)) {
 			if (progress) printf("compiled in %gs\n\n", totalTime.since());
 			complete();
 			return is_clean();
@@ -1021,10 +1067,10 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		hse::synthesize_rules(&pr, &hg, &v, !inverting, progress);
 		if (progress) printf("done\n\n");
 
-		if (doRules) {
+		if (builder.has(Build::RULES)) {
 			FILE *fout = stdout;
 			if (prefix != "") {
-				string suffix = stage == DO_RULES ? "" : "_simple";
+				string suffix = builder.stage == Build::RULES ? "" : "_simple";
 				fout = fopen((prefix+suffix+".prs").c_str(), "w");
 			}
 			fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
@@ -1032,7 +1078,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		}
 	}
 
-	if (stage >= 0 and stage < DO_BUBBLE) {
+	if (not builder.get(Build::BUBBLE)) {
 		if (progress) printf("compiled in %gs\n\n", totalTime.since());
 		complete();
 		return is_clean();
@@ -1076,17 +1122,17 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 			bub.load_prs(pr, v);
 
 			int step = 0;
-			if (doBubble and debug) {
+			if (builder.has(Build::BUBBLE) and debug) {
 				save_bubble(prefix+"_bubble0.png", bub, v);
 			}
 			for (auto i = bub.net.begin(); i != bub.net.end(); i++) {
 				auto result = bub.step(i);
-				if (doBubble and debug and result.second) {
+				if (builder.has(Build::BUBBLE) and debug and result.second) {
 					save_bubble(prefix+"_bubble" + to_string(++step) + ".png", bub, v);
 				}
 			}
 			auto result = bub.complete();
-			if (doBubble and debug and result) {
+			if (builder.has(Build::BUBBLE) and debug and result) {
 				save_bubble(prefix+"_bubble" + to_string(++step) + ".png", bub, v);
 			}
 
@@ -1096,10 +1142,10 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 				printf("done\n\n");
 			}
 
-			if (doBubble) {
+			if (builder.has(Build::BUBBLE)) {
 				FILE *fout = stdout;
 				if (prefix != "") {
-					string suffix = stage == DO_BUBBLE ? "" : "_bubbled";
+					string suffix = builder.stage == Build::BUBBLE ? "" : "_bubbled";
 					fout = fopen((prefix+suffix+".prs").c_str(), "w");
 				}
 				fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
@@ -1107,21 +1153,21 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 			}
 		}
 
-		if (stage >= 0 and stage < DO_KEEPERS) {
+		if (not builder.get(Build::KEEPERS)) {
 			if (progress) printf("compiled in %gs\n\n", totalTime.since());
 			complete();
 			return is_clean();
 		}
 
-		if (logic == LOGIC_CMOS or logic == LOGIC_RAW) {
+		if (builder.logic == Build::LOGIC_CMOS or builder.logic == Build::LOGIC_RAW) {
 			if (progress) printf("Insert keepers:\n");
 			pr.add_keepers(v, true, false, 1, progress);
 			if (progress) printf("done\n\n");
 
-			if (doKeepers) {
+			if (builder.has(Build::KEEPERS)) {
 				FILE *fout = stdout;
 				if (prefix != "") {
-					string suffix = stage == DO_KEEPERS ? "" : "_keep";
+					string suffix = builder.stage == Build::KEEPERS ? "" : "_keep";
 					fout = fopen((prefix+suffix+".prs").c_str(), "w");
 				}
 				fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
@@ -1129,7 +1175,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 			}
 		}
 
-		if (stage >= 0 and stage < DO_SIZE) {
+		if (not builder.get(Build::SIZE)) {
 			if (progress) printf("compiled in %gs\n\n", totalTime.since());
 			complete();
 			return is_clean();
@@ -1139,10 +1185,10 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		pr.size_devices(0.1, progress);
 		if (progress) printf("done\n\n");
 
-		if (doSize) {
+		if (builder.has(Build::SIZE)) {
 			FILE *fout = stdout;
 			if (prefix != "") {
-				string suffix = stage == DO_SIZE ? "" : "_sized";
+				string suffix = builder.stage == Build::SIZE ? "" : "_sized";
 				fout = fopen((prefix+suffix+".prs").c_str(), "w");
 			}
 			fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
@@ -1150,14 +1196,14 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		}
 	}
 
-	if (stage >= 0 and stage < DO_NETS) {
+	if (not builder.get(Build::NETS)) {
 		if (progress) printf("compiled in %gs\n\n", totalTime.since());
 		complete();
 		return is_clean();
 	}
 
 	if (techPath.empty()) {
-		if (stage >= DO_NETS or format == "spi" or format == "gds") {
+		if (builder.stage >= Build::NETS or format == "spi" or format == "gds") {
 			cout << "please provide a python techfile." << endl;
 		} else {
 			FILE *fout = stdout;
@@ -1202,10 +1248,10 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 			net.subckts.back().print();
 		}
 
-		if (doNets) {
+		if (builder.has(Build::NETS)) {
 			FILE *fout = stdout;
 			if (prefix != "") {
-				string suffix = stage == DO_NETS ? "" : "_simple";
+				string suffix = builder.stage == Build::NETS ? "" : "_simple";
 				fout = fopen((prefix+".spi").c_str(), "w");
 			}
 			fprintf(fout, "%s", sch::export_netlist(net).to_string().c_str());
@@ -1213,7 +1259,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		}
 	}
 
-	if (stage >= 0 and stage < DO_MAP) {
+	if (not builder.get(Build::MAP)) {
 		if (progress) printf("compiled in %gs\n\n", totalTime.since());
 		complete();
 		return is_clean();
@@ -1232,7 +1278,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		}
 	}
 
-	if (noCells) {
+	if (builder.noCells) {
 		for (int i = 0; i < (int)net.subckts.size(); i++) {
 			net.subckts[i].isCell = true;
 		}
@@ -1253,7 +1299,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		fclose(fout);
 	}
 
-	if (stage >= 0 and stage < DO_CELLS) {
+	if (not builder.get(Build::CELLS)) {
 		if (progress) printf("compiled in %gs\n\n", totalTime.since());
 		complete();
 		return is_clean();
@@ -1268,7 +1314,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 	
 	loadCells(lib, net, &gds, &cells, progress, debug);
 
-	if (stage >= 0 and stage < DO_PLACE) {
+	if (not builder.get(Build::PLACE)) {
 		gds.close();
 		if (progress) printf("compiled in %gs\n\n", totalTime.since());
 		complete();
@@ -1277,7 +1323,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 
 	doPlacement(lib, net, &gds, &cells, progress);
 
-	if (stage >= 0 and stage < DO_ROUTE) {
+	if (not builder.get(Build::ROUTE)) {
 		gds.close();
 		if (progress) printf("compiled in %gs\n\n", totalTime.since());
 		complete();
