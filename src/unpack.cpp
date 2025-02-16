@@ -165,7 +165,7 @@ int unpack_command(configuration &config, string techPath, string cellsDir, int 
 		return 1;
 	}
 	phy::Library lib(tech);
-	sch::Netlist net(tech);
+	sch::Netlist net;
 
 	if (format == "gds") {
 		import_library(lib, filename);
@@ -183,7 +183,7 @@ int unpack_command(configuration &config, string techPath, string cellsDir, int 
 
 		if (doNets or stage < 0) {
 			FILE *fout = fopen((prefix+"_ext.spi").c_str(), "w");
-			fprintf(fout, "%s", sch::export_netlist(net).to_string().c_str());
+			fprintf(fout, "%s", sch::export_netlist(tech, net).to_string().c_str());
 			fclose(fout);
 		}
 	}
@@ -203,7 +203,7 @@ int unpack_command(configuration &config, string techPath, string cellsDir, int 
 		if (tokens.decrement(__FILE__, __LINE__))
 		{
 			parse_spice::netlist syntax(tokens);
-			sch::import_netlist(syntax, net, &tokens);
+			sch::import_netlist(tech, net, syntax, &tokens);
 		}
 	}
 

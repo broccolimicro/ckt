@@ -127,7 +127,7 @@ int compare_command(configuration &config, string techPath, string cellsDir, int
 	vector<sch::Netlist> spiNet;
 	vector<vector<bool> > spiCanon;
 	if (spiFiles != files.end()) {
-		spiNet.resize(spiFiles->second.size(), sch::Netlist(tech));
+		spiNet.resize(spiFiles->second.size(), sch::Netlist());
 		spiCanon.resize(spiFiles->second.size(), vector<bool>());
 		tokenizer tokens;
 		parse_spice::netlist::register_syntax(tokens);
@@ -139,7 +139,7 @@ int compare_command(configuration &config, string techPath, string cellsDir, int
 			if (tokens.decrement(__FILE__, __LINE__))
 			{
 				parse_spice::netlist syntax(tokens);
-				sch::import_netlist(syntax, spiNet[idx], &tokens);
+				sch::import_netlist(tech, spiNet[idx], syntax, &tokens);
 			}
 			tokens.reset();
 			spiCanon[idx].resize(spiNet[idx].subckts.size(), false);
@@ -156,7 +156,7 @@ int compare_command(configuration &config, string techPath, string cellsDir, int
 				continue;
 			}
 
-			sch::Netlist gdsNet(tech);
+			sch::Netlist gdsNet;
 			extract(gdsNet, gdsLib);
 			for (auto gds = gdsNet.subckts.begin(); gds != gdsNet.subckts.end(); gds++) {
 				gds->cleanDangling(true);

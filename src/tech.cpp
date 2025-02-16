@@ -184,7 +184,7 @@ int tech_cells_command(configuration &config, string techDir, string techPath, s
 			continue;
 		}
 
-		sch::Netlist net(tech);
+		sch::Netlist net;
 		extract(net, lib);
 		for (int i = 0; i < (int)net.subckts.size(); i++) {
 			auto spi = net.subckts.begin()+i;
@@ -206,7 +206,7 @@ int tech_cells_command(configuration &config, string techDir, string techPath, s
 			string cellPath = tech.lib + "/" + spi->name;
 			export_layout(cellPath+".gds", *gds);
 			export_lef(cellPath+".lef", *gds);
-			export_spi(cellPath+".spi", net, *spi);
+			export_spi(cellPath+".spi", tech, net, *spi);
 		}
 	}
 

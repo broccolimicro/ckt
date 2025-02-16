@@ -391,7 +391,7 @@ void export_cells(const phy::Library &lib, const sch::Netlist &net) {
 				export_layout(cellPath+".gds", lib.macros[i]);
 				export_lef(cellPath+".lef", lib.macros[i]);
 				if (i < (int)net.subckts.size()) {
-					export_spi(cellPath+".spi", net, net.subckts[i]);
+					export_spi(cellPath+".spi", *lib.tech, net, net.subckts[i]);
 				}
 			}
 		}
@@ -499,7 +499,7 @@ void loadCells(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=nu
 				string cellPath = lib.tech->lib + "/" + lib.macros[i].name;
 				export_layout(cellPath+".gds", lib.macros[i]);
 				export_lef(cellPath+".lef", lib.macros[i]);
-				export_spi(cellPath+".spi", lst, lst.subckts[i]);
+				export_spi(cellPath+".spi", *lib.tech, lst, lst.subckts[i]);
 			}
 			if (stream != nullptr and cells != nullptr) {
 				export_layout(*stream, lib, i, *cells);
@@ -518,7 +518,7 @@ void doPlacement(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=
 	}
 
 	if (lib.macros.size() < lst.subckts.size()) {
-		lib.macros.resize(lst.subckts.size(), Layout(*lst.tech));
+		lib.macros.resize(lst.subckts.size(), Layout(*lib.tech));
 	}
 
 	sch::Placer placer(lib, lst);
@@ -583,28 +583,6 @@ void build_help() {
 	printf(" *.prs          production rules\n");
 	printf(" *.astg         asynchronous signal transition graph\n");
 }
-
-struct Process {
-	Process() {}
-	Process(string prefix) {
-		this->prefix = prefix;
-	}
-	~Process() {}
-
-	string prefix;
-
-	ucs::variable_set v;
-	unique_ptr<chp::graph> cg;
-	unique_ptr<hse::graph> hg;
-	unique_ptr<prs::production_rule_set> pr;
-	unique_ptr<sch::Netlist> sp;
-};
-
-struct SymbolTable {
-	map<string, Process> procs;
-
-	bool load(string path);
-};
 
 struct Build {
 	Build() {
@@ -688,6 +666,174 @@ void Build::excl(int target) {
 bool Build::has(int target) {
 	return targets[target];
 }
+
+struct Process {
+	Process() {}
+	Process(string prefix) {
+		this->prefix = prefix;
+	}
+	~Process() {}
+
+	string prefix;
+
+	ucs::variable_set v;
+	shared_ptr<chp::graph> cg;
+	shared_ptr<hse::graph> hg;
+	shared_ptr<prs::production_rule_set> pr;
+	shared_ptr<sch::Netlist> sp;
+};
+
+struct SymbolTable {
+	map<string, Process> procs;
+
+	map<string, Process>::iterator create(string prefix);
+	bool load(configuration &config, string path, const Tech *tech=nullptr);
+};
+
+map<string, Process>::iterator SymbolTable::create(string prefix) {
+	return procs.insert(pair<string, Process>(prefix, Process(prefix))).first;
+}
+
+bool SymbolTable::load(configuration &config, string path, const Tech *tech) {
+	size_t dot = path.find_last_of(".");
+	string format = "";
+	if (dot != string::npos) {
+		format = path.substr(dot+1);
+		if (format == "spice"
+			or format == "sp"
+			or format == "s") {
+			format = "spi";
+		}
+	}
+
+	string prefix = dot != string::npos ? path.substr(0, dot) : path;
+
+	if (format == "chp") {
+		tokenizer tokens;
+		tokens.register_token<parse::block_comment>(false);
+		tokens.register_token<parse::line_comment>(false);
+		parse_chp::composition::register_syntax(tokens);
+		config.load(tokens, path, "");
+
+		auto proc = create(prefix);
+		proc->second.cg = shared_ptr<chp::graph>(new chp::graph());
+
+		tokens.increment(false);
+		tokens.expect<parse_chp::composition>();
+		while (tokens.decrement(__FILE__, __LINE__))
+		{
+			parse_chp::composition syntax(tokens);
+			proc->second.cg->merge(chp::parallel, chp::import_chp(syntax, proc->second.v, 0, &tokens, true));
+
+			tokens.increment(false);
+			tokens.expect<parse_chp::composition>();
+		}
+	} else if (format == "hse") {
+		tokenizer tokens;
+		tokens.register_token<parse::block_comment>(false);
+		tokens.register_token<parse::line_comment>(false);
+		parse_chp::composition::register_syntax(tokens);
+		config.load(tokens, path, "");
+		
+		auto proc = create(prefix);
+		proc->second.hg = shared_ptr<hse::graph>(new hse::graph());
+
+		tokens.increment(false);
+		tokens.expect<parse_chp::composition>();
+		while (tokens.decrement(__FILE__, __LINE__))
+		{
+			parse_chp::composition syntax(tokens);
+			proc->second.hg->merge(hse::parallel, hse::import_hse(syntax, proc->second.v, 0, &tokens, true));
+
+			tokens.increment(false);
+			tokens.expect<parse_chp::composition>();
+		}
+	} else if (format == "astg") {
+		tokenizer tokens;
+		tokens.register_token<parse::block_comment>(false);
+		tokens.register_token<parse::line_comment>(false);
+		parse_astg::graph::register_syntax(tokens);
+		config.load(tokens, path, "");
+		
+		auto proc = create(prefix);
+		proc->second.hg = shared_ptr<hse::graph>(new hse::graph());
+		
+		tokens.increment(false);
+		tokens.expect<parse_astg::graph>();
+		while (tokens.decrement(__FILE__, __LINE__))
+		{
+			parse_astg::graph syntax(tokens);
+			proc->second.hg->merge(hse::parallel, hse::import_hse(syntax, proc->second.v, &tokens));
+
+			tokens.increment(false);
+			tokens.expect<parse_astg::graph>();
+		}
+	} else if (format == "cog") {
+		tokenizer tokens;
+		tokens.register_token<parse::block_comment>(false);
+		tokens.register_token<parse::line_comment>(false);
+		parse_cog::composition::register_syntax(tokens);
+		config.load(tokens, path, "");
+		
+		auto proc = create(prefix);
+		proc->second.hg = shared_ptr<hse::graph>(new hse::graph());
+
+		tokens.increment(false);
+		tokens.expect<parse_cog::composition>();
+		while (tokens.decrement(__FILE__, __LINE__))
+		{
+			parse_cog::composition syntax(tokens);
+			boolean::cover covered;
+			bool hasRepeat = false;
+			proc->second.hg->merge(hse::parallel, hse::import_hse(syntax, proc->second.v, covered, hasRepeat, 0, &tokens, true));
+
+			tokens.increment(false);
+			tokens.expect<parse_cog::composition>();
+		}
+	} else if (format == "prs") {
+		tokenizer tokens;
+		tokens.register_token<parse::block_comment>(false);
+		tokens.register_token<parse::line_comment>(false);
+		parse_prs::production_rule_set::register_syntax(tokens);
+		config.load(tokens, path, "");
+		
+		auto proc = create(prefix);
+		proc->second.pr = shared_ptr<prs::production_rule_set>(new prs::production_rule_set());
+
+		tokens.increment(false);
+		tokens.expect<parse_prs::production_rule_set>();
+		if (tokens.decrement(__FILE__, __LINE__))
+		{
+			parse_prs::production_rule_set syntax(tokens);
+			map<int, int> nodemap;
+			prs::import_production_rule_set(syntax, *proc->second.pr, -1, -1, prs::attributes(), proc->second.v, nodemap, 0, &tokens, true);
+		}
+	} else if (format == "spi") {
+		if (tech == nullptr) {
+			printf("unable to open spice file without technology\n");
+		}
+
+		tokenizer tokens;
+		parse_spice::netlist::register_syntax(tokens);
+		config.load(tokens, path, "");
+		
+		auto proc = create(prefix);
+		proc->second.sp = shared_ptr<sch::Netlist>(new sch::Netlist());
+
+		tokens.increment(false);
+		tokens.expect<parse_spice::netlist>();
+		if (tokens.decrement(__FILE__, __LINE__))
+		{
+			parse_spice::netlist syntax(tokens);
+			sch::import_netlist(*tech, *proc->second.sp, syntax, &tokens);
+		}
+	} else {
+		printf("unrecognized file format '%s'\n", format.c_str());
+		return false;
+	}
+	return true;
+}
+
 
 int build_command(configuration &config, string techPath, string cellsDir, int argc, char **argv, bool progress, bool debug) {
 	Build builder;
@@ -1234,7 +1380,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		complete();
 		return 1;
 	}
-	sch::Netlist net(tech);
+	sch::Netlist net;
 
 	if (format == "chp"
 		or format == "hse"
@@ -1254,7 +1400,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 				string suffix = builder.stage == Build::NETS ? "" : "_simple";
 				fout = fopen((prefix+".spi").c_str(), "w");
 			}
-			fprintf(fout, "%s", sch::export_netlist(net).to_string().c_str());
+			fprintf(fout, "%s", sch::export_netlist(tech, net).to_string().c_str());
 			fclose(fout);
 		}
 	}
@@ -1274,7 +1420,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		if (tokens.decrement(__FILE__, __LINE__))
 		{
 			parse_spice::netlist syntax(tokens);
-			sch::import_netlist(syntax, net, &tokens);
+			sch::import_netlist(tech, net, syntax, &tokens);
 		}
 	}
 
@@ -1286,7 +1432,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 
 	if (progress) printf("Break subckts into cells:\n");
 	Timer cellsTmr;
-	net.mapCells(progress);
+	net.mapCells(tech, progress);
 	if (progress) printf("done\t%gs\n\n", cellsTmr.since());
 
 	if (format != "spi") {
@@ -1295,7 +1441,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		if (prefix != "") {
 			fout = fopen((prefix+".spi").c_str(), "w");
 		}
-		fprintf(fout, "%s", sch::export_netlist(net).to_string().c_str());
+		fprintf(fout, "%s", sch::export_netlist(tech, net).to_string().c_str());
 		fclose(fout);
 	}
 
