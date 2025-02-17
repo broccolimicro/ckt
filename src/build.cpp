@@ -630,6 +630,9 @@ struct Build {
 
 	bool noCells;
 	bool noGhosts;
+
+	bool progress;
+	bool debug;
 	
 	vector<bool> targets;
 
@@ -667,31 +670,49 @@ bool Build::has(int target) {
 	return targets[target];
 }
 
-struct Process {
-	Process() {}
-	Process(string prefix) {
-		this->prefix = prefix;
-	}
-	~Process() {}
-
-	string prefix;
+struct Function {
+	Function() {}
+	~Function() {}
 
 	ucs::variable_set v;
 	shared_ptr<chp::graph> cg;
 	shared_ptr<hse::graph> hg;
-	shared_ptr<prs::production_rule_set> pr;
-	shared_ptr<sch::Netlist> sp;
 };
 
-struct SymbolTable {
-	map<string, Process> procs;
+struct Structure {
+	Structure() {}
+	~Structure() {}
 
-	map<string, Process>::iterator create(string prefix);
+	ucs::variable_set v;
+	shared_ptr<prs::production_rule_set> pr;
+	shared_ptr<sch::Subckt> sp;
+};
+
+/*
+struct Data {
+	Data() {}
+	~Data() {}
+
+	...?
+};
+*/
+
+struct SymbolTable {
+	map<string, Function> funcs;
+	map<string, Structure> structs;
+	// map<string, Data> data;
+
+	map<string, Function>::iterator createFunc(string name);
+	map<string, Structure>::iterator createStruct(string name);
 	bool load(configuration &config, string path, const Tech *tech=nullptr);
 };
 
-map<string, Process>::iterator SymbolTable::create(string prefix) {
-	return procs.insert(pair<string, Process>(prefix, Process(prefix))).first;
+map<string, Function>::iterator SymbolTable::createFunc(string name) {
+	return funcs.insert(pair<string, Function>(name, Function())).first;
+}
+
+map<string, Structure>::iterator SymbolTable::createStruct(string name) {
+	return structs.insert(pair<string, Structure>(name, Structure())).first;
 }
 
 bool SymbolTable::load(configuration &config, string path, const Tech *tech) {
@@ -708,15 +729,34 @@ bool SymbolTable::load(configuration &config, string path, const Tech *tech) {
 
 	string prefix = dot != string::npos ? path.substr(0, dot) : path;
 
-	if (format == "chp") {
+	if (format == "ucs") {
+		cout << "parsing ucs" << endl;
+		parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
+
+		tokenizer tokens;
+		tokens.register_token<parse::block_comment>(false);
+		tokens.register_token<parse::line_comment>(false);
+		parse_ucs::source::register_syntax(tokens);
+		config.load(tokens, path, "");
+
+		tokens.increment(true);
+		tokens.expect<parse_ucs::source>();
+		if (tokens.decrement(__FILE__, __LINE__)) {
+			parse_ucs::source syntax(tokens);
+			cout << syntax.to_string() << endl;
+		}
+
+		cout << "done" << endl;
+	} else if (format == "chp") {
 		tokenizer tokens;
 		tokens.register_token<parse::block_comment>(false);
 		tokens.register_token<parse::line_comment>(false);
 		parse_chp::composition::register_syntax(tokens);
 		config.load(tokens, path, "");
 
-		auto proc = create(prefix);
+		auto proc = createFunc(prefix);
 		proc->second.cg = shared_ptr<chp::graph>(new chp::graph());
+		proc->second.cg->name = prefix;
 
 		tokens.increment(false);
 		tokens.expect<parse_chp::composition>();
@@ -735,8 +775,9 @@ bool SymbolTable::load(configuration &config, string path, const Tech *tech) {
 		parse_chp::composition::register_syntax(tokens);
 		config.load(tokens, path, "");
 		
-		auto proc = create(prefix);
+		auto proc = createFunc(prefix);
 		proc->second.hg = shared_ptr<hse::graph>(new hse::graph());
+		proc->second.hg->name = prefix;
 
 		tokens.increment(false);
 		tokens.expect<parse_chp::composition>();
@@ -755,8 +796,9 @@ bool SymbolTable::load(configuration &config, string path, const Tech *tech) {
 		parse_astg::graph::register_syntax(tokens);
 		config.load(tokens, path, "");
 		
-		auto proc = create(prefix);
+		auto proc = createFunc(prefix);
 		proc->second.hg = shared_ptr<hse::graph>(new hse::graph());
+		proc->second.hg->name = prefix;
 		
 		tokens.increment(false);
 		tokens.expect<parse_astg::graph>();
@@ -775,8 +817,9 @@ bool SymbolTable::load(configuration &config, string path, const Tech *tech) {
 		parse_cog::composition::register_syntax(tokens);
 		config.load(tokens, path, "");
 		
-		auto proc = create(prefix);
+		auto proc = createFunc(prefix);
 		proc->second.hg = shared_ptr<hse::graph>(new hse::graph());
+		proc->second.hg->name = prefix;
 
 		tokens.increment(false);
 		tokens.expect<parse_cog::composition>();
@@ -797,8 +840,9 @@ bool SymbolTable::load(configuration &config, string path, const Tech *tech) {
 		parse_prs::production_rule_set::register_syntax(tokens);
 		config.load(tokens, path, "");
 		
-		auto proc = create(prefix);
+		auto proc = createStruct(prefix);
 		proc->second.pr = shared_ptr<prs::production_rule_set>(new prs::production_rule_set());
+		proc->second.pr->name = prefix;
 
 		tokens.increment(false);
 		tokens.expect<parse_prs::production_rule_set>();
@@ -816,16 +860,20 @@ bool SymbolTable::load(configuration &config, string path, const Tech *tech) {
 		tokenizer tokens;
 		parse_spice::netlist::register_syntax(tokens);
 		config.load(tokens, path, "");
-		
-		auto proc = create(prefix);
-		proc->second.sp = shared_ptr<sch::Netlist>(new sch::Netlist());
 
 		tokens.increment(false);
 		tokens.expect<parse_spice::netlist>();
 		if (tokens.decrement(__FILE__, __LINE__))
 		{
 			parse_spice::netlist syntax(tokens);
-			sch::import_netlist(*tech, *proc->second.sp, syntax, &tokens);
+			
+			sch::Netlist lst;
+			sch::import_netlist(*tech, lst, syntax, &tokens);
+
+			for (auto i = lst.subckts.begin(); i != lst.subckts.end(); i++) {
+				auto proc = createStruct(prefix);
+				proc->second.sp = shared_ptr<sch::Subckt>(new sch::Subckt(*i));
+			}
 		}
 	} else {
 		printf("unrecognized file format '%s'\n", format.c_str());
@@ -834,9 +882,29 @@ bool SymbolTable::load(configuration &config, string path, const Tech *tech) {
 	return true;
 }
 
+void canonicalize_hse(const Build &builder, SymbolTable &tbl, Function &func) {
+	func.hg->post_process(func.v, true);
+	func.hg->check_variables(func.v);
+
+	if (builder.doPostprocess) {
+		export_astg(func.hg->name+"_post.astg", *func.hg, func.v);
+	}
+}
+
+void elaborate_hse(const Build &builder, SymbolTable &tbl, Function &func) {
+	if (builder.progress) printf("Elaborate state space:\n");
+	hse::elaborate(*func.hg, func.v, builder.stage >= Build::ENCODE or not builder.noGhosts, true, builder.progress);
+	if (builder.progress) printf("done\n\n");
+}
+
+void hse_to_prs(const Build &builder, SymbolTable &tbl, Structure &strct, const Function &func) {
+	
+}
 
 int build_command(configuration &config, string techPath, string cellsDir, int argc, char **argv, bool progress, bool debug) {
 	Build builder;
+	builder.progress = progress;
+	builder.debug = debug;
 
 	tokenizer tokens;
 	
@@ -1099,12 +1167,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 	}
 
 	if (builder.doPreprocess) {
-		FILE *fout = stdout;
-		if (prefix != "") {
-			fout = fopen((prefix+"_pre.astg").c_str(), "w");
-		}
-		fprintf(fout, "%s", export_astg(hg, v).to_string().c_str());
-		fclose(fout);
+		export_astg(prefix+"_pre.astg", hg, v);
 	}
 
 	if (!is_clean()) {
@@ -1121,12 +1184,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		hg.check_variables(v);
 
 		if (builder.doPostprocess) {
-			FILE *fout = stdout;
-			if (prefix != "") {
-				fout = fopen((prefix+"_post.astg").c_str(), "w");
-			}
-			fprintf(fout, "%s", export_astg(hg, v).to_string().c_str());
-			fclose(fout);
+			export_astg(prefix+"_post.astg", hg, v);
 		}
 
 		if (progress) printf("Elaborate state space:\n");
@@ -1140,13 +1198,8 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		}
 
 		if (builder.has(Build::ELAB)) {
-			FILE *fout = stdout;
-			if (prefix != "") {
-				string suffix = builder.stage == Build::ELAB ? "" : "_predicate";
-				fout = fopen((prefix+suffix+".astg").c_str(), "w");
-			}
-			fprintf(fout, "%s", export_astg(hg, v).to_string().c_str());
-			fclose(fout);
+			string suffix = builder.stage == Build::ELAB ? "" : "_predicate";
+			export_astg(prefix+suffix+".astg", hg, v);
 		}
 
 		if (not builder.get(Build::CONFLICTS)) {
@@ -1186,13 +1239,8 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		if (progress) printf("done\n\n");
 
 		if (builder.has(Build::ENCODE)) {
-			FILE *fout = stdout;
-			if (prefix != "") {
-				string suffix = builder.stage == Build::ENCODE ? "" : "_complete";
-				fout = fopen((prefix+suffix+".astg").c_str(), "w");
-			}
-			fprintf(fout, "%s", export_astg(hg, v).to_string().c_str());
-			fclose(fout);
+			string suffix = builder.stage == Build::ENCODE ? "" : "_complete";
+			export_astg(prefix+suffix+".astg", hg, v);
 		}
 
 		if (enc.conflicts.size() > 0) {
