@@ -34,6 +34,8 @@
 #include <interpret_arithmetic/import.h>
 #include <ucs/variable.h>
 
+#include "symbol.h"
+
 #ifdef GRAPHVIZ_SUPPORTED
 namespace graphviz
 {
@@ -178,22 +180,50 @@ int show_command(configuration &config, string techPath, string cellsDir, int ar
 
 	ucs::variable_set v;
 
-	if (format == "chp") {
+	if (format == "ucs") {
+		parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
+		parse_ucs::function::registry.insert({"struct", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
+
+		SymbolTable tbl;
+		tbl.load(config, filename);
+		for (auto i = tbl.funcs.begin(); i != tbl.funcs.end(); i++) {
+			
+		}
+	} else if (format == "chp" or format == "cog") {
 		chp::graph cg;
 
-		parse_chp::composition::register_syntax(tokens);
-		config.load(tokens, filename, "");
-
-		tokens.increment(false);
-		tokens.expect<parse_chp::composition>();
-		while (tokens.decrement(__FILE__, __LINE__))
-		{
-			parse_chp::composition syntax(tokens);
-			cg.merge(chp::parallel, chp::import_chp(syntax, v, 0, &tokens, true));
+		if (format == "chp") {
+			parse_chp::composition::register_syntax(tokens);
+			config.load(tokens, filename, "");
 
 			tokens.increment(false);
 			tokens.expect<parse_chp::composition>();
+			while (tokens.decrement(__FILE__, __LINE__))
+			{
+				parse_chp::composition syntax(tokens);
+				cg.merge(chp::parallel, chp::import_chp(syntax, v, 0, &tokens, true));
+
+				tokens.increment(false);
+				tokens.expect<parse_chp::composition>();
+			}
+		} else {
+			parse_cog::composition::register_syntax(tokens);
+			config.load(tokens, filename, "");
+
+			tokens.increment(false);
+			tokens.expect<parse_cog::composition>();
+			while (tokens.decrement(__FILE__, __LINE__))
+			{
+				parse_cog::composition syntax(tokens);
+				arithmetic::expression covered;
+				bool hasRepeat = false;
+				cg.merge(petri::parallel, chp::import_chp(syntax, v, covered, hasRepeat, 0, &tokens, true));
+
+				tokens.increment(false);
+				tokens.expect<parse_cog::composition>();
+			}
 		}
+		
 		if (process) {
 			cg.post_process(v, true);
 		}

@@ -11,6 +11,9 @@
 
 #include <parse_ucs/source.h>
 #include <parse_cog/factory.h>
+#include <parse_chp/factory.h>
+#include <parse_prs/factory.h>
+#include <parse_spice/factory.h>
 
 #include <chp/graph.h>
 //#include <chp/simulator.h>
@@ -55,6 +58,8 @@
 #include <ucs/variable.h>
 
 #include <filesystem>
+
+#include "symbol.h"
 
 //printf(" -c             check for state conflicts that occur regardless of sense\n");
 //	printf(" -cu            check for state conflicts that occur due to up-going transitions\n");
@@ -670,231 +675,67 @@ bool Build::has(int target) {
 	return targets[target];
 }
 
-struct Function {
-	Function() {}
-	~Function() {}
-
-	ucs::variable_set v;
-	shared_ptr<chp::graph> cg;
-	shared_ptr<hse::graph> hg;
-};
-
-struct Structure {
-	Structure() {}
-	~Structure() {}
-
-	ucs::variable_set v;
-	shared_ptr<prs::production_rule_set> pr;
-	shared_ptr<sch::Subckt> sp;
-};
-
-/*
-struct Data {
-	Data() {}
-	~Data() {}
-
-	...?
-};
-*/
-
-struct SymbolTable {
-	map<string, Function> funcs;
-	map<string, Structure> structs;
-	// map<string, Data> data;
-
-	map<string, Function>::iterator createFunc(string name);
-	map<string, Structure>::iterator createStruct(string name);
-	bool load(configuration &config, string path, const Tech *tech=nullptr);
-};
-
-map<string, Function>::iterator SymbolTable::createFunc(string name) {
-	return funcs.insert(pair<string, Function>(name, Function())).first;
-}
-
-map<string, Structure>::iterator SymbolTable::createStruct(string name) {
-	return structs.insert(pair<string, Structure>(name, Structure())).first;
-}
-
-bool SymbolTable::load(configuration &config, string path, const Tech *tech) {
-	size_t dot = path.find_last_of(".");
-	string format = "";
-	if (dot != string::npos) {
-		format = path.substr(dot+1);
-		if (format == "spice"
-			or format == "sp"
-			or format == "s") {
-			format = "spi";
-		}
-	}
-
-	string prefix = dot != string::npos ? path.substr(0, dot) : path;
-
-	if (format == "ucs") {
-		cout << "parsing ucs" << endl;
-		parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
-
-		tokenizer tokens;
-		tokens.register_token<parse::block_comment>(false);
-		tokens.register_token<parse::line_comment>(false);
-		parse_ucs::source::register_syntax(tokens);
-		config.load(tokens, path, "");
-
-		tokens.increment(true);
-		tokens.expect<parse_ucs::source>();
-		if (tokens.decrement(__FILE__, __LINE__)) {
-			parse_ucs::source syntax(tokens);
-			cout << syntax.to_string() << endl;
-		}
-
-		cout << "done" << endl;
-	} else if (format == "chp") {
-		tokenizer tokens;
-		tokens.register_token<parse::block_comment>(false);
-		tokens.register_token<parse::line_comment>(false);
-		parse_chp::composition::register_syntax(tokens);
-		config.load(tokens, path, "");
-
-		auto proc = createFunc(prefix);
-		proc->second.cg = shared_ptr<chp::graph>(new chp::graph());
-		proc->second.cg->name = prefix;
-
-		tokens.increment(false);
-		tokens.expect<parse_chp::composition>();
-		while (tokens.decrement(__FILE__, __LINE__))
-		{
-			parse_chp::composition syntax(tokens);
-			proc->second.cg->merge(chp::parallel, chp::import_chp(syntax, proc->second.v, 0, &tokens, true));
-
-			tokens.increment(false);
-			tokens.expect<parse_chp::composition>();
-		}
-	} else if (format == "hse") {
-		tokenizer tokens;
-		tokens.register_token<parse::block_comment>(false);
-		tokens.register_token<parse::line_comment>(false);
-		parse_chp::composition::register_syntax(tokens);
-		config.load(tokens, path, "");
-		
-		auto proc = createFunc(prefix);
-		proc->second.hg = shared_ptr<hse::graph>(new hse::graph());
-		proc->second.hg->name = prefix;
-
-		tokens.increment(false);
-		tokens.expect<parse_chp::composition>();
-		while (tokens.decrement(__FILE__, __LINE__))
-		{
-			parse_chp::composition syntax(tokens);
-			proc->second.hg->merge(hse::parallel, hse::import_hse(syntax, proc->second.v, 0, &tokens, true));
-
-			tokens.increment(false);
-			tokens.expect<parse_chp::composition>();
-		}
-	} else if (format == "astg") {
-		tokenizer tokens;
-		tokens.register_token<parse::block_comment>(false);
-		tokens.register_token<parse::line_comment>(false);
-		parse_astg::graph::register_syntax(tokens);
-		config.load(tokens, path, "");
-		
-		auto proc = createFunc(prefix);
-		proc->second.hg = shared_ptr<hse::graph>(new hse::graph());
-		proc->second.hg->name = prefix;
-		
-		tokens.increment(false);
-		tokens.expect<parse_astg::graph>();
-		while (tokens.decrement(__FILE__, __LINE__))
-		{
-			parse_astg::graph syntax(tokens);
-			proc->second.hg->merge(hse::parallel, hse::import_hse(syntax, proc->second.v, &tokens));
-
-			tokens.increment(false);
-			tokens.expect<parse_astg::graph>();
-		}
-	} else if (format == "cog") {
-		tokenizer tokens;
-		tokens.register_token<parse::block_comment>(false);
-		tokens.register_token<parse::line_comment>(false);
-		parse_cog::composition::register_syntax(tokens);
-		config.load(tokens, path, "");
-		
-		auto proc = createFunc(prefix);
-		proc->second.hg = shared_ptr<hse::graph>(new hse::graph());
-		proc->second.hg->name = prefix;
-
-		tokens.increment(false);
-		tokens.expect<parse_cog::composition>();
-		while (tokens.decrement(__FILE__, __LINE__))
-		{
-			parse_cog::composition syntax(tokens);
-			boolean::cover covered;
-			bool hasRepeat = false;
-			proc->second.hg->merge(hse::parallel, hse::import_hse(syntax, proc->second.v, covered, hasRepeat, 0, &tokens, true));
-
-			tokens.increment(false);
-			tokens.expect<parse_cog::composition>();
-		}
-	} else if (format == "prs") {
-		tokenizer tokens;
-		tokens.register_token<parse::block_comment>(false);
-		tokens.register_token<parse::line_comment>(false);
-		parse_prs::production_rule_set::register_syntax(tokens);
-		config.load(tokens, path, "");
-		
-		auto proc = createStruct(prefix);
-		proc->second.pr = shared_ptr<prs::production_rule_set>(new prs::production_rule_set());
-		proc->second.pr->name = prefix;
-
-		tokens.increment(false);
-		tokens.expect<parse_prs::production_rule_set>();
-		if (tokens.decrement(__FILE__, __LINE__))
-		{
-			parse_prs::production_rule_set syntax(tokens);
-			map<int, int> nodemap;
-			prs::import_production_rule_set(syntax, *proc->second.pr, -1, -1, prs::attributes(), proc->second.v, nodemap, 0, &tokens, true);
-		}
-	} else if (format == "spi") {
-		if (tech == nullptr) {
-			printf("unable to open spice file without technology\n");
-		}
-
-		tokenizer tokens;
-		parse_spice::netlist::register_syntax(tokens);
-		config.load(tokens, path, "");
-
-		tokens.increment(false);
-		tokens.expect<parse_spice::netlist>();
-		if (tokens.decrement(__FILE__, __LINE__))
-		{
-			parse_spice::netlist syntax(tokens);
-			
-			sch::Netlist lst;
-			sch::import_netlist(*tech, lst, syntax, &tokens);
-
-			for (auto i = lst.subckts.begin(); i != lst.subckts.end(); i++) {
-				auto proc = createStruct(prefix);
-				proc->second.sp = shared_ptr<sch::Subckt>(new sch::Subckt(*i));
-			}
-		}
-	} else {
-		printf("unrecognized file format '%s'\n", format.c_str());
-		return false;
-	}
-	return true;
-}
-
-void canonicalize_hse(const Build &builder, SymbolTable &tbl, Function &func) {
+bool canonicalize_hse(const Build &builder, SymbolTable &tbl, Function &func) {
 	func.hg->post_process(func.v, true);
 	func.hg->check_variables(func.v);
 
 	if (builder.doPostprocess) {
 		export_astg(func.hg->name+"_post.astg", *func.hg, func.v);
 	}
+	return true;
 }
 
-void elaborate_hse(const Build &builder, SymbolTable &tbl, Function &func) {
+bool elaborate_hse(const Build &builder, SymbolTable &tbl, Function &func) {
 	if (builder.progress) printf("Elaborate state space:\n");
 	hse::elaborate(*func.hg, func.v, builder.stage >= Build::ENCODE or not builder.noGhosts, true, builder.progress);
 	if (builder.progress) printf("done\n\n");
+	return true;
+}
+
+bool encode_hse(const Build &builder, SymbolTable &tbl, Function &func) {
+	/*hse::encoder enc;
+	enc.base = &func.hg;
+	enc.variables = &func.v;
+
+	if (progress) {
+		printf("Identify state conflicts:\n");
+	}
+	enc.check(!inverting, progress);
+	if (progress) {
+		printf("done\n\n");
+	}
+
+	if (builder.has(Build::CONFLICTS)) {
+		print_conflicts(enc);
+	}
+
+	if (not builder.get(Build::ENCODE)) {
+		if (progress) printf("compiled in %gs\n\n", totalTime.since());
+		complete();
+		return is_clean();
+	}
+
+	if (progress) printf("Insert state variables:\n");
+	if (not enc.insert_state_variables(20, !inverting, progress, false)) {
+		if (progress) printf("compiled in %gs\n\n", totalTime.since());
+		complete();
+		return 1;
+	}
+	if (progress) printf("done\n\n");
+
+	if (builder.has(Build::ENCODE)) {
+		string suffix = builder.stage == Build::ENCODE ? "" : "_complete";
+		export_astg(prefix+suffix+".astg", hg, v);
+	}
+
+	if (enc.conflicts.size() > 0) {
+		// state variable insertion failed
+		print_conflicts(enc);
+		if (progress) printf("compiled in %gs\n\n", totalTime.since());
+		complete();
+		return is_clean();
+	}
+	return true;*/
 }
 
 void hse_to_prs(const Build &builder, SymbolTable &tbl, Structure &strct, const Function &func) {
@@ -1046,25 +887,17 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 	Timer totalTime;
 
 	if (format == "ucs") {
-		cout << "parsing ucs" << endl;
 		parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
+		//parse_ucs::function::registry.insert({"chp", parse_ucs::language(&parse_chp::produce, &parse_chp::expect, &parse_chp::register_syntax)});
+		//parse_ucs::function::registry.insert({"hse", parse_ucs::language(&parse_chp::produce, &parse_chp::expect, &parse_chp::register_syntax)});
+		parse_ucs::function::registry.insert({"struct", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
+		//parse_ucs::function::registry.insert({"spice", parse_ucs::language(&parse_spice::produce, &parse_spice::expect, &parse_spice::register_syntax)});
 
-		tokens.register_token<parse::block_comment>(false);
-		tokens.register_token<parse::line_comment>(false);
-		parse_ucs::source::register_syntax(tokens);
-		config.load(tokens, filename, "");
+		SymbolTable tbl;
 
-		tokens.increment(true);
-		tokens.expect<parse_ucs::source>();
-		if (tokens.decrement(__FILE__, __LINE__)) {
-			parse_ucs::source syntax(tokens);
-			cout << syntax.to_string() << endl;
-		}
-
-		cout << "done" << endl;
+		tbl.load(config, filename);
 		return 0;
 	}
-
 
 	ucs::variable_set v;
 	chp::graph cg;
