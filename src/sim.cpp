@@ -446,10 +446,9 @@ void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps =
 
 }
 
-void hsesim(hse::graph &g, ucs::variable_set &v, string prefix, vector<hse::term_index> steps = vector<hse::term_index>()) {
+void hsesim(hse::graph &g, string prefix, vector<hse::term_index> steps = vector<hse::term_index>()) {
 	hse::simulator sim;
 	sim.base = &g;
-	sim.variables = &v;
 
 	tokenizer assignment_parser(false);
 	parse_expression::composition::register_syntax(assignment_parser);
@@ -459,7 +458,7 @@ void hsesim(hse::graph &g, ucs::variable_set &v, string prefix, vector<hse::term
 	//vector<pair<uint64_t, > > events;
 
 	vcd dump;
-	dump.create(prefix, v, 0);
+	dump.create(prefix, g);
 
 	int seed = 0;
 	srand(seed);
@@ -544,14 +543,14 @@ void hsesim(hse::graph &g, ucs::variable_set &v, string prefix, vector<hse::term
 		{
 			if (sscanf(command, "reset %d", &n) == 1 || sscanf(command, "r%d", &n) == 1)
 			{
-				sim = hse::simulator(&g, &v, g.reset[n]);
+				sim = hse::simulator(&g, g.reset[n]);
 				uptodate = false;
 				step = 0;
 				srand(seed);
 			}
 			else
 				for (int i = 0; i < (int)g.reset.size(); i++)
-					printf("(%d) %s\n", i, g.reset[i].to_string(v).c_str());
+					printf("(%d) %s\n", i, g.reset[i].to_string(g).c_str());
 		}
 		else if ((strncmp(command, "tokens", 6) == 0 && length == 6) || (strncmp(command, "t", 1) == 0 && length == 1))
 		{
@@ -572,7 +571,7 @@ void hsesim(hse::graph &g, ucs::variable_set &v, string prefix, vector<hse::term
 
 			for (int i = 0; i < (int)tokens.size(); i++)
 			{
-				printf("%s {\n", export_composition(sim.encoding.flipped_mask(g.places[sim.tokens[tokens[i][0]].index].mask), v).to_string().c_str());
+				printf("%s {\n", export_composition(sim.encoding.flipped_mask(g.places[sim.tokens[tokens[i][0]].index].mask), g).to_string().c_str());
 				for (int j = 0; j < (int)tokens[i].size(); j++) {
 					int virt = -1;
 					for (int k = 0; k < (int)sim.loaded.size() and virt < 0; k++) {
@@ -581,9 +580,9 @@ void hsesim(hse::graph &g, ucs::variable_set &v, string prefix, vector<hse::term
 						}
 					}
 					if (virt >= 0) {
-						printf("\t\t(%d) %s->%s\tP%d\t%s\n", tokens[i][j], export_expression(sim.tokens[tokens[i][j]].guard, v).to_string().c_str(), export_composition(g.transitions[sim.loaded[virt].index].local_action, v).to_string().c_str(), sim.tokens[tokens[i][j]].index, export_node(hse::iterator(hse::place::type, sim.tokens[tokens[i][j]].index), g, v).c_str());
+						printf("\t\t(%d) %s->%s\tP%d\t%s\n", tokens[i][j], export_expression(sim.tokens[tokens[i][j]].guard, g).to_string().c_str(), export_composition(g.transitions[sim.loaded[virt].index].local_action, g).to_string().c_str(), sim.tokens[tokens[i][j]].index, export_node(hse::iterator(hse::place::type, sim.tokens[tokens[i][j]].index), g).c_str());
 					} else {
-						printf("\t(%d) P%d\t%s\n", tokens[i][j], sim.tokens[tokens[i][j]].index, export_node(hse::iterator(hse::place::type, sim.tokens[tokens[i][j]].index), g, v).c_str());
+						printf("\t(%d) P%d\t%s\n", tokens[i][j], sim.tokens[tokens[i][j]].index, export_node(hse::iterator(hse::place::type, sim.tokens[tokens[i][j]].index), g).c_str());
 					}
 				}
 				printf("}\n");
@@ -599,7 +598,7 @@ void hsesim(hse::graph &g, ucs::variable_set &v, string prefix, vector<hse::term
 
 			for (int i = 0; i < enabled; i++)
 			{
-				printf("(%d) T%d.%d:%s->%s\n", i, sim.loaded[sim.ready[i].first].index, sim.ready[i].second, export_expression(g.transitions[sim.loaded[sim.ready[i].first].index].guard, v).to_string().c_str(), export_composition(g.transitions[sim.loaded[sim.ready[i].first].index].local_action[sim.ready[i].second], v).to_string().c_str());
+				printf("(%d) T%d.%d:%s->%s\n", i, sim.loaded[sim.ready[i].first].index, sim.ready[i].second, export_expression(g.transitions[sim.loaded[sim.ready[i].first].index].guard, g).to_string().c_str(), export_composition(g.transitions[sim.loaded[sim.ready[i].first].index].local_action[sim.ready[i].second], g).to_string().c_str());
 				if (sim.loaded[sim.ready[i].first].vacuous) {
 					printf("\tvacuous");
 				}
@@ -627,8 +626,8 @@ void hsesim(hse::graph &g, ucs::variable_set &v, string prefix, vector<hse::term
 
 			assignment_parser.insert("", string(command).substr(i));
 			parse_expression::composition expr(assignment_parser);
-			boolean::cube local_action = import_cube(expr, v, 0, &assignment_parser, false);
-			boolean::cube remote_action = local_action.remote(v.get_groups());
+			boolean::cube local_action = boolean::import_cube(expr, g, 0, &assignment_parser, false);
+			boolean::cube remote_action = local_action.remote(g.remote_groups());
 			if (assignment_parser.is_clean())
 			{
 				sim.encoding = boolean::local_assign(sim.encoding, local_action, true);
@@ -648,8 +647,8 @@ void hsesim(hse::graph &g, ucs::variable_set &v, string prefix, vector<hse::term
 			{
 				assignment_parser.insert("", string(command).substr(6));
 				parse_expression::composition expr(assignment_parser);
-				boolean::cube local_action = import_cube(expr, v, 0, &assignment_parser, false);
-				boolean::cube remote_action = local_action.remote(v.get_groups());
+				boolean::cube local_action = boolean::import_cube(expr, g, 0, &assignment_parser, false);
+				boolean::cube remote_action = local_action.remote(g.remote_groups());
 				if (assignment_parser.is_clean())
 				{
 					sim.encoding = boolean::local_assign(sim.encoding, remote_action, true);
@@ -716,7 +715,7 @@ void hsesim(hse::graph &g, ucs::variable_set &v, string prefix, vector<hse::term
 					boolean::cube action = g.transitions[sim.loaded[sim.ready[firing].first].index].local_action[sim.ready[firing].second];
 					boolean::cube remote_action = g.transitions[sim.loaded[sim.ready[firing].first].index].remote_action[sim.ready[firing].second];
 
-					printf("%lu\tT%d.%d\t%s -> %s%s\n", sim.now, sim.loaded[sim.ready[firing].first].index, sim.ready[firing].second, export_expression(guard, v).to_string().c_str(), export_composition(action, v).to_string().c_str(), flags.c_str());
+					printf("%lu\tT%d.%d\t%s -> %s%s\n", sim.now, sim.loaded[sim.ready[firing].first].index, sim.ready[firing].second, export_expression(guard, g).to_string().c_str(), export_composition(action, g).to_string().c_str(), flags.c_str());
 					
 					sim.fire(firing);
 
@@ -757,7 +756,7 @@ void hsesim(hse::graph &g, ucs::variable_set &v, string prefix, vector<hse::term
 						boolean::cube action = g.transitions[sim.loaded[sim.ready[n].first].index].local_action[sim.ready[n].second];
 						boolean::cube remote_action = g.transitions[sim.loaded[sim.ready[n].first].index].remote_action[sim.ready[n].second];
 
-						printf("%lu\tT%d.%d\t%s -> %s%s\n", sim.now, sim.loaded[sim.ready[n].first].index, sim.ready[n].second, export_expression(guard, v).to_string().c_str(), export_composition(action, v).to_string().c_str(), flags.c_str());
+						printf("%lu\tT%d.%d\t%s -> %s%s\n", sim.now, sim.loaded[sim.ready[n].first].index, sim.ready[n].second, export_expression(guard, g).to_string().c_str(), export_composition(action, g).to_string().c_str(), flags.c_str());
 					
 						sim.fire(n);
 
@@ -783,12 +782,12 @@ void hsesim(hse::graph &g, ucs::variable_set &v, string prefix, vector<hse::term
 	dump.close();
 }
 
-void prsim(prs::production_rule_set &pr, ucs::variable_set &v, string prefix, bool debug) {//, vector<prs::term_index> steps = vector<prs::term_index>()) {
-	prs::globals g(v);
-	prs::simulator sim(&pr, &v, debug);
+void prsim(prs::production_rule_set &pr, string prefix, bool debug) {//, vector<prs::term_index> steps = vector<prs::term_index>()) {
+	prs::globals g(pr);
+	prs::simulator sim(&pr, debug);
 
 	vcd dump;
-	dump.create(prefix, v, (int)pr.nodes.size());
+	dump.create(prefix, pr);
 
 	tokenizer assignment_parser(false);
 	parse_expression::composition::register_syntax(assignment_parser);
@@ -796,7 +795,7 @@ void prsim(prs::production_rule_set &pr, ucs::variable_set &v, string prefix, bo
 	int seed = 0;
 	srand(seed);
 	int step = 0;
-	int n = 0, n1 = 0;
+	int n = 0;
 	char command[256];
 	bool done = false;
 	FILE *script = stdin;
@@ -879,16 +878,11 @@ void prsim(prs::production_rule_set &pr, ucs::variable_set &v, string prefix, bo
 		} else if (strncmp(command, "wait", 4) == 0 || strncmp(command, "w", 1) == 0) {
 			sim.wait();
 		} else if ((strncmp(command, "tokens", 6) == 0 && length == 6) || (strncmp(command, "t", 1) == 0 && length == 1)) {
-			printf("%s\n", export_composition(sim.encoding, v).to_string().c_str());
+			printf("%s\n", export_composition(sim.encoding, pr).to_string().c_str());
 		} else if ((strncmp(command, "enabled", 7) == 0 && length == 7) || (strncmp(command, "e", 1) == 0 && length == 1)) {
 			for (int i = 0; i < (int)sim.nets.size(); i++) {
 				if (sim.nets[i] != nullptr) {
-					printf("(%d) %s\n", i, sim.nets[i]->value.to_string(v).c_str());
-				}
-			}
-			for (int i = 0; i < (int)sim.nodes.size(); i++) {
-				if (sim.nodes[i] != nullptr) {
-					printf("(%d) %s\n", pr.flip(i), sim.nodes[i]->value.to_string(v).c_str());
+					printf("(%d) %s\n", i, sim.nets[i]->value.to_string(&pr).c_str());
 				}
 			}
 		} else if (strncmp(command, "set", 3) == 0) {
@@ -905,7 +899,7 @@ void prsim(prs::production_rule_set &pr, ucs::variable_set &v, string prefix, bo
 
 			assignment_parser.insert("", string(command).substr(i));
 			parse_expression::composition expr(assignment_parser);
-			boolean::cube local_action = import_cube(expr, v, 0, &assignment_parser, false);
+			boolean::cube local_action = boolean::import_cube(expr, pr, 0, &assignment_parser, false);
 			if (assignment_parser.is_clean()) {
 				sim.set(local_action);
 			}
@@ -919,8 +913,8 @@ void prsim(prs::production_rule_set &pr, ucs::variable_set &v, string prefix, bo
 			} else {
 				assignment_parser.insert("", string(command).substr(6));
 				parse_expression::composition expr(assignment_parser);
-				boolean::cube local_action = import_cube(expr, v, 0, &assignment_parser, false);
-				boolean::cube remote_action = local_action.remote(v.get_groups());
+				boolean::cube local_action = boolean::import_cube(expr, pr, 0, &assignment_parser, false);
+				boolean::cube remote_action = local_action.remote(pr.remote_groups());
 				if (assignment_parser.is_clean()) {
 					sim.set(remote_action);
 				}
@@ -943,15 +937,10 @@ void prsim(prs::production_rule_set &pr, ucs::variable_set &v, string prefix, bo
 				}
 
 				if (debug) {
-					printf("\n\n%s\n", export_composition(sim.encoding, v).to_string().c_str());
+					printf("\n\n%s\n", export_composition(sim.encoding, pr).to_string().c_str());
 					for (int i = 0; i < (int)sim.nets.size(); i++) {
 						if (sim.nets[i] != nullptr) {
-							printf("(%d) %s\n", i, sim.nets[i]->value.to_string(v).c_str());
-						}
-					}
-					for (int i = 0; i < (int)sim.nodes.size(); i++) {
-						if (sim.nodes[i] != nullptr) {
-							printf("(%d) %s\n", pr.flip(i), sim.nodes[i]->value.to_string(v).c_str());
+							printf("(%d) %s\n", i, sim.nets[i]->value.to_string(&pr).c_str());
 						}
 					}
 				}
@@ -972,7 +961,7 @@ void prsim(prs::production_rule_set &pr, ucs::variable_set &v, string prefix, bo
 
 				//boolean::cube old = sim.encoding;
 				auto e = sim.fire();
-				printf("%lu\t%s\n", e.fire_at, e.to_string(v).c_str());
+				printf("%lu\t%s\n", e.fire_at, e.to_string(&pr).c_str());
 
 				dump.append(e.fire_at, sim.encoding, sim.strength);
 
@@ -985,7 +974,7 @@ void prsim(prs::production_rule_set &pr, ucs::variable_set &v, string prefix, bo
 			}
 		} else if (strncmp(command, "fire", 4) == 0 || strncmp(command, "f", 1) == 0) {
 			if (sscanf(command, "fire %d", &n) == 1 || sscanf(command, "f%d", &n) == 1) {
-				if (((n >= 0 and n < (int)sim.nets.size()) or (n < 0 and pr.flip(n) >= (int)sim.nodes.size())) and sim.at(n) != nullptr) {
+				if (n >= 0 and n < (int)sim.nets.size() and sim.at(n) != nullptr) {
 					/*if (step < (int)steps.size())
 						printf("error: deviating from loaded simulation, please clear the simulation to continue\n");
 					else
@@ -994,7 +983,7 @@ void prsim(prs::production_rule_set &pr, ucs::variable_set &v, string prefix, bo
 
 						//boolean::cube old = sim.encoding;
 						auto e = sim.fire(n);
-						printf("%lu\t%s\n", e.fire_at, e.to_string(v).c_str());
+						printf("%lu\t%s\n", e.fire_at, e.to_string(&pr).c_str());
 			
 						dump.append(e.fire_at, sim.encoding, sim.strength);
 
@@ -1145,7 +1134,7 @@ int sim_command(configuration &config, string techPath, string cellsDir, int arg
 			while (tokens.decrement(__FILE__, __LINE__))
 			{
 				parse_chp::composition syntax(tokens);
-				hg.merge(hse::parallel, hse::import_hse(syntax, v, 0, &tokens, true));
+				hg.merge(hse::parallel, hse::import_hse(syntax, 0, &tokens, true));
 
 				tokens.increment(false);
 				tokens.expect<parse_chp::composition>();
@@ -1159,7 +1148,7 @@ int sim_command(configuration &config, string techPath, string cellsDir, int arg
 			while (tokens.decrement(__FILE__, __LINE__))
 			{
 				parse_astg::graph syntax(tokens);
-				hg.merge(hse::parallel, hse::import_hse(syntax, v, &tokens));
+				hg.merge(hse::parallel, hse::import_hse(syntax, &tokens));
 
 				tokens.increment(false);
 				tokens.expect<parse_astg::graph>();
@@ -1175,16 +1164,16 @@ int sim_command(configuration &config, string techPath, string cellsDir, int arg
 				parse_cog::composition syntax(tokens);
 				boolean::cover covered;
 				bool hasRepeat = false;
-				hg.merge(hse::parallel, hse::import_hse(syntax, v, covered, hasRepeat, 0, &tokens, true));
+				hg.merge(hse::parallel, hse::import_hse(syntax, covered, hasRepeat, 0, &tokens, true));
 
 				tokens.increment(false);
 				tokens.expect<parse_cog::composition>();
 			}
 		}
-		hg.post_process(v, true);
-		hg.check_variables(v);
+		hg.post_process(true);
+		hg.check_variables();
 
-		hsesim(hg, v, prefix, steps);
+		hsesim(hg, prefix, steps);
 	} else if (format == "prs") {
 		/*vector<prs::term_index> steps;
 		if (sfilename != "") {
@@ -1214,17 +1203,16 @@ int sim_command(configuration &config, string techPath, string cellsDir, int arg
 		if (tokens.decrement(__FILE__, __LINE__))
 		{
 			parse_prs::production_rule_set syntax(tokens);
-			map<int, int> nodemap;
-			prs::import_production_rule_set(syntax, pr, -1, -1, prs::attributes(), v, nodemap, 0, &tokens, true);
+			prs::import_production_rule_set(syntax, pr, -1, -1, prs::attributes(), 0, &tokens, true);
 		}
 
 		if (debug) {
-			printf("\n\n%s\n\n", export_production_rule_set(pr, v).to_string().c_str());
-			pr.print(v);
+			printf("\n\n%s\n\n", export_production_rule_set(pr).to_string().c_str());
+			pr.print();
 			printf("\n\n");
 		}
 
-		prsim(pr, v, prefix, debug);//, steps);
+		prsim(pr, prefix, debug);//, steps);
 	}
 
 	complete();

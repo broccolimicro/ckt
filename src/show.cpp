@@ -243,7 +243,7 @@ int show_command(configuration &config, string techPath, string cellsDir, int ar
 			while (tokens.decrement(__FILE__, __LINE__))
 			{
 				parse_chp::composition syntax(tokens);
-				hg.merge(hse::parallel, hse::import_hse(syntax, v, 0, &tokens, true));
+				hg.merge(hse::parallel, hse::import_hse(syntax, 0, &tokens, true));
 
 				tokens.increment(false);
 				tokens.expect<parse_chp::composition>();
@@ -257,7 +257,7 @@ int show_command(configuration &config, string techPath, string cellsDir, int ar
 			while (tokens.decrement(__FILE__, __LINE__))
 			{
 				parse_astg::graph syntax(tokens);
-				hg.merge(hse::parallel, hse::import_hse(syntax, v, &tokens));
+				hg.merge(hse::parallel, hse::import_hse(syntax, &tokens));
 
 				tokens.increment(false);
 				tokens.expect<parse_astg::graph>();
@@ -273,26 +273,26 @@ int show_command(configuration &config, string techPath, string cellsDir, int ar
 				parse_cog::composition syntax(tokens);
 				boolean::cover covered;
 				bool hasRepeat = false;
-				hg.merge(hse::parallel, hse::import_hse(syntax, v, covered, hasRepeat, 0, &tokens, true));
+				hg.merge(hse::parallel, hse::import_hse(syntax, covered, hasRepeat, 0, &tokens, true));
 
 				tokens.increment(false);
 				tokens.expect<parse_cog::composition>();
 			}
 		}
 		if (process) {
-			hg.post_process(v, true);
+			hg.post_process(true);
 		}
-		hg.check_variables(v);
+		hg.check_variables();
 
 		if (is_clean()) {
 			if (states) {
-				hse::graph sg = hse::to_state_graph(hg, v, true);
-				render(ofilename, oformat, export_graph(sg, v, horiz, labels, notations, ghost, encodings).to_string());
+				hse::graph sg = hse::to_state_graph(hg, true);
+				render(ofilename, oformat, export_graph(sg, horiz, labels, notations, ghost, encodings).to_string());
 			} else if (petri) {
-				hse::graph pn = hse::to_petri_net(hg, v, true);
-				render(ofilename, oformat, export_graph(hg, v, horiz, labels, notations, ghost, encodings).to_string());
+				hse::graph pn = hse::to_petri_net(hg, true);
+				render(ofilename, oformat, export_graph(hg, horiz, labels, notations, ghost, encodings).to_string());
 			} else {
-				render(ofilename, oformat, export_graph(hg, v, horiz, labels, notations, ghost, encodings).to_string());
+				render(ofilename, oformat, export_graph(hg, horiz, labels, notations, ghost, encodings).to_string());
 			}
 		}
 	} else if (format == "prs") {
@@ -306,8 +306,7 @@ int show_command(configuration &config, string techPath, string cellsDir, int ar
 		if (tokens.decrement(__FILE__, __LINE__))
 		{
 			parse_prs::production_rule_set syntax(tokens);
-			map<int, int> nodemap;
-			prs::import_production_rule_set(syntax, pr, -1, -1, prs::attributes(), v, nodemap, 0, &tokens, true);
+			prs::import_production_rule_set(syntax, pr, -1, -1, prs::attributes(), 0, &tokens, true);
 		}
 	}
 

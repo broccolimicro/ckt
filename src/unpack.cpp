@@ -211,11 +211,11 @@ int unpack_command(configuration &config, string techPath, string cellsDir, int 
 		or format == "spi") {
 		for (auto ckt = net.subckts.begin(); ckt != net.subckts.end(); ckt++) {
 			ucs::variable_set v;
-			prs::production_rule_set pr = prs::extract_rules(v, tech, *ckt);
+			prs::production_rule_set pr = prs::extract_rules(tech, *ckt);
 
 			if (doSized or stage < 0) {
 				FILE *fout = fopen((prefix+"_"+ckt->name+"_ext.prs").c_str(), "w");
-				fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
+				fprintf(fout, "%s", export_production_rule_set(pr).to_string().c_str());
 				fclose(fout);
 			}
 		}

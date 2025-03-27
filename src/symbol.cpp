@@ -60,7 +60,7 @@ bool SymbolTable::load(configuration &config, string path, const Tech *tech) {
 					auto proc = createFunc(i->name);
 					proc->second.hg = shared_ptr<hse::graph>(new hse::graph());
 					proc->second.hg->name = i->name;
-					proc->second.hg->merge(hse::parallel, hse::import_hse(*(parse_chp::composition*)i->body, proc->second.v, 0, &tokens, true));
+					proc->second.hg->merge(hse::parallel, hse::import_hse(*(parse_chp::composition*)i->body, 0, &tokens, true));
 				} else if (i->lang == "prs") {
 					/*auto proc = createStruct(prefix);
 					proc->second.pr = shared_ptr<prs::production_rule_set>(new prs::production_rule_set());
@@ -110,7 +110,7 @@ bool SymbolTable::load(configuration &config, string path, const Tech *tech) {
 		while (tokens.decrement(__FILE__, __LINE__))
 		{
 			parse_chp::composition syntax(tokens);
-			proc->second.hg->merge(hse::parallel, hse::import_hse(syntax, proc->second.v, 0, &tokens, true));
+			proc->second.hg->merge(hse::parallel, hse::import_hse(syntax, 0, &tokens, true));
 
 			tokens.increment(false);
 			tokens.expect<parse_chp::composition>();
@@ -131,7 +131,7 @@ bool SymbolTable::load(configuration &config, string path, const Tech *tech) {
 		while (tokens.decrement(__FILE__, __LINE__))
 		{
 			parse_astg::graph syntax(tokens);
-			proc->second.hg->merge(hse::parallel, hse::import_hse(syntax, proc->second.v, &tokens));
+			proc->second.hg->merge(hse::parallel, hse::import_hse(syntax, &tokens));
 
 			tokens.increment(false);
 			tokens.expect<parse_astg::graph>();
@@ -154,7 +154,7 @@ bool SymbolTable::load(configuration &config, string path, const Tech *tech) {
 			parse_cog::composition syntax(tokens);
 			boolean::cover covered;
 			bool hasRepeat = false;
-			proc->second.hg->merge(hse::parallel, hse::import_hse(syntax, proc->second.v, covered, hasRepeat, 0, &tokens, true));
+			proc->second.hg->merge(hse::parallel, hse::import_hse(syntax, covered, hasRepeat, 0, &tokens, true));
 
 			tokens.increment(false);
 			tokens.expect<parse_cog::composition>();
@@ -175,8 +175,7 @@ bool SymbolTable::load(configuration &config, string path, const Tech *tech) {
 		if (tokens.decrement(__FILE__, __LINE__))
 		{
 			parse_prs::production_rule_set syntax(tokens);
-			map<int, int> nodemap;
-			prs::import_production_rule_set(syntax, *proc->second.pr, -1, -1, prs::attributes(), proc->second.v, nodemap, 0, &tokens, true);
+			prs::import_production_rule_set(syntax, *proc->second.pr, -1, -1, prs::attributes(), 0, &tokens, true);
 		}
 	} else if (format == "spi") {
 		if (tech == nullptr) {

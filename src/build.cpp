@@ -108,10 +108,10 @@ void print_conflicts(const hse::encoder &enc) {
 	for (int sense = -1; sense < 2; sense++) {
 		for (auto i = enc.conflicts.begin(); i != enc.conflicts.end(); i++) {
 			if (i->sense == sense) {
-				printf("T%d.%d\t...%s...   conflicts with:\n", i->index.index, i->index.term, export_node(i->index.iter(), *enc.base, *enc.variables).c_str());
+				printf("T%d.%d\t...%s...   conflicts with:\n", i->index.index, i->index.term, export_node(i->index.iter(), *enc.base).c_str());
 
 				for (auto j = i->region.begin(); j != i->region.end(); j++) {
-					printf("\t%s\t...%s...\n", j->to_string().c_str(), export_node(*j, *enc.base, *enc.variables).c_str());
+					printf("\t%s\t...%s...\n", j->to_string().c_str(), export_node(*j, *enc.base).c_str());
 				}
 				printf("\n");
 			}
@@ -128,7 +128,7 @@ vector<pair<hse::iterator, int> > get_locations(FILE *script, hse::graph &g, ucs
 	if (g.source.size() > 0)
 		for (int i = 0; i < (int)g.source[0].tokens.size(); i++)
 			source.push_back(hse::iterator(hse::place::type, g.source[0].tokens[i].index));
-	parse_chp::composition p = export_sequence(source, g, v);
+	parse_chp::composition p = export_sequence(source, g);
 
 	vector<parse::syntax*> stack(1, &p);
 
@@ -276,7 +276,6 @@ void real_time(hse::graph &g, ucs::variable_set &v, string filename)
 {
 	hse::encoder enc;
 	enc.base = &g;
-	enc.variables = &v;
 
 	tokenizer assignment_parser(false);
 	parse_expression::composition::register_syntax(assignment_parser);
@@ -304,7 +303,7 @@ void real_time(hse::graph &g, ucs::variable_set &v, string filename)
 		else if ((strncmp(command, "quit", 4) == 0 && length == 4) || (strncmp(command, "q", 1) == 0 && length == 1))
 			done = true;
 		else if ((strncmp(command, "elaborate", 9) == 0 && length == 9) || (strncmp(command, "e", 1) == 0 && length == 1))
-			hse::elaborate(g, v, true, true, true);
+			hse::elaborate(g, true, true, true);
 		else if ((strncmp(command, "conflicts", 9) == 0 && length == 9) || (strncmp(command, "c", 1) == 0 && length == 1))
 		{
 			enc.check(true, true);
@@ -328,7 +327,7 @@ void real_time(hse::graph &g, ucs::variable_set &v, string filename)
 			{
 				assignment_parser.insert("", string(command).substr(6));
 				parse_expression::composition expr(assignment_parser);
-				boolean::cover action = import_cover(expr, v, 0, &assignment_parser, true);
+				boolean::cover action = boolean::import_cover(expr, g, 0, &assignment_parser, true);
 				if (assignment_parser.is_clean())
 				{
 					vector<pair<hse::iterator, int> > locations = get_locations(script, g, v);
@@ -342,9 +341,9 @@ void real_time(hse::graph &g, ucs::variable_set &v, string filename)
 	}
 }
 
-void save_bubble(string filename, const prs::bubble &bub, const ucs::variable_set &vars)
+void save_bubble(string filename, const prs::bubble &bub, const prs::production_rule_set &pr)
 {
-	string dot = export_bubble(bub, vars).to_string();
+	string dot = export_bubble(bub, pr).to_string();
 	size_t pos = filename.find_last_of(".");
 	string format = "png";
 	if (pos != string::npos) {
@@ -676,18 +675,18 @@ bool Build::has(int target) {
 }
 
 bool canonicalize_hse(const Build &builder, SymbolTable &tbl, Function &func) {
-	func.hg->post_process(func.v, true);
-	func.hg->check_variables(func.v);
+	func.hg->post_process(true);
+	func.hg->check_variables();
 
 	if (builder.doPostprocess) {
-		export_astg(func.hg->name+"_post.astg", *func.hg, func.v);
+		export_astg(func.hg->name+"_post.astg", *func.hg);
 	}
 	return true;
 }
 
 bool elaborate_hse(const Build &builder, SymbolTable &tbl, Function &func) {
 	if (builder.progress) printf("Elaborate state space:\n");
-	hse::elaborate(*func.hg, func.v, builder.stage >= Build::ENCODE or not builder.noGhosts, true, builder.progress);
+	hse::elaborate(*func.hg, builder.stage >= Build::ENCODE or not builder.noGhosts, true, builder.progress);
 	if (builder.progress) printf("done\n\n");
 	return true;
 }
@@ -958,7 +957,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		while (tokens.decrement(__FILE__, __LINE__))
 		{
 			parse_chp::composition syntax(tokens);
-			hg.merge(hse::parallel, hse::import_hse(syntax, v, 0, &tokens, true));
+			hg.merge(hse::parallel, hse::import_hse(syntax, 0, &tokens, true));
 
 			tokens.increment(false);
 			tokens.expect<parse_chp::composition>();
@@ -974,7 +973,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		while (tokens.decrement(__FILE__, __LINE__))
 		{
 			parse_astg::graph syntax(tokens);
-			hg.merge(hse::parallel, hse::import_hse(syntax, v, &tokens));
+			hg.merge(hse::parallel, hse::import_hse(syntax, &tokens));
 
 			tokens.increment(false);
 			tokens.expect<parse_astg::graph>();
@@ -992,7 +991,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 			parse_cog::composition syntax(tokens);
 			boolean::cover covered;
 			bool hasRepeat = false;
-			hg.merge(hse::parallel, hse::import_hse(syntax, v, covered, hasRepeat, 0, &tokens, true));
+			hg.merge(hse::parallel, hse::import_hse(syntax, covered, hasRepeat, 0, &tokens, true));
 
 			tokens.increment(false);
 			tokens.expect<parse_cog::composition>();
@@ -1000,7 +999,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 	}
 
 	if (builder.doPreprocess) {
-		export_astg(prefix+"_pre.astg", hg, v);
+		export_astg(prefix+"_pre.astg", hg);
 	}
 
 	if (!is_clean()) {
@@ -1013,15 +1012,15 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		or format == "hse"
 		or format == "cog"
 		or format == "astg") {
-		hg.post_process(v, true);
-		hg.check_variables(v);
+		hg.post_process(true);
+		hg.check_variables();
 
 		if (builder.doPostprocess) {
-			export_astg(prefix+"_post.astg", hg, v);
+			export_astg(prefix+"_post.astg", hg);
 		}
 
 		if (progress) printf("Elaborate state space:\n");
-		hse::elaborate(hg, v, builder.stage >= Build::ENCODE or not builder.noGhosts, true, progress);
+		hse::elaborate(hg, builder.stage >= Build::ENCODE or not builder.noGhosts, true, progress);
 		if (progress) printf("done\n\n");
 
 		if (not is_clean()) {
@@ -1032,7 +1031,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 
 		if (builder.has(Build::ELAB)) {
 			string suffix = builder.stage == Build::ELAB ? "" : "_predicate";
-			export_astg(prefix+suffix+".astg", hg, v);
+			export_astg(prefix+suffix+".astg", hg);
 		}
 
 		if (not builder.get(Build::CONFLICTS)) {
@@ -1043,7 +1042,6 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 
 		hse::encoder enc;
 		enc.base = &hg;
-		enc.variables = &v;
 
 		if (progress) {
 			printf("Identify state conflicts:\n");
@@ -1073,7 +1071,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 
 		if (builder.has(Build::ENCODE)) {
 			string suffix = builder.stage == Build::ENCODE ? "" : "_complete";
-			export_astg(prefix+suffix+".astg", hg, v);
+			export_astg(prefix+suffix+".astg", hg);
 		}
 
 		if (enc.conflicts.size() > 0) {
@@ -1091,7 +1089,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		}
 
 		if (progress) printf("Synthesize production rules:\n");
-		hse::synthesize_rules(&pr, &hg, &v, !inverting, progress);
+		hse::synthesize_rules(&pr, &hg, !inverting, progress);
 		if (progress) printf("done\n\n");
 
 		if (builder.has(Build::RULES)) {
@@ -1100,7 +1098,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 				string suffix = builder.stage == Build::RULES ? "" : "_simple";
 				fout = fopen((prefix+suffix+".prs").c_str(), "w");
 			}
-			fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
+			fprintf(fout, "%s", export_production_rule_set(pr).to_string().c_str());
 			fclose(fout);
 		}
 	}
@@ -1122,8 +1120,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		if (tokens.decrement(__FILE__, __LINE__))
 		{
 			parse_prs::production_rule_set syntax(tokens);
-			map<int, int> nodemap;
-			prs::import_production_rule_set(syntax, pr, -1, -1, prs::attributes(), v, nodemap, 0, &tokens, true);
+			prs::import_production_rule_set(syntax, pr, -1, -1, prs::attributes(), 0, &tokens, true);
 		}
 
 		pr.name = prefix;
@@ -1146,24 +1143,24 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 				printf("  %s...", prefix.c_str());
 				fflush(stdout);
 			}
-			bub.load_prs(pr, v);
+			bub.load_prs(pr);
 
 			int step = 0;
 			if (builder.has(Build::BUBBLE) and debug) {
-				save_bubble(prefix+"_bubble0.png", bub, v);
+				save_bubble(prefix+"_bubble0.png", bub, pr);
 			}
 			for (auto i = bub.net.begin(); i != bub.net.end(); i++) {
 				auto result = bub.step(i);
 				if (builder.has(Build::BUBBLE) and debug and result.second) {
-					save_bubble(prefix+"_bubble" + to_string(++step) + ".png", bub, v);
+					save_bubble(prefix+"_bubble" + to_string(++step) + ".png", bub, pr);
 				}
 			}
 			auto result = bub.complete();
 			if (builder.has(Build::BUBBLE) and debug and result) {
-				save_bubble(prefix+"_bubble" + to_string(++step) + ".png", bub, v);
+				save_bubble(prefix+"_bubble" + to_string(++step) + ".png", bub, pr);
 			}
 
-			bub.save_prs(&pr, v);
+			bub.save_prs(&pr);
 			if (progress) {
 				printf("[%sDONE%s]\n", KGRN, KNRM);
 				printf("done\n\n");
@@ -1175,7 +1172,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 					string suffix = builder.stage == Build::BUBBLE ? "" : "_bubbled";
 					fout = fopen((prefix+suffix+".prs").c_str(), "w");
 				}
-				fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
+				fprintf(fout, "%s", export_production_rule_set(pr).to_string().c_str());
 				fclose(fout);
 			}
 		}
@@ -1188,7 +1185,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 
 		if (builder.logic == Build::LOGIC_CMOS or builder.logic == Build::LOGIC_RAW) {
 			if (progress) printf("Insert keepers:\n");
-			pr.add_keepers(v, true, false, 1, progress);
+			pr.add_keepers(true, false, 1, progress);
 			if (progress) printf("done\n\n");
 
 			if (builder.has(Build::KEEPERS)) {
@@ -1197,7 +1194,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 					string suffix = builder.stage == Build::KEEPERS ? "" : "_keep";
 					fout = fopen((prefix+suffix+".prs").c_str(), "w");
 				}
-				fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
+				fprintf(fout, "%s", export_production_rule_set(pr).to_string().c_str());
 				fclose(fout);
 			}
 		}
@@ -1218,7 +1215,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 				string suffix = builder.stage == Build::SIZE ? "" : "_sized";
 				fout = fopen((prefix+suffix+".prs").c_str(), "w");
 			}
-			fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
+			fprintf(fout, "%s", export_production_rule_set(pr).to_string().c_str());
 			fclose(fout);
 		}
 	}
@@ -1237,7 +1234,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 			if (prefix != "") {
 				fout = fopen((prefix+".prs").c_str(), "w");
 			}
-			fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
+			fprintf(fout, "%s", export_production_rule_set(pr).to_string().c_str());
 			fclose(fout);
 		}
 		if (!is_clean()) {
@@ -1255,7 +1252,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		if (prefix != "") {
 			fout = fopen((prefix+".prs").c_str(), "w");
 		}
-		fprintf(fout, "%s", export_production_rule_set(pr, v).to_string().c_str());
+		fprintf(fout, "%s", export_production_rule_set(pr).to_string().c_str());
 		fclose(fout);
 		if (progress) printf("compiled in %gs\n\n", totalTime.since());
 		complete();
@@ -1269,7 +1266,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		or format == "astg"
 		or format == "prs") {
 		if (progress) printf("Build netlist:\n");
-		net.subckts.push_back(prs::build_netlist(tech, pr, v, progress));
+		net.subckts.push_back(prs::build_netlist(tech, pr, progress));
 		if (progress) printf("done\n\n");
 		if (debug) {
 			net.subckts.back().print();

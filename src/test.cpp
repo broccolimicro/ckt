@@ -135,7 +135,7 @@ int test_command(configuration &config, string techPath, string cellsDir, int ar
 			while (tokens.decrement(__FILE__, __LINE__))
 			{
 				parse_chp::composition syntax(tokens);
-				hg.merge(hse::parallel, hse::import_hse(syntax, v, 0, &tokens, true));
+				hg.merge(hse::parallel, hse::import_hse(syntax, 0, &tokens, true));
 
 				tokens.increment(false);
 				tokens.expect<parse_chp::composition>();
@@ -149,7 +149,7 @@ int test_command(configuration &config, string techPath, string cellsDir, int ar
 			while (tokens.decrement(__FILE__, __LINE__))
 			{
 				parse_astg::graph syntax(tokens);
-				hg.merge(hse::parallel, hse::import_hse(syntax, v, &tokens));
+				hg.merge(hse::parallel, hse::import_hse(syntax, &tokens));
 
 				tokens.increment(false);
 				tokens.expect<parse_astg::graph>();
@@ -165,16 +165,16 @@ int test_command(configuration &config, string techPath, string cellsDir, int ar
 				parse_cog::composition syntax(tokens);
 				boolean::cover covered;
 				bool hasRepeat = false;
-				hg.merge(hse::parallel, hse::import_hse(syntax, v, covered, hasRepeat, 0, &tokens, true));
+				hg.merge(hse::parallel, hse::import_hse(syntax, covered, hasRepeat, 0, &tokens, true));
 
 				tokens.increment(false);
 				tokens.expect<parse_cog::composition>();
 			}
 		}
-		hg.post_process(v, true);
-		hg.check_variables(v);
+		hg.post_process(true);
+		hg.check_variables();
 
-		hse::elaborate(hg, v, false, false, true);
+		hse::elaborate(hg, false, false, true);
 	} else if (format == "prs") {
 		prs::production_rule_set pr;
 
@@ -186,13 +186,12 @@ int test_command(configuration &config, string techPath, string cellsDir, int ar
 		if (tokens.decrement(__FILE__, __LINE__))
 		{
 			parse_prs::production_rule_set syntax(tokens);
-			map<int, int> nodemap;
-			prs::import_production_rule_set(syntax, pr, -1, -1, prs::attributes(), v, nodemap, 0, &tokens, true);
+			prs::import_production_rule_set(syntax, pr, -1, -1, prs::attributes(), 0, &tokens, true);
 		}
 
 		if (debug) {
-			printf("\n\n%s\n\n", export_production_rule_set(pr, v).to_string().c_str());
-			pr.print(v);
+			printf("\n\n%s\n\n", export_production_rule_set(pr).to_string().c_str());
+			pr.print();
 			printf("\n\n");
 		}
 	}
