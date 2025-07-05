@@ -1,9 +1,8 @@
 #pragma once
 
 #include <common/standard.h>
+#include <common/net.h>
 #include <boolean/cube.h>
-#include <ucs/variable.h>
-#include <interpret_boolean/interface.h>
 
 struct vcd {
 	vcd();
@@ -19,8 +18,7 @@ struct vcd {
 
 	string &at(int net);
 
-	void create(string prefix, const ucs::variable_set &v);
-	void create(string prefix, boolean::ConstNetlist nets);
+	void create(string prefix, ucs::ConstNetlist nets);
 	void append(uint64_t t, boolean::cube encoding, string error="");
 	void append(uint64_t t, boolean::cube encoding, boolean::cube strength, string error="");
 	void close();

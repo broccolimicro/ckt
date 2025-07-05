@@ -5,6 +5,12 @@
 #include <parse/default/block_comment.h>
 #include <parse/default/line_comment.h>
 
+#include <parse_ucs/source.h>
+#include <parse_cog/factory.h>
+#include <parse_chp/factory.h>
+#include <parse_prs/factory.h>
+#include <parse_spice/factory.h>
+
 #include <chp/graph.h>
 //#include <chp/simulator.h>
 //#include <parse_chp/composition.h>
@@ -32,9 +38,6 @@
 #include <interpret_boolean/import.h>
 #include <interpret_arithmetic/export.h>
 #include <interpret_arithmetic/import.h>
-#include <ucs/variable.h>
-
-#include "symbol.h"
 
 #ifdef GRAPHVIZ_SUPPORTED
 namespace graphviz
@@ -178,22 +181,11 @@ int show_command(configuration &config, string techPath, string cellsDir, int ar
 		return 0;
 	}
 
-	ucs::variable_set v;
-
-	if (format == "ucs") {
-		parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
-		parse_ucs::function::registry.insert({"struct", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
-
-		SymbolTable tbl;
-		tbl.load(config, filename);
-		for (auto i = tbl.funcs.begin(); i != tbl.funcs.end(); i++) {
-			
-		}
-	} else if (format == "chp" or format == "cog") {
+	if (format == "chp") {
 		chp::graph cg;
 
 		if (format == "chp") {
-			parse_chp::composition::register_syntax(tokens);
+			parse_chp::register_syntax(tokens);
 			config.load(tokens, filename, "");
 
 			tokens.increment(false);
@@ -201,13 +193,13 @@ int show_command(configuration &config, string techPath, string cellsDir, int ar
 			while (tokens.decrement(__FILE__, __LINE__))
 			{
 				parse_chp::composition syntax(tokens);
-				cg.merge(chp::parallel, chp::import_chp(syntax, v, 0, &tokens, true));
+				chp::import_chp(cg, syntax, &tokens, true);
 
 				tokens.increment(false);
 				tokens.expect<parse_chp::composition>();
 			}
 		} else {
-			parse_cog::composition::register_syntax(tokens);
+			parse_cog::register_syntax(tokens);
 			config.load(tokens, filename, "");
 
 			tokens.increment(false);
@@ -215,9 +207,7 @@ int show_command(configuration &config, string techPath, string cellsDir, int ar
 			while (tokens.decrement(__FILE__, __LINE__))
 			{
 				parse_cog::composition syntax(tokens);
-				arithmetic::expression covered;
-				bool hasRepeat = false;
-				cg.merge(petri::parallel, chp::import_chp(syntax, v, covered, hasRepeat, 0, &tokens, true));
+				chp::import_chp(cg, syntax, &tokens, true);
 
 				tokens.increment(false);
 				tokens.expect<parse_cog::composition>();
@@ -225,17 +215,17 @@ int show_command(configuration &config, string techPath, string cellsDir, int ar
 		}
 		
 		if (process) {
-			cg.post_process(v, true);
+			cg.post_process(true);
 		}
 
 		if (is_clean()) {
-			render(ofilename, oformat, export_graph(cg, v, labels).to_string());
+			render(ofilename, oformat, export_graph(cg, labels).to_string());
 		}
 	} else if (format == "hse" or format == "astg" or format == "cog") {
 		hse::graph hg;
 
 		if (format == "hse") {
-			parse_chp::composition::register_syntax(tokens);
+			parse_chp::register_syntax(tokens);
 			config.load(tokens, filename, "");
 
 			tokens.increment(false);
@@ -243,7 +233,7 @@ int show_command(configuration &config, string techPath, string cellsDir, int ar
 			while (tokens.decrement(__FILE__, __LINE__))
 			{
 				parse_chp::composition syntax(tokens);
-				hg.merge(hse::parallel, hse::import_hse(syntax, 0, &tokens, true));
+				hse::import_hse(hg, syntax, &tokens, true);
 
 				tokens.increment(false);
 				tokens.expect<parse_chp::composition>();
@@ -257,13 +247,13 @@ int show_command(configuration &config, string techPath, string cellsDir, int ar
 			while (tokens.decrement(__FILE__, __LINE__))
 			{
 				parse_astg::graph syntax(tokens);
-				hg.merge(hse::parallel, hse::import_hse(syntax, &tokens));
+				hg.merge(hse::import_hse(syntax, &tokens));
 
 				tokens.increment(false);
 				tokens.expect<parse_astg::graph>();
 			}
 		} else if (format == "cog") {
-			parse_cog::composition::register_syntax(tokens);
+			parse_cog::register_syntax(tokens);
 			config.load(tokens, filename, "");
 
 			tokens.increment(false);
@@ -271,9 +261,7 @@ int show_command(configuration &config, string techPath, string cellsDir, int ar
 			while (tokens.decrement(__FILE__, __LINE__))
 			{
 				parse_cog::composition syntax(tokens);
-				boolean::cover covered;
-				bool hasRepeat = false;
-				hg.merge(hse::parallel, hse::import_hse(syntax, covered, hasRepeat, 0, &tokens, true));
+				hse::import_hse(hg, syntax, &tokens, true);
 
 				tokens.increment(false);
 				tokens.expect<parse_cog::composition>();

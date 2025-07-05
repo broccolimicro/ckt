@@ -6,7 +6,12 @@
 #include <parse/default/block_comment.h>
 #include <parse/default/line_comment.h>
 
-#include <parse_chp/composition.h>
+#include <parse_ucs/source.h>
+#include <parse_cog/factory.h>
+#include <parse_chp/factory.h>
+#include <parse_prs/factory.h>
+#include <parse_spice/factory.h>
+
 #include <chp/graph.h>
 #include <chp/simulator.h>
 #include <interpret_chp/import.h>
@@ -19,11 +24,11 @@
 #include <hse/elaborator.h>
 #include <interpret_hse/import.h>
 #include <interpret_hse/export.h>
+#include <interpret_hse/export_cli.h>
 
 #include <parse_expression/expression.h>
 #include <parse_expression/assignment.h>
 #include <parse_expression/composition.h>
-#include <parse_prs/production_rule_set.h>
 #include <prs/production_rule.h>
 #include <prs/simulator.h>
 
@@ -31,7 +36,6 @@
 #include <interpret_prs/export.h>
 #include <interpret_boolean/export.h>
 #include <interpret_boolean/import.h>
-#include <ucs/variable.h>
 
 void sim_help() {
 	printf("Usage: lm sim [options] <ckt-file> [sim-file]\n");
@@ -113,10 +117,9 @@ void print_prsim_help() {
 	printf(" force <expr>        execute a transition as if it were local to all tokens\n");
 }
 
-void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps = vector<chp::term_index>()) {
+void chpsim(chp::graph &g, vector<chp::term_index> steps = vector<chp::term_index>()) {
 	chp::simulator sim;
 	sim.base = &g;
-	sim.variables = &v;
 
 	tokenizer assignment_parser(false);
 	parse_expression::composition::register_syntax(assignment_parser);
@@ -208,14 +211,14 @@ void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps =
 		{
 			if (sscanf(command, "reset %d", &n) == 1 || sscanf(command, "r%d", &n) == 1)
 			{
-				sim = chp::simulator(&g, &v, g.reset[n]);
+				sim = chp::simulator(&g, g.reset[n]);
 				uptodate = false;
 				step = 0;
 				srand(seed);
 			}
 			else
 				for (int i = 0; i < (int)g.reset.size(); i++)
-					printf("(%d) %s\n", i, g.reset[i].to_string(v).c_str());
+					printf("(%d) %s\n", i, g.reset[i].to_string(g).c_str());
 		}
 		else if ((strncmp(command, "tokens", 6) == 0 && length == 6) || (strncmp(command, "t", 1) == 0 && length == 1))
 		{
@@ -236,7 +239,7 @@ void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps =
 
 			for (int i = 0; i < (int)tokens.size(); i++)
 			{
-				printf("%s {\n", export_composition(sim.encoding, v).to_string().c_str());
+				printf("%s {\n", export_composition(sim.encoding, g).to_string().c_str());
 				for (int j = 0; j < (int)tokens[i].size(); j++) {
 					int virt = -1;
 					for (int k = 0; k < (int)sim.loaded.size() and virt < 0; k++) {
@@ -245,9 +248,9 @@ void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps =
 						}
 					}
 					if (virt >= 0) {
-						printf("\t\t(%d) %s->%s\tP%d\t%s\n", tokens[i][j], export_expression(sim.tokens[tokens[i][j]].guard, v).to_string().c_str(), export_composition(g.transitions[sim.loaded[virt].index].action, v).to_string().c_str(), sim.tokens[tokens[i][j]].index, export_node(chp::iterator(chp::place::type, sim.tokens[tokens[i][j]].index), g, v).c_str());
+						printf("\t\t(%d) %s->%s\tP%d\t%s\n", tokens[i][j], export_expression(sim.tokens[tokens[i][j]].guard, g).to_string().c_str(), export_composition(g.transitions[sim.loaded[virt].index].action, g).to_string().c_str(), sim.tokens[tokens[i][j]].index, export_node(chp::iterator(chp::place::type, sim.tokens[tokens[i][j]].index), g).c_str());
 					} else {
-						printf("\t(%d) P%d\t%s\n", tokens[i][j], sim.tokens[tokens[i][j]].index, export_node(chp::iterator(chp::place::type, sim.tokens[tokens[i][j]].index), g, v).c_str());
+						printf("\t(%d) P%d\t%s\n", tokens[i][j], sim.tokens[tokens[i][j]].index, export_node(chp::iterator(chp::place::type, sim.tokens[tokens[i][j]].index), g).c_str());
 					}
 				}
 				printf("}\n");
@@ -263,7 +266,7 @@ void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps =
 
 			for (int i = 0; i < enabled; i++)
 			{
-				printf("(%d) T%d.%d:%s->%s\n", i, sim.loaded[sim.ready[i].first].index, sim.ready[i].second, export_expression(sim.loaded[sim.ready[i].first].guard_action, v).to_string().c_str(), export_composition(sim.loaded[sim.ready[i].first].local_action.states[sim.ready[i].second], v).to_string().c_str());
+				printf("(%d) T%d.%d:%s->%s\n", i, sim.loaded[sim.ready[i].first].index, sim.ready[i].second, export_expression(sim.loaded[sim.ready[i].first].guard_action, g).to_string().c_str(), export_composition(sim.loaded[sim.ready[i].first].local_action.states[sim.ready[i].second], g).to_string().c_str());
 				if (sim.loaded[sim.ready[i].first].vacuous) {
 					printf("\tvacuous");
 				}
@@ -284,7 +287,7 @@ void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps =
 
 			for (int i = 0; i < (int)sim.loaded.size(); i++)
 			{
-				printf("(%d) T%d:%s->%s\n", i, sim.loaded[i].index, export_expression(sim.loaded[i].guard_action, v).to_string().c_str(), export_composition(sim.loaded[i].local_action, v).to_string().c_str());
+				printf("(%d) T%d:%s->%s\n", i, sim.loaded[i].index, export_expression(sim.loaded[i].guard_action, g).to_string().c_str(), export_composition(sim.loaded[i].local_action, g).to_string().c_str());
 				if (sim.loaded[i].vacuous) {
 					printf("\tvacuous");
 				}
@@ -313,14 +316,14 @@ void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps =
 
 			assignment_parser.insert("", string(command).substr(i));
 			parse_expression::composition expr(assignment_parser);
-			arithmetic::parallel assign = import_parallel(expr, v, 0, &assignment_parser, false);
+			arithmetic::Parallel assign = arithmetic::import_parallel(expr, g, 0, &assignment_parser, false);
 			if (assignment_parser.is_clean())
 			{
-				arithmetic::state local_action = assign.evaluate(sim.encoding);
-				arithmetic::state remote_action = local_action.remote(v.get_groups());
-				sim.encoding = arithmetic::local_assign(sim.encoding, local_action, true);
-				sim.global = arithmetic::local_assign(sim.global, remote_action, true);
-				sim.encoding = arithmetic::remote_assign(sim.encoding, sim.global, true);
+				arithmetic::State local_action = assign.evaluate(sim.encoding);
+				arithmetic::State remote_action = local_action.remote(g.remote_groups());
+				sim.encoding = arithmetic::localAssign(sim.encoding, local_action, true);
+				sim.global = arithmetic::localAssign(sim.global, remote_action, true);
+				sim.encoding = arithmetic::remoteAssign(sim.encoding, sim.global, true);
 			}
 			assignment_parser.reset();
 			uptodate = false;
@@ -333,13 +336,13 @@ void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps =
 			{
 				assignment_parser.insert("", string(command).substr(6));
 				parse_expression::composition expr(assignment_parser);
-				arithmetic::parallel assign = import_parallel(expr, v, 0, &assignment_parser, false);
+				arithmetic::Parallel assign = arithmetic::import_parallel(expr, g, 0, &assignment_parser, false);
 				if (assignment_parser.is_clean())
 				{
-					arithmetic::state local_action = assign.evaluate(sim.encoding);
-					arithmetic::state remote_action = local_action.remote(v.get_groups());
-					sim.encoding = arithmetic::local_assign(sim.encoding, remote_action, true);
-					sim.global = arithmetic::local_assign(sim.global, remote_action, true);
+					arithmetic::State local_action = assign.evaluate(sim.encoding);
+					arithmetic::State remote_action = local_action.remote(g.remote_groups());
+					sim.encoding = arithmetic::localAssign(sim.encoding, remote_action, true);
+					sim.global = arithmetic::localAssign(sim.global, remote_action, true);
 				}
 				assignment_parser.reset();
 				uptodate = false;
@@ -387,7 +390,7 @@ void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps =
 					if (vacuous) {
 						flags = " [vacuous]";
 					}
-					printf("%d\tT%d.%d\t%s -> %s%s\n", step, sim.loaded[sim.ready[firing].first].index, sim.ready[firing].second, export_expression(sim.loaded[sim.ready[firing].first].guard_action, v).to_string().c_str(), export_composition(sim.loaded[sim.ready[firing].first].local_action[sim.ready[firing].second], v).to_string().c_str(), flags.c_str());
+					printf("%d\tT%d.%d\t%s -> %s%s\n", step, sim.loaded[sim.ready[firing].first].index, sim.ready[firing].second, export_expression(sim.loaded[sim.ready[firing].first].guard_action, g).to_string().c_str(), export_composition(sim.loaded[sim.ready[firing].first].local_action[sim.ready[firing].second], g).to_string().c_str(), flags.c_str());
 
 					sim.fire(firing);
 
@@ -423,7 +426,7 @@ void chpsim(chp::graph &g, ucs::variable_set &v, vector<chp::term_index> steps =
 							flags = " [vacuous]";
 						}
 
-						printf("%d\tT%d.%d\t%s -> %s%s\n", step, sim.loaded[sim.ready[n].first].index, sim.ready[n].second, export_expression(sim.loaded[sim.ready[n].first].guard_action, v).to_string().c_str(), export_composition(sim.loaded[sim.ready[n].first].local_action[sim.ready[n].second], v).to_string().c_str(), flags.c_str());
+						printf("%d\tT%d.%d\t%s -> %s%s\n", step, sim.loaded[sim.ready[n].first].index, sim.ready[n].second, export_expression(sim.loaded[sim.ready[n].first].guard_action, g).to_string().c_str(), export_composition(sim.loaded[sim.ready[n].first].local_action[sim.ready[n].second], g).to_string().c_str(), flags.c_str());
 						
 						sim.fire(n);
 
@@ -1065,7 +1068,6 @@ int sim_command(configuration &config, string techPath, string cellsDir, int arg
 		return 0;
 	}
 
-	ucs::variable_set v;
 
 	if (format == "chp") {
 		vector<chp::term_index> steps;
@@ -1088,7 +1090,7 @@ int sim_command(configuration &config, string techPath, string cellsDir, int arg
 
 		chp::graph cg;
 
-		parse_chp::composition::register_syntax(tokens);
+		parse_chp::register_syntax(tokens);
 		config.load(tokens, filename, "");
 
 		tokens.increment(false);
@@ -1096,14 +1098,14 @@ int sim_command(configuration &config, string techPath, string cellsDir, int arg
 		while (tokens.decrement(__FILE__, __LINE__))
 		{
 			parse_chp::composition syntax(tokens);
-			cg.merge(chp::parallel, chp::import_chp(syntax, v, 0, &tokens, true));
+			chp::import_chp(cg, syntax, &tokens, true);
 
 			tokens.increment(false);
 			tokens.expect<parse_chp::composition>();
 		}
-		cg.post_process(v, true);
+		cg.post_process(true);
 
-		chpsim(cg, v, steps);
+		chpsim(cg, steps);
 	} else if (format == "hse" or format == "astg" or format == "cog") {
 		vector<hse::term_index> steps;
 		if (sfilename != "") {
@@ -1126,7 +1128,7 @@ int sim_command(configuration &config, string techPath, string cellsDir, int arg
 		hse::graph hg;
 
 		if (format == "hse") {
-			parse_chp::composition::register_syntax(tokens);
+			parse_chp::register_syntax(tokens);
 			config.load(tokens, filename, "");
 
 			tokens.increment(false);
@@ -1134,7 +1136,7 @@ int sim_command(configuration &config, string techPath, string cellsDir, int arg
 			while (tokens.decrement(__FILE__, __LINE__))
 			{
 				parse_chp::composition syntax(tokens);
-				hg.merge(hse::parallel, hse::import_hse(syntax, 0, &tokens, true));
+				hse::import_hse(hg, syntax, &tokens, true);
 
 				tokens.increment(false);
 				tokens.expect<parse_chp::composition>();
@@ -1148,13 +1150,13 @@ int sim_command(configuration &config, string techPath, string cellsDir, int arg
 			while (tokens.decrement(__FILE__, __LINE__))
 			{
 				parse_astg::graph syntax(tokens);
-				hg.merge(hse::parallel, hse::import_hse(syntax, &tokens));
+				hg.merge(hse::import_hse(syntax, &tokens));
 
 				tokens.increment(false);
 				tokens.expect<parse_astg::graph>();
 			}
 		} else if (format == "cog") {
-			parse_cog::composition::register_syntax(tokens);
+			parse_cog::register_syntax(tokens);
 			config.load(tokens, filename, "");
 
 			tokens.increment(false);
@@ -1162,9 +1164,7 @@ int sim_command(configuration &config, string techPath, string cellsDir, int arg
 			while (tokens.decrement(__FILE__, __LINE__))
 			{
 				parse_cog::composition syntax(tokens);
-				boolean::cover covered;
-				bool hasRepeat = false;
-				hg.merge(hse::parallel, hse::import_hse(syntax, covered, hasRepeat, 0, &tokens, true));
+				hse::import_hse(hg, syntax, &tokens, true);
 
 				tokens.increment(false);
 				tokens.expect<parse_cog::composition>();

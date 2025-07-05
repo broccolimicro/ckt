@@ -5,7 +5,12 @@
 #include <parse/default/block_comment.h>
 #include <parse/default/line_comment.h>
 
-#include <parse_chp/composition.h>
+#include <parse_ucs/source.h>
+#include <parse_cog/factory.h>
+#include <parse_chp/factory.h>
+#include <parse_prs/factory.h>
+#include <parse_spice/factory.h>
+
 #include <chp/graph.h>
 #include <chp/simulator.h>
 #include <interpret_chp/import.h>
@@ -22,7 +27,6 @@
 #include <parse_expression/expression.h>
 #include <parse_expression/assignment.h>
 #include <parse_expression/composition.h>
-#include <parse_prs/production_rule_set.h>
 #include <prs/production_rule.h>
 #include <prs/simulator.h>
 
@@ -30,7 +34,6 @@
 #include <interpret_prs/export.h>
 #include <interpret_boolean/export.h>
 #include <interpret_boolean/import.h>
-#include <ucs/variable.h>
 
 #include <unistd.h>
 
@@ -103,39 +106,35 @@ int test_command(configuration &config, string techPath, string cellsDir, int ar
 		return 0;
 	}
 
-	ucs::variable_set v;
-
 	if (format == "chp") {
 		chp::graph cg;
 
-		parse_chp::composition::register_syntax(tokens);
+		parse_chp::register_syntax(tokens);
 		config.load(tokens, filename, "");
 
 		tokens.increment(false);
 		tokens.expect<parse_chp::composition>();
-		while (tokens.decrement(__FILE__, __LINE__))
-		{
+		while (tokens.decrement(__FILE__, __LINE__)) {
 			parse_chp::composition syntax(tokens);
-			cg.merge(chp::parallel, chp::import_chp(syntax, v, 0, &tokens, true));
+			chp::import_chp(cg, syntax, &tokens, true);
 
 			tokens.increment(false);
 			tokens.expect<parse_chp::composition>();
 		}
-		cg.post_process(v, true);
+		cg.post_process(true);
 
 	} else if (format == "hse" or format == "astg") {
 		hse::graph hg;
 
 		if (format == "hse") {
-			parse_chp::composition::register_syntax(tokens);
+			parse_chp::register_syntax(tokens);
 			config.load(tokens, filename, "");
 
 			tokens.increment(false);
 			tokens.expect<parse_chp::composition>();
-			while (tokens.decrement(__FILE__, __LINE__))
-			{
+			while (tokens.decrement(__FILE__, __LINE__)) {
 				parse_chp::composition syntax(tokens);
-				hg.merge(hse::parallel, hse::import_hse(syntax, 0, &tokens, true));
+				hse::import_hse(hg, syntax, &tokens, true);
 
 				tokens.increment(false);
 				tokens.expect<parse_chp::composition>();
@@ -149,23 +148,20 @@ int test_command(configuration &config, string techPath, string cellsDir, int ar
 			while (tokens.decrement(__FILE__, __LINE__))
 			{
 				parse_astg::graph syntax(tokens);
-				hg.merge(hse::parallel, hse::import_hse(syntax, &tokens));
+				hg.merge(hse::import_hse(syntax, &tokens));
 
 				tokens.increment(false);
 				tokens.expect<parse_astg::graph>();
 			}
 		} else if (format == "cog") {
-			parse_cog::composition::register_syntax(tokens);
+			parse_cog::register_syntax(tokens);
 			config.load(tokens, filename, "");
 
 			tokens.increment(false);
 			tokens.expect<parse_cog::composition>();
-			while (tokens.decrement(__FILE__, __LINE__))
-			{
+			while (tokens.decrement(__FILE__, __LINE__)) {
 				parse_cog::composition syntax(tokens);
-				boolean::cover covered;
-				bool hasRepeat = false;
-				hg.merge(hse::parallel, hse::import_hse(syntax, covered, hasRepeat, 0, &tokens, true));
+				hse::import_hse(hg, syntax, &tokens, true);
 
 				tokens.increment(false);
 				tokens.expect<parse_cog::composition>();

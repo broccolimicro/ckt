@@ -1,6 +1,5 @@
 #include "vcd.h"
 
-#include <interpret_ucs/export.h>
 #include <interpret_boolean/export.h>
 #include <unistd.h>
 
@@ -18,71 +17,7 @@ string &vcd::at(int net) {
 	return nets[net];
 }
 
-void vcd::create(string prefix, const ucs::variable_set &v) {
-	time_t rawtime;
-	tm *timeinfo;
-	char buffer[1024];
-
-	time (&rawtime);
-	timeinfo = localtime(&rawtime);
-	strftime(buffer,sizeof(buffer),"%Y-%m-%d",timeinfo);
-
-	fvcd = fopen((prefix+".vcd").c_str(), "w");
-	fprintf(fvcd, "$date\n");
-	fprintf(fvcd, "%s\n", buffer);
-	fprintf(fvcd, "$end\n");
-	fprintf(fvcd, "$timescale 1ps $end\n");
-
-	if ((int)v.nodes.size() > (int)nets.size()) {
-		nets.resize(v.nodes.size());
-	} 
-	string id = {33,33,33};
-	for (int i = 0; i < (int)v.nodes.size(); i++) {
-		string name = export_variable_name(i, v).to_string();
-		at(i) = id;
-		curr.set(i, -1);
-
-		for (int j = (int)name.size(); j >= 0; j--) {
-			if (string(":.").find(name[j]) != string::npos) {
-				name[j] = '_';
-			} else if (string("[]").find(name[j]) != string::npos) {
-				name.erase(name.begin()+j);
-			}
-		}
-	
-		fprintf(fvcd, "$var wire %d %s %s $end\n", 1, id.c_str(), name.c_str());
-
-		id[2] += 1;
-		if (id[2] > 126) {
-			id[1] += 1;
-			id[2] = 33;
-		}
-		if (id[1] > 126) {
-			id[0] += 1;
-			id[1] = 33;
-		}
-	}
-
-	fprintf(fvcd, "$enddefinitions $end\n");
-
-	fprintf(fvcd, "$dumpvars\n");
-	for (int i = 0; i < (int)nets.size(); i++) {
-		//if (value[1] == 1) {
-			fprintf(fvcd, "x%s\n", at(i).c_str());
-		//} else {
-		//	fprintf(fvcd, "b%s %s", "x"*value[1], value[0]);
-		//}
-	}
-	fprintf(fvcd, "$end\n");
-
-	getcwd(buffer, 1024);
-
-	fgtk = fopen((prefix+".gtkw").c_str(), "w");
-	fprintf(fgtk, "[dumpfile] \"%s/%s.vcd\"\n", buffer, prefix.c_str());
-	fprintf(fgtk, "[savefile] \"%s/%s.gtkw\"\n", buffer, prefix.c_str());
-}
-
-void vcd::create(string prefix, boolean::ConstNetlist v) {
+void vcd::create(string prefix, ucs::ConstNetlist v) {
 	time_t rawtime;
 	tm *timeinfo;
 	char buffer[1024];
@@ -102,7 +37,7 @@ void vcd::create(string prefix, boolean::ConstNetlist v) {
 	} 
 	string id = {33,33,33};
 	for (int i = 0; i < v.netCount(); i++) {
-		string name = export_net(i, v).to_string();
+		string name = v.netAt(i);
 		at(i) = id;
 		curr.set(i, -1);
 

@@ -45,7 +45,6 @@
 #include <interpret_boolean/import.h>
 #include <interpret_arithmetic/export.h>
 #include <interpret_arithmetic/import.h>
-#include <ucs/variable.h>
 
 #include <filesystem>
 #include <chrono>
@@ -210,7 +209,6 @@ int unpack_command(configuration &config, string techPath, string cellsDir, int 
 	if (format == "gds"
 		or format == "spi") {
 		for (auto ckt = net.subckts.begin(); ckt != net.subckts.end(); ckt++) {
-			ucs::variable_set v;
 			prs::production_rule_set pr = prs::extract_rules(tech, *ckt);
 
 			if (doSized or stage < 0) {

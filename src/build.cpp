@@ -28,6 +28,7 @@
 #include <hse/synthesize.h>
 #include <interpret_hse/import.h>
 #include <interpret_hse/export.h>
+#include <interpret_hse/export_cli.h>
 
 #include <prs/production_rule.h>
 #include <prs/bubble.h>
@@ -55,11 +56,8 @@
 #include <interpret_boolean/import.h>
 #include <interpret_arithmetic/export.h>
 #include <interpret_arithmetic/import.h>
-#include <ucs/variable.h>
 
 #include <filesystem>
-
-#include "symbol.h"
 
 //printf(" -c             check for state conflicts that occur regardless of sense\n");
 //	printf(" -cu            check for state conflicts that occur due to up-going transitions\n");
@@ -104,30 +102,13 @@ void print_location_help()
 	printf(" up, u                         back out of the current hse block\n");
 }
 
-void print_conflicts(const hse::encoder &enc) {
-	for (int sense = -1; sense < 2; sense++) {
-		for (auto i = enc.conflicts.begin(); i != enc.conflicts.end(); i++) {
-			if (i->sense == sense) {
-				printf("T%d.%d\t...%s...   conflicts with:\n", i->index.index, i->index.term, export_node(i->index.iter(), *enc.base).c_str());
-
-				for (auto j = i->region.begin(); j != i->region.end(); j++) {
-					printf("\t%s\t...%s...\n", j->to_string().c_str(), export_node(*j, *enc.base).c_str());
-				}
-				printf("\n");
-			}
-		}
-		printf("\n");
-	}
-}
-
-vector<pair<hse::iterator, int> > get_locations(FILE *script, hse::graph &g, ucs::variable_set &v)
-{
+vector<pair<hse::iterator, int> > get_locations(FILE *script, hse::graph &g) {
 	vector<pair<hse::iterator, int> > result;
 
 	vector<hse::iterator> source;
-	if (g.source.size() > 0)
-		for (int i = 0; i < (int)g.source[0].tokens.size(); i++)
-			source.push_back(hse::iterator(hse::place::type, g.source[0].tokens[i].index));
+	if (g.reset.size() > 0)
+		for (int i = 0; i < (int)g.reset[0].tokens.size(); i++)
+			source.push_back(hse::iterator(hse::place::type, g.reset[0].tokens[i].index));
 	parse_chp::composition p = export_sequence(source, g);
 
 	vector<parse::syntax*> stack(1, &p);
@@ -272,7 +253,7 @@ vector<pair<hse::iterator, int> > get_locations(FILE *script, hse::graph &g, ucs
 	return result;
 }
 
-void real_time(hse::graph &g, ucs::variable_set &v, string filename)
+void real_time(hse::graph &g, string filename)
 {
 	hse::encoder enc;
 	enc.base = &g;
@@ -330,7 +311,7 @@ void real_time(hse::graph &g, ucs::variable_set &v, string filename)
 				boolean::cover action = boolean::import_cover(expr, g, 0, &assignment_parser, true);
 				if (assignment_parser.is_clean())
 				{
-					vector<pair<hse::iterator, int> > locations = get_locations(script, g, v);
+					vector<pair<hse::iterator, int> > locations = get_locations(script, g);
 					for (int i = 0; i < (int)locations.size(); i++)
 						printf("%s %c%d\n", locations[i].second ? "after" : "before", locations[i].first.type == hse::place::type ? 'P' : 'T', locations[i].first.index);
 				}
@@ -674,72 +655,6 @@ bool Build::has(int target) {
 	return targets[target];
 }
 
-bool canonicalize_hse(const Build &builder, SymbolTable &tbl, Function &func) {
-	func.hg->post_process(true);
-	func.hg->check_variables();
-
-	if (builder.doPostprocess) {
-		export_astg(func.hg->name+"_post.astg", *func.hg);
-	}
-	return true;
-}
-
-bool elaborate_hse(const Build &builder, SymbolTable &tbl, Function &func) {
-	if (builder.progress) printf("Elaborate state space:\n");
-	hse::elaborate(*func.hg, builder.stage >= Build::ENCODE or not builder.noGhosts, true, builder.progress);
-	if (builder.progress) printf("done\n\n");
-	return true;
-}
-
-bool encode_hse(const Build &builder, SymbolTable &tbl, Function &func) {
-	/*hse::encoder enc;
-	enc.base = &func.hg;
-	enc.variables = &func.v;
-
-	if (progress) {
-		printf("Identify state conflicts:\n");
-	}
-	enc.check(!inverting, progress);
-	if (progress) {
-		printf("done\n\n");
-	}
-
-	if (builder.has(Build::CONFLICTS)) {
-		print_conflicts(enc);
-	}
-
-	if (not builder.get(Build::ENCODE)) {
-		if (progress) printf("compiled in %gs\n\n", totalTime.since());
-		complete();
-		return is_clean();
-	}
-
-	if (progress) printf("Insert state variables:\n");
-	if (not enc.insert_state_variables(20, !inverting, progress, false)) {
-		if (progress) printf("compiled in %gs\n\n", totalTime.since());
-		complete();
-		return 1;
-	}
-	if (progress) printf("done\n\n");
-
-	if (builder.has(Build::ENCODE)) {
-		string suffix = builder.stage == Build::ENCODE ? "" : "_complete";
-		export_astg(prefix+suffix+".astg", hg, v);
-	}
-
-	if (enc.conflicts.size() > 0) {
-		// state variable insertion failed
-		print_conflicts(enc);
-		if (progress) printf("compiled in %gs\n\n", totalTime.since());
-		complete();
-		return is_clean();
-	}
-	return true;*/
-}
-
-void hse_to_prs(const Build &builder, SymbolTable &tbl, Structure &strct, const Function &func) {
-	
-}
 
 int build_command(configuration &config, string techPath, string cellsDir, int argc, char **argv, bool progress, bool debug) {
 	Build builder;
@@ -885,20 +800,6 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 
 	Timer totalTime;
 
-	if (format == "ucs") {
-		parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
-		//parse_ucs::function::registry.insert({"chp", parse_ucs::language(&parse_chp::produce, &parse_chp::expect, &parse_chp::register_syntax)});
-		//parse_ucs::function::registry.insert({"hse", parse_ucs::language(&parse_chp::produce, &parse_chp::expect, &parse_chp::register_syntax)});
-		parse_ucs::function::registry.insert({"struct", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
-		//parse_ucs::function::registry.insert({"spice", parse_ucs::language(&parse_spice::produce, &parse_spice::expect, &parse_spice::register_syntax)});
-
-		SymbolTable tbl;
-
-		tbl.load(config, filename);
-		return 0;
-	}
-
-	ucs::variable_set v;
 	chp::graph cg;
 	hse::graph hg;
 	hg.name = prefix;
@@ -908,7 +809,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 	if (format == "chp") {
 		tokens.register_token<parse::block_comment>(false);
 		tokens.register_token<parse::line_comment>(false);
-		parse_chp::composition::register_syntax(tokens);
+		parse_chp::register_syntax(tokens);
 		config.load(tokens, filename, "");
 
 		tokens.increment(false);
@@ -916,7 +817,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		while (tokens.decrement(__FILE__, __LINE__))
 		{
 			parse_chp::composition syntax(tokens);
-			cg.merge(chp::parallel, chp::import_chp(syntax, v, 0, &tokens, true));
+			chp::import_chp(cg, syntax, &tokens, true);
 
 			tokens.increment(false);
 			tokens.expect<parse_chp::composition>();
@@ -936,7 +837,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 			if (prefix != "") {
 				fout = fopen((prefix+".astg").c_str(), "w");
 			}
-			fprintf(fout, "%s", export_astg(cg, v).to_string().c_str());
+			fprintf(fout, "%s", export_astg(cg).to_string().c_str());
 			fclose(fout);
 		}
 
@@ -949,7 +850,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 	if (format == "hse") {
 		tokens.register_token<parse::block_comment>(false);
 		tokens.register_token<parse::line_comment>(false);
-		parse_chp::composition::register_syntax(tokens);
+		parse_chp::register_syntax(tokens);
 		config.load(tokens, filename, "");
 
 		tokens.increment(false);
@@ -957,7 +858,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		while (tokens.decrement(__FILE__, __LINE__))
 		{
 			parse_chp::composition syntax(tokens);
-			hg.merge(hse::parallel, hse::import_hse(syntax, 0, &tokens, true));
+			hse::import_hse(hg, syntax, &tokens, true);
 
 			tokens.increment(false);
 			tokens.expect<parse_chp::composition>();
@@ -973,7 +874,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		while (tokens.decrement(__FILE__, __LINE__))
 		{
 			parse_astg::graph syntax(tokens);
-			hg.merge(hse::parallel, hse::import_hse(syntax, &tokens));
+			hg.merge(hse::import_hse(syntax, &tokens));
 
 			tokens.increment(false);
 			tokens.expect<parse_astg::graph>();
@@ -981,7 +882,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 	} else if (format == "cog") {
 		tokens.register_token<parse::block_comment>(false);
 		tokens.register_token<parse::line_comment>(false);
-		parse_cog::composition::register_syntax(tokens);
+		parse_cog::register_syntax(tokens);
 		config.load(tokens, filename, "");
 
 		tokens.increment(false);
@@ -989,9 +890,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		while (tokens.decrement(__FILE__, __LINE__))
 		{
 			parse_cog::composition syntax(tokens);
-			boolean::cover covered;
-			bool hasRepeat = false;
-			hg.merge(hse::parallel, hse::import_hse(syntax, covered, hasRepeat, 0, &tokens, true));
+			hse::import_hse(hg, syntax, &tokens, true);
 
 			tokens.increment(false);
 			tokens.expect<parse_cog::composition>();
@@ -1112,7 +1011,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 	if (format == "prs") {
 		tokens.register_token<parse::block_comment>(false);
 		tokens.register_token<parse::line_comment>(false);
-		parse_prs::production_rule_set::register_syntax(tokens);
+		parse_prs::register_syntax(tokens);
 		config.load(tokens, filename, "");
 
 		tokens.increment(false);
