@@ -258,18 +258,17 @@ int build_command(string workingDir, string techPath, string cellsDir, int argc,
 	//parse_ucs::function::registry.insert({"spice", parse_ucs::language(&parse_spice::produce, &parse_spice::expect, &parse_spice::register_syntax)});
 
 	weaver::Term::pushDialect("func", chp::factory);
-	weaver::Binder bd;
 
+	Timer totalTime;
 
+	weaver::Program prgm;
+	weaver::Binder bd(prgm);
 	if (filename == "") {
 		string workingDir = bd.findWorkingDir();
 		filename = workingDir + "/top.wv";
 	}
-
-	Timer totalTime;
-	
-	weaver::Program prgm;
-	bd.load(prgm, filename);
+	loadGlobalTypes(prgm);
+	bd.load(filename);
 	prgm.print();
 
 	if (!is_clean()) {

@@ -9,7 +9,7 @@
 
 namespace weaver {
 
-Binder::Binder() {
+Binder::Binder(Program &prgm) : prgm(prgm) {
 }
 
 Binder::~Binder() {
@@ -111,7 +111,7 @@ parse_ucs::source Binder::parsePath(string path, string root) {
 }*/
 
 bool import_declaration(vector<Instance> &result, const Program &prgm, int index, const parse_ucs::declaration &syntax) {
-	int type = prgm.findType(index, syntax.type.names);
+	TypeID type = prgm.findType(index, syntax.type.names);
 	if (type == weaver::UNDEF) {
 		printf("error: type not defined '%s'\n", syntax.type.to_string().c_str());
 		return false;
@@ -124,8 +124,8 @@ bool import_declaration(vector<Instance> &result, const Program &prgm, int index
 	return true;
 }
 
-Decl import_prototype(const Program &prgm, int index, const parse_ucs::prototype &syntax, int recvType) {
-	int retType = prgm.findType(index, syntax.ret.names);
+Decl import_prototype(const Program &prgm, int index, const parse_ucs::prototype &syntax, TypeID recvType) {
+	TypeID retType = prgm.findType(index, syntax.ret.names);
 	vector<Instance> args;
 	for (auto i = syntax.args.begin(); i != syntax.args.end(); i++) {
 		import_declaration(args, prgm, index, *i);
@@ -134,65 +134,81 @@ Decl import_prototype(const Program &prgm, int index, const parse_ucs::prototype
 	return Decl(syntax.name, args, retType, recvType);
 }
 
-void Binder::loadSymbols(Program &prgm, int index, const parse_ucs::source &syntax) {
-	prgm.mods[index].name = syntax.name;
+bool Binder::define(vector<string> typeName, string name, vector<int> size, ucs::Netlist nets) {
+	TypeID type = prgm.findType(currModule, typeName);
+	Instance newInst(type, name, size);
+	if (prgm.mods[currModule].terms[currTerm].symb.define(newInst)) {
+		vector<int> i;
+		i.resize(size.size(), 0);
+		return true;
+	}
+	return false;
+}
+
+void Binder::pushScope() {
+	prgm.mods[currModule].terms[currTerm].symb.pushScope();
+}
+
+void Binder::popScope() {
+	prgm.mods[currModule].terms[currTerm].symb.popScope();
+}
+
+void Binder::loadSymbols(int index, const parse_ucs::source &syntax) {
+	currModule = index;
+	prgm.mods[currModule].name = syntax.name;
 	for (auto i = syntax.types.begin(); i != syntax.types.end(); i++) {
-		int recvType = prgm.mods[index].createType(Type::typeOf(i->name));
+		int recvType = prgm.mods[currModule].createType(Type::typeOf(i->name));
 	}
 }
 
-void Binder::loadModule(Program &prgm, int index, const parse_ucs::source &syntax) {
+void Binder::loadModule(int index, const parse_ucs::source &syntax) {
+	currModule = index;
 	cout << syntax.to_string() << endl;
 	for (auto i = syntax.types.begin(); i != syntax.types.end(); i++) {
-		int recvType = prgm.findType(index, {i->name});
+		TypeID recvType = prgm.findType(currModule, {i->name});
 		for (auto j = i->members.begin(); j != i->members.end(); j++) {
-			import_declaration(prgm.mods[index].types[recvType].members, prgm, index, *j);
+			import_declaration(prgm.mods[recvType[0]].types[recvType[1]].members, prgm, currModule, *j);
 		}
 
 		for (auto j = i->protocols.begin(); j != i->protocols.end(); j++) {
-			prgm.mods[index].types[recvType].methods.push_back(import_prototype(prgm, index, *j, recvType));
+			prgm.mods[recvType[0]].types[recvType[1]].methods.push_back(import_prototype(prgm, currModule, *j, recvType));
 		}
 	}
 
 	for (auto i = syntax.funcs.begin(); i != syntax.funcs.end(); i++) {
 		int kind = Term::findDialect(i->lang);
-		int recvType = weaver::VOID;
+		TypeID recvType = weaver::UNDEF;
 		if (not i->recv.empty()) {
-			recvType = prgm.findType(index, {i->recv});
-		}
-		if (recvType == weaver::UNDEF) {
-			printf("error: type not defined '%s'\n", i->recv.c_str());
-			continue;
+			recvType = prgm.findType(currModule, {i->recv});
+			if (recvType == weaver::UNDEF) {
+				printf("error: type not defined '%s'\n", i->recv.c_str());
+				continue;
+			}
 		}
 
-		int retType = weaver::VOID;
+		TypeID retType = weaver::UNDEF;
 		if (i->ret.valid) {
-			retType = prgm.findType(index, i->ret.names);
-		}
-		if (retType == weaver::UNDEF) {
-			printf("error: type not defined '%s'\n", i->ret.to_string().c_str());
-			continue;
-		}
-
-		if (recvType != weaver::VOID and (recvType < 0 or recvType >= (int)prgm.mods[index].types.size())) {
-			printf("error: invalid receive type %d/%d\n", recvType, (int)prgm.mods[index].types.size());
-			continue;
+			retType = prgm.findType(currModule, i->ret.names);
+			if (retType == weaver::UNDEF) {
+				printf("error: type not defined '%s'\n", i->ret.to_string().c_str());
+				continue;
+			}
 		}
 
 		vector<Instance> args;
 		for (auto j = i->args.begin(); j != i->args.end(); j++) {
-			import_declaration(args, prgm, index, *j);
+			import_declaration(args, prgm, currModule, *j);
 		}
 
-		int proc = prgm.mods[index].createTerm(Term::procOf(kind, i->name, args, retType, recvType));
+		currTerm = prgm.mods[currModule].createTerm(Term::procOf(kind, i->name, args, retType, recvType));
 
 		if (kind >= 0) {
-			prgm.mods[index].terms[proc].def = Term::dialects[kind].factory(i->body, nullptr);
+			prgm.mods[currModule].terms[currTerm].def = Term::dialects[kind].factory(i->body, nullptr);
 		}
 	}
 }
 
-void Binder::load(Program &prgm, string path) {
+void Binder::load(string path) {
 	// TODO(edward.bingham) Implement modules appropriately:
 	// 1. load top.wv from current directory
 	// 2. import paths are relative to project root, so find project root
@@ -201,6 +217,7 @@ void Binder::load(Program &prgm, string path) {
 
 	// walk import tree
 	string root = findProjectRoot(path);
+	int offset = (int)prgm.mods.size();
 
 	vector<parse_ucs::source> src;
 	vector<string> stack;
@@ -219,14 +236,14 @@ void Binder::load(Program &prgm, string path) {
 	}
 
 	// load symbols to break dependency chains
-	prgm.mods.resize(src.size());
+	prgm.mods.resize(offset+src.size());
 	for (int i = 0; i < (int)src.size(); i++) {
-		loadSymbols(prgm, i, src[i]);
+		loadSymbols(i+offset, src[i]);
 	}
 
 	// link up all of the dependencies
 	for (int i = 0; i < (int)src.size(); i++) {
-		loadModule(prgm, i, src[i]);
+		loadModule(i+offset, src[i]);
 	}
 }
 

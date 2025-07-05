@@ -22,16 +22,9 @@ namespace weaver {
 // implemented by subgraphs I'm currently representing CHP as a petri-net. Primary
 // difference is the flattening of scope.
 
-enum {
-	UNDEF = -6,
-	CHAN = -5,
-	BOOL = -4,
-	UFIXED = -3,
-	FIXED = -2,
-	VOID = -1,
-};
+using TypeID=array<int, 2>;
 
-using TypeID=int;
+static const TypeID UNDEF={-1,-1};
 
 // represents variable declarations, this does not include "connections" for functions
 struct Instance {
@@ -54,7 +47,7 @@ bool operator==(const Instance &i0, const Instance &i1);
 // represents function prototypes
 struct Decl {
 	Decl();
-	Decl(string name, vector<Instance> args, TypeID ret=VOID, TypeID recv=VOID);
+	Decl(string name, vector<Instance> args, TypeID ret=UNDEF, TypeID recv=UNDEF);
 	~Decl();
 
 	TypeID recv;
@@ -78,10 +71,26 @@ struct Dialect {
 	Factory factory;
 };
 
-struct SymbolTable {
+struct Scope {
+	enum {
+		NOTFOUND=-1
+	};
 	vector<Instance> tbl;
+	int parent;
+	vector<int> child;
 
 	int find(string name) const;
+};
+
+struct SymbolTable {
+	vector<Scope> scope;
+	int curr;
+
+	bool define(Instance inst);
+	void pushScope();
+	void popScope();
+	
+	Instance find(string name) const;
 };
 
 struct Term {
@@ -89,7 +98,7 @@ struct Term {
 	~Term();
 
 	enum {
-		UNDEF = -2,
+		NONE = -2,
 		CONTEXT = -1,
 		PROCESS = 0,
 	};
@@ -101,12 +110,12 @@ struct Term {
 	SymbolTable symb;
 	std::any def;
 
-	static Term procOf(int kind, string name, vector<Instance> args, TypeID ret=VOID, TypeID recv=VOID);
-	static Term contextOf(string name, vector<Instance> args, TypeID ret=VOID, TypeID recv=VOID);
+	static Term procOf(int kind, string name, vector<Instance> args, TypeID ret=UNDEF, TypeID recv=UNDEF);
+	static Term contextOf(string name, vector<Instance> args, TypeID ret=UNDEF, TypeID recv=UNDEF);
 
 	static int pushDialect(string name, Dialect::Factory factory);
 	static int findDialect(string name);
-	
+
 	void print();
 };
 
@@ -115,7 +124,7 @@ struct Type {
 	~Type();
 
 	enum {
-		UNDEF = -2,
+		NONE = -2,
 		INTERFACE = -1,
 		TYPE = 0,
 	};
@@ -147,15 +156,21 @@ struct Module {
 };
 
 struct Program {
+	Program();
+	~Program();
+
 	vector<Module> mods;
+	int global;
 
 	int createModule(string name);
 
 	int findTerm(int index, Decl proto) const;
-	int findType(int index, vector<string> name) const;
+	TypeID findType(int index, vector<string> name) const;
 
 	void print();
 };
+
+void loadGlobalTypes(Program &prgm);
 
 // Variables in Weaver are compound (type, interface)
 // Variables in flow are channels (type)

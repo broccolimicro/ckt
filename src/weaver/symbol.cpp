@@ -21,7 +21,7 @@ Instance::~Instance() {
 }
 
 void Instance::print() {
-	printf("instance %d %s {", type, name.c_str());
+	printf("instance (%d,%d) %s {", type[0], type[1], name.c_str());
 	for (int i = 0; i < (int)size.size(); i++) {
 		printf("%d ", size[i]);
 	}
@@ -56,11 +56,11 @@ Decl::~Decl() {
 }
 
 void Decl::print() {
-	printf("decl %d %s {\n", recv, name.c_str());
+	printf("decl (%d,%d) %s {\n", recv[0], recv[1], name.c_str());
 	for (int i = 0; i < (int)args.size(); i++) {
 		args[i].print();
 	}
-	printf("} %d\n", ret);
+	printf("} (%d,%d)\n", ret[0], ret[1]);
 }
 
 bool operator==(const Decl &d0, const Decl &d1) {
@@ -88,6 +88,35 @@ Dialect::Dialect(string name, Dialect::Factory factory) {
 }
 
 Dialect::~Dialect() {
+}
+
+int Scope::find(string name) const {
+	for (int i = 0; i < (int)tbl.size(); i++) {
+		if (tbl[i].name == name) {
+			return i;
+		}
+	}
+	return NOTFOUND;
+}
+
+bool SymbolTable::define(Instance inst) {
+	if (scope[curr].find(inst.name) != Scope::NOTFOUND) {
+		return false;
+	}
+
+	scope[curr].tbl.push_back(inst);
+	return true;
+}
+
+void SymbolTable::pushScope() {
+	scope.push_back(Scope());
+	scope[curr].child.push_back((int)scope.size()-1);
+	scope.back().parent = curr;
+	curr = (int)scope.size()-1;
+}
+
+void SymbolTable::popScope() {
+	curr = scope[curr].parent;
 }
 
 Term::Term() {
@@ -121,7 +150,7 @@ int Term::findDialect(string name) {
 			return i;
 		}
 	}
-	return Term::UNDEF;
+	return Term::NONE;
 }
 
 void Term::print() {
@@ -182,7 +211,7 @@ int Module::findTerm(Decl proto) const {
 			return i;
 		}
 	}
-	return UNDEF;
+	return -1;
 }
 
 int Module::findType(vector<string> name) const {
@@ -196,7 +225,7 @@ int Module::findType(vector<string> name) const {
 		printf("error: unimplemented\n");
 		// function call?
 	}
-	return UNDEF;
+	return -1;
 }
 
 void Module::print() {
@@ -210,13 +239,24 @@ void Module::print() {
 	printf("}\n");
 }
 
-int SymbolTable::find(string name) const {
-	for (int i = 0; i < (int)tbl.size(); i++) {
-		if (tbl[i].name == name) {
-			return i;
-		}
+Instance SymbolTable::find(string name) const {
+	int i = curr;
+	int index;
+	do {
+		index = scope[i].find(name);
+	} while (index == Scope::NOTFOUND and i >= 0);
+
+	if (i >= 0 and index >= 0) {
+		return scope[i].tbl[index];
 	}
-	return -1;
+	return Instance();
+}
+
+Program::Program() {
+	global = -1;
+}
+
+Program::~Program() {
 }
 
 int Program::createModule(string name) {
@@ -228,7 +268,7 @@ int Program::createModule(string name) {
 int Program::findTerm(int index, Decl proto) const {
 	size_t dot = proto.name.find_first_of(".");
 	if (dot == string::npos) {
-		return UNDEF;
+		return -1;
 	}
 
 	string modName = proto.name.substr(0, dot);
@@ -238,34 +278,32 @@ int Program::findTerm(int index, Decl proto) const {
 			return mods[i].findTerm(proto);
 		}
 	}
-	return UNDEF;
+	return -1;
 }
 
-int Program::findType(int index, vector<string> name) const {
+TypeID Program::findType(int index, vector<string> name) const {
 	if (name.empty()) {
 		return UNDEF;
 	} else if (name.size() == 1u) {
-		if (name[0] == "void") {
-			return VOID;
-		} else if (name[0] == "bool") {
-			return BOOL;
-		} else if (name[0].rfind("fixed", 0) == 0) {
-			return FIXED;
-		} else if (name[0].rfind("ufixed", 0) == 0) {
-			return UFIXED;
-		} else if (name[0] == "chan") {
-			return CHAN;
-		} else if (index >= 0) {
-			return mods[index].findType(name);
+		TypeID result = UNDEF;
+		if (global >= 0) {
+			result[0] = global;
+			result[1] = mods[global].findType(name);
 		}
-		return UNDEF;
+
+		if (result[1] == UNDEF[1] and index >= 0) {
+			result[0] = index;
+			result[1] = mods[index].findType(name);
+		}
+		
+		return result;
 	}
 
 	string modName = name[0];
 	name.erase(name.begin());
 	for (int i = 0; i < (int)mods.size(); i++) {
 		if (mods[i].name == modName) {
-			return mods[i].findType(name);
+			return {i, mods[i].findType(name)};
 		}
 	}
 	return UNDEF;
@@ -275,6 +313,19 @@ void Program::print() {
 	for (int i = 0; i < (int)mods.size(); i++) {
 		mods[i].print();
 	}
+}
+
+void loadGlobalTypes(Program &prgm) {
+	if (prgm.global >= 0) {
+		return;
+	}
+	Module glob;
+	glob.types.push_back(Type::interfaceOf("chan"));
+	glob.types.push_back(Type::interfaceOf("fixed"));
+	glob.types.push_back(Type::interfaceOf("ufixed"));
+	glob.types.push_back(Type::interfaceOf("bool"));
+	prgm.mods.push_back(glob);
+	prgm.global = (int)prgm.mods.size()-1;
 }
 
 /*Instance at(Module &types, SymbolTable &symb, vector<int> idx) {
