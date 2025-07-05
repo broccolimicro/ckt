@@ -1,5 +1,5 @@
 NAME          = lm
-DEPEND        = interpret_sch interpret_prs interpret_hse interpret_chp weaver chp interpret_arithmetic interpret_boolean hse prs sch interpret_phy phy petri arithmetic boolean parse_prs parse_cog parse_chp parse_astg parse_spice parse_dot parse_expression parse_ucs parse common
+DEPEND        = interpret_sch interpret_prs interpret_hse interpret_chp weaver chp interpret_flow interpret_arithmetic interpret_boolean hse prs sch interpret_phy flow phy petri arithmetic boolean parse_verilog parse_prs parse_cog parse_chp parse_astg parse_spice parse_dot parse_expression parse_ucs parse common
 
 SRCDIR        = src
 TESTDIR       = tests
@@ -11,7 +11,7 @@ INCLUDE_PATHS = $(DEPEND:%=-I../../lib/%) -I../../lib/gdstk/build/include $(shel
 LIBRARY_PATHS = $(DEPEND:%=-L../../lib/%) -L.
 LIBRARIES     = $(DEPEND:%=-l%) -ldl
 LIBFILES      = $(foreach dep,$(DEPEND),../../lib/$(dep)/lib$(dep).a)
-CXXFLAGS      = -std=c++17 -O2 -g -Wall -fmessage-length=0 -D CL_HPP_MINIMUM_OPENCL_VERSION=120 -D CL_HPP_TARGET_OPENCL_VERSION=120 -D CL_HPP_ENABLE_EXCEPTIONS 
+CXXFLAGS      = -std=c++20 -O2 -g -Wall -fmessage-length=0 -D CL_HPP_MINIMUM_OPENCL_VERSION=120 -D CL_HPP_TARGET_OPENCL_VERSION=120 -D CL_HPP_ENABLE_EXCEPTIONS 
 LDFLAGS       = 
 
 SOURCES	     := $(shell mkdir -p $(SRCDIR); find $(SRCDIR) -name '*.cpp')

@@ -58,6 +58,12 @@
 #include <interpret_arithmetic/export.h>
 #include <interpret_arithmetic/import.h>
 
+#include <chp/synthesize.h>
+#include <flow/func.h>
+#include <flow/module.h>
+#include <flow/synthesize.h>
+#include <interpret_flow/export.h>
+
 #include <filesystem>
 
 #include "weaver/symbol.h"
@@ -257,17 +263,73 @@ int build_command(string workingDir, string techPath, string cellsDir, int argc,
 
 	weaver::Term::pushDialect("func", chp::factory);
 
-	Timer totalTime;
+	if (format == "wv") {
+		Timer totalTime;
 
-	weaver::Program prgm;
-	weaver::Binder bd(prgm);
-	if (filename == "") {
-		string workingDir = bd.findWorkingDir();
-		filename = workingDir + "/top.wv";
+		weaver::Program prgm;
+		weaver::Binder bd(prgm);
+		if (filename == "") {
+			string workingDir = bd.findWorkingDir();
+			filename = workingDir + "/top.wv";
+		}
+		loadGlobalTypes(prgm);
+		bd.load(filename);
+		prgm.print();
+	} else if (format == "chp" or format == "cog") {
+		// Set up tokenizer
+		tokenizer tokens;
+		tokens.register_token<parse::block_comment>(false);
+		tokens.register_token<parse::line_comment>(false);
+
+		if (format == "cog") {
+			parse_cog::register_syntax(tokens);
+		} else if (format == "chp") {
+			parse_chp::register_syntax(tokens);
+		}
+
+		ifstream fin;
+		fin.open(filename.c_str(), ios::binary | ios::in);
+		if (!fin.is_open()) {
+			tokens.error("file not found '" + filename + "'", __FILE__, __LINE__);
+			return 1;
+		} else {
+			fin.seekg(0, ios::end);
+			int size = (int)fin.tellg();
+			string buffer(size, ' ');
+			fin.seekg(0, ios::beg);
+			fin.read(&buffer[0], size);
+			fin.clear();
+			tokens.insert(filename, buffer, nullptr);
+		}
+
+		chp::graph g;
+
+		// Parse input
+		if (format == "cog") {
+			tokens.increment(false);
+			tokens.expect<parse_cog::composition>();
+			if (tokens.decrement(__FILE__, __LINE__)) {
+				parse_cog::composition syntax(tokens);
+				chp::import_chp(g, syntax, &tokens, true);
+			}
+		} else if (format == "chp") {
+			tokens.increment(false);
+			tokens.expect<parse_chp::composition>();
+			if (tokens.decrement(__FILE__, __LINE__)) {
+				parse_chp::composition syntax(tokens);
+				chp::import_chp(g, syntax, &tokens, true);
+			}
+		}
+
+		g.post_process();
+		gvdot::render(prefix+".png", chp::export_graph(g, true).to_string());
+		flow::Func fn;
+		chp::synthesizeFunc(fn, g);
+
+		clocked::Module mod = flow::synthesize_valrdy(fn);
+
+		cout << flow::export_module(mod).to_string() << endl;
 	}
-	loadGlobalTypes(prgm);
-	bd.load(filename);
-	prgm.print();
 
 	if (!is_clean()) {
 		complete();
