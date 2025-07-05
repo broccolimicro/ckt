@@ -10,6 +10,7 @@
 namespace weaver {
 
 Binder::Binder(Program &prgm) : prgm(prgm) {
+	loadGlobalTypes(this->prgm);
 }
 
 Binder::~Binder() {
@@ -111,8 +112,8 @@ parse_ucs::source Binder::parsePath(string path, string root) {
 }*/
 
 bool import_declaration(vector<Instance> &result, const Program &prgm, int index, const parse_ucs::declaration &syntax) {
-	TypeID type = prgm.findType(index, syntax.type.names);
-	if (type == weaver::UNDEF) {
+	TypeId type = prgm.findType(index, syntax.type.names);
+	if (not type.defined()) {
 		printf("error: type not defined '%s'\n", syntax.type.to_string().c_str());
 		return false;
 	}
@@ -124,8 +125,8 @@ bool import_declaration(vector<Instance> &result, const Program &prgm, int index
 	return true;
 }
 
-Decl import_prototype(const Program &prgm, int index, const parse_ucs::prototype &syntax, TypeID recvType) {
-	TypeID retType = prgm.findType(index, syntax.ret.names);
+Decl import_prototype(const Program &prgm, int index, const parse_ucs::prototype &syntax, TypeId recvType) {
+	TypeId retType = prgm.findType(index, syntax.ret.names);
 	vector<Instance> args;
 	for (auto i = syntax.args.begin(); i != syntax.args.end(); i++) {
 		import_declaration(args, prgm, index, *i);
@@ -135,7 +136,7 @@ Decl import_prototype(const Program &prgm, int index, const parse_ucs::prototype
 }
 
 bool Binder::define(vector<string> typeName, string name, vector<int> size, ucs::Netlist nets) {
-	TypeID type = prgm.findType(currModule, typeName);
+	TypeId type = prgm.findType(currModule, typeName);
 	Instance newInst(type, name, size);
 	if (prgm.mods[currModule].terms[currTerm].symb.define(newInst)) {
 		vector<int> i;
@@ -165,31 +166,31 @@ void Binder::loadModule(int index, const parse_ucs::source &syntax) {
 	currModule = index;
 	cout << syntax.to_string() << endl;
 	for (auto i = syntax.types.begin(); i != syntax.types.end(); i++) {
-		TypeID recvType = prgm.findType(currModule, {i->name});
+		TypeId recvType = prgm.findType(currModule, {i->name});
 		for (auto j = i->members.begin(); j != i->members.end(); j++) {
-			import_declaration(prgm.mods[recvType[0]].types[recvType[1]].members, prgm, currModule, *j);
+			import_declaration(prgm.typeAt(recvType).members, prgm, currModule, *j);
 		}
 
 		for (auto j = i->protocols.begin(); j != i->protocols.end(); j++) {
-			prgm.mods[recvType[0]].types[recvType[1]].methods.push_back(import_prototype(prgm, currModule, *j, recvType));
+			prgm.typeAt(recvType).methods.push_back(import_prototype(prgm, currModule, *j, recvType));
 		}
 	}
 
 	for (auto i = syntax.funcs.begin(); i != syntax.funcs.end(); i++) {
 		int kind = Term::findDialect(i->lang);
-		TypeID recvType = weaver::UNDEF;
+		TypeId recvType;
 		if (not i->recv.empty()) {
 			recvType = prgm.findType(currModule, {i->recv});
-			if (recvType == weaver::UNDEF) {
+			if (not recvType.defined()) {
 				printf("error: type not defined '%s'\n", i->recv.c_str());
 				continue;
 			}
 		}
 
-		TypeID retType = weaver::UNDEF;
+		TypeId retType;
 		if (i->ret.valid) {
 			retType = prgm.findType(currModule, i->ret.names);
-			if (retType == weaver::UNDEF) {
+			if (not retType.defined()) {
 				printf("error: type not defined '%s'\n", i->ret.to_string().c_str());
 				continue;
 			}

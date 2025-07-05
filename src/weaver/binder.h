@@ -1,7 +1,5 @@
 #pragma once
 
-#include "symbol.h"
-
 #include <common/net.h>
 
 #include <parse/tokenizer.h>
@@ -9,6 +7,8 @@
 
 #include <vector>
 #include <string>
+
+#include <weaver/program.h>
 
 using std::vector;
 using std::string;

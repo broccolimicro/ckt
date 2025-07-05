@@ -68,11 +68,9 @@
 namespace chp {
 
 std::any factory(const parse::syntax *syntax, tokenizer *tokens) {
-	arithmetic::Expression covered;
-	bool hasRepeat = false;
 	graph g;
 	if (syntax != nullptr) {
-		g = import_chp(*(const parse_cog::composition *)syntax, covered, hasRepeat, 0, tokens, true);
+		import_chp(g, *(const parse_cog::composition *)syntax, tokens, true);
 		//g.post_process(true);
 	}
 	return g;
