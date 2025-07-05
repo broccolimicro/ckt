@@ -174,7 +174,7 @@ int test_command(configuration &config, string techPath, string cellsDir, int ar
 	} else if (format == "prs") {
 		prs::production_rule_set pr;
 
-		parse_prs::production_rule_set::register_syntax(tokens);
+		parse_prs::register_syntax(tokens);
 		config.load(tokens, filename, "");
 
 		tokens.increment(false);
