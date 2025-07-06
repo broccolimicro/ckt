@@ -6,6 +6,7 @@
 #include <parse/default/line_comment.h>
 
 #include <parse_ucs/source.h>
+#include <parse_astg/factory.h>
 #include <parse_cog/factory.h>
 #include <parse_chp/factory.h>
 #include <parse_prs/factory.h>
@@ -140,7 +141,7 @@ int test_command(configuration &config, string techPath, string cellsDir, int ar
 				tokens.expect<parse_chp::composition>();
 			}
 		} else if (format == "astg") {
-			parse_astg::graph::register_syntax(tokens);
+			parse_astg::register_syntax(tokens);
 			config.load(tokens, filename, "");
 			
 			tokens.increment(false);
@@ -148,7 +149,7 @@ int test_command(configuration &config, string techPath, string cellsDir, int ar
 			while (tokens.decrement(__FILE__, __LINE__))
 			{
 				parse_astg::graph syntax(tokens);
-				hg.merge(hse::import_hse(syntax, &tokens));
+				hse::import_hse(hg, syntax, &tokens);
 
 				tokens.increment(false);
 				tokens.expect<parse_astg::graph>();

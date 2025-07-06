@@ -6,6 +6,7 @@
 #include <parse/default/line_comment.h>
 
 #include <parse_ucs/source.h>
+#include <parse_astg/factory.h>
 #include <parse_cog/factory.h>
 #include <parse_chp/factory.h>
 #include <parse_prs/factory.h>
@@ -97,7 +98,7 @@ void render(string filename, string format, string content) {
 	}
 }
 
-int show_command(configuration &config, string techPath, string cellsDir, int argc, char **argv) {
+int show_command(configuration &config, string techPath, string cellsDir, int argc, char **argv, bool progress, bool debug) {
 	tokenizer tokens;
 	tokens.register_token<parse::block_comment>(false);
 	tokens.register_token<parse::line_comment>(false);
@@ -239,7 +240,7 @@ int show_command(configuration &config, string techPath, string cellsDir, int ar
 				tokens.expect<parse_chp::composition>();
 			}
 		} else if (format == "astg") {
-			parse_astg::graph::register_syntax(tokens);
+			parse_astg::register_syntax(tokens);
 			config.load(tokens, filename, "");
 			
 			tokens.increment(false);
@@ -247,7 +248,7 @@ int show_command(configuration &config, string techPath, string cellsDir, int ar
 			while (tokens.decrement(__FILE__, __LINE__))
 			{
 				parse_astg::graph syntax(tokens);
-				hg.merge(hse::import_hse(syntax, &tokens));
+				hse::import_hse(hg, syntax, &tokens);
 
 				tokens.increment(false);
 				tokens.expect<parse_astg::graph>();
@@ -268,7 +269,7 @@ int show_command(configuration &config, string techPath, string cellsDir, int ar
 			}
 		}
 		if (process) {
-			hg.post_process(true);
+			hg.post_process(true, false, true, debug);
 		}
 		hg.check_variables();
 

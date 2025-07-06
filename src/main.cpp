@@ -172,7 +172,7 @@ int main(int argc, char **argv) {
 			return compare_command(config, techPath, cellsDir, argc-i, argv+i, progress, debug);
 		} else if (arg == "show") {
 			++i;
-			return show_command(config, techPath, cellsDir, argc-i, argv+i);
+			return show_command(config, techPath, cellsDir, argc-i, argv+i, progress, debug);
 		} else if (arg == "tech") {
 			++i;
 			return tech_command(config, techDir, techPath, cellsDir, argc-i, argv+i, progress, debug);

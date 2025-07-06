@@ -10,6 +10,7 @@
 #include <parse/default/new_line.h>
 
 #include <parse_ucs/source.h>
+#include <parse_astg/factory.h>
 #include <parse_cog/factory.h>
 #include <parse_chp/factory.h>
 #include <parse_prs/factory.h>
@@ -866,7 +867,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 	} else if (format == "astg") {
 		tokens.register_token<parse::block_comment>(false);
 		tokens.register_token<parse::line_comment>(false);
-		parse_astg::graph::register_syntax(tokens);
+		parse_astg::register_syntax(tokens);
 		config.load(tokens, filename, "");
 		
 		tokens.increment(false);
@@ -874,7 +875,7 @@ int build_command(configuration &config, string techPath, string cellsDir, int a
 		while (tokens.decrement(__FILE__, __LINE__))
 		{
 			parse_astg::graph syntax(tokens);
-			hg.merge(hse::import_hse(syntax, &tokens));
+			hse::import_hse(hg, syntax, &tokens);
 
 			tokens.increment(false);
 			tokens.expect<parse_astg::graph>();
