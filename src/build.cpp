@@ -258,24 +258,12 @@ int build_command(string workingDir, string techPath, string cellsDir, int argc,
 	parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
 	//parse_ucs::function::registry.insert({"chp", parse_ucs::language(&parse_chp::produce, &parse_chp::expect, &parse_chp::register_syntax)});
 	//parse_ucs::function::registry.insert({"hse", parse_ucs::language(&parse_chp::produce, &parse_chp::expect, &parse_chp::register_syntax)});
-	parse_ucs::function::registry.insert({"struct", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
+	//parse_ucs::function::registry.insert({"struct", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
 	//parse_ucs::function::registry.insert({"spice", parse_ucs::language(&parse_spice::produce, &parse_spice::expect, &parse_spice::register_syntax)});
 
 	weaver::Term::pushDialect("func", chp::factory);
 
-	if (format == "wv") {
-		Timer totalTime;
-
-		weaver::Program prgm;
-		weaver::Binder bd(prgm);
-		if (filename == "") {
-			string workingDir = bd.findWorkingDir();
-			filename = workingDir + "/top.wv";
-		}
-		loadGlobalTypes(prgm);
-		bd.load(filename);
-		prgm.print();
-	} else if (format == "chp" or format == "cog") {
+	if (format == "chp" or format == "cog") {
 		// Set up tokenizer
 		tokenizer tokens;
 		tokens.register_token<parse::block_comment>(false);
@@ -329,6 +317,35 @@ int build_command(string workingDir, string techPath, string cellsDir, int argc,
 		clocked::Module mod = flow::synthesize_valrdy(fn);
 
 		cout << flow::export_module(mod).to_string() << endl;
+	} else {
+		Timer totalTime;
+
+		weaver::Program prgm;
+		weaver::Binder bd(prgm);
+		if (filename == "") {
+			string workingDir = bd.findWorkingDir();
+			filename = workingDir + "/top.wv";
+		}
+		loadGlobalTypes(prgm);
+		bd.load(filename);
+		for (auto i = prgm.mods.begin(); i != prgm.mods.end(); i++) {
+			for (auto j = i->terms.begin(); j != i->terms.end(); j++) {
+				if (weaver::Term::dialects[j->kind].name == "func") {
+					chp::graph &g = std::any_cast<chp::graph&>(j->def);
+					g.name = j->decl.name;
+					g.post_process();
+					gvdot::render(prefix+".png", chp::export_graph(g, true).to_string());
+					flow::Func fn;
+					chp::synthesizeFunc(fn, g);
+
+					clocked::Module mod = flow::synthesize_valrdy(fn);
+
+					cout << flow::export_module(mod).to_string() << endl;
+				}
+			}
+		}
+			
+		prgm.print();
 	}
 
 	if (!is_clean()) {

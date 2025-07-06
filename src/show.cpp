@@ -209,7 +209,7 @@ int show_command(string workingDir, string techPath, string cellsDir, int argc, 
 			while (tokens.decrement(__FILE__, __LINE__))
 			{
 				parse_astg::graph syntax(tokens);
-				hg.merge(hse::import_hse(syntax, &tokens));
+				hse::import_hse(hg, syntax, &tokens);
 
 				tokens.increment(false);
 				tokens.expect<parse_astg::graph>();

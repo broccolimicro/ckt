@@ -164,7 +164,7 @@ void Binder::loadSymbols(int index, const parse_ucs::source &syntax) {
 
 void Binder::loadModule(int index, const parse_ucs::source &syntax) {
 	currModule = index;
-	cout << syntax.to_string() << endl;
+	//cout << syntax.to_string() << endl;
 	for (auto i = syntax.types.begin(); i != syntax.types.end(); i++) {
 		TypeId recvType = prgm.findType(currModule, {i->name});
 		for (auto j = i->members.begin(); j != i->members.end(); j++) {
