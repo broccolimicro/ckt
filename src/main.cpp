@@ -5,7 +5,7 @@
 #include "build.h"
 //#include "unpack.h"
 //#include "sim.h"
-//#include "show.h"
+#include "show.h"
 //#include "test.h"
 //#include "compare.h"
 #include "tech.h"
@@ -170,7 +170,7 @@ int main(int argc, char **argv) {
 			//return compare_command(workingDir, techPath, cellsDir, argc-i, argv+i, progress, debug);
 		} else if (arg == "show") {
 			++i;
-			//return show_command(workingDir, techPath, cellsDir, argc-i, argv+i, progress, debug);
+			return show_command(workingDir, techPath, cellsDir, argc-i, argv+i, progress, debug);
 		} else if (arg == "tech") {
 			++i;
 			return tech_command(workingDir, techDir, techPath, cellsDir, argc-i, argv+i, progress, debug);
@@ -195,7 +195,7 @@ int main(int argc, char **argv) {
 			} else if (arg == "compare") {
 				//compare_help();
 			} else if (arg == "show") {
-				//show_help();
+				show_help();
 			} else if (arg == "tech") {
 				tech_help();
 			} else {
