@@ -1,4 +1,4 @@
-#include "sim.h"
+#include "tech.h"
 
 #include <common/standard.h>
 #include <parse/parse.h>
@@ -69,7 +69,7 @@ void tech_help() {
 	//printf("  drop [cell name...]     delete these cells from your cell library\n");
 }
 
-int tech_list_command(configuration &config, string techDir, int argc, char **argv, bool progress, bool debug) {
+int tech_list_command(string workingDir, string techDir, int argc, char **argv, bool progress, bool debug) {
 	if (not std::filesystem::exists(techDir)) {
 		return 1;
 	}
@@ -82,7 +82,7 @@ int tech_list_command(configuration &config, string techDir, int argc, char **ar
 	return 1;
 }
 
-int tech_set_command(configuration &config, string techDir, int argc, char **argv, bool progress, bool debug) {
+int tech_set_command(string workingDir, string techDir, int argc, char **argv, bool progress, bool debug) {
 	string tech = "sky130";
 	if (argc >= 1) {
 		tech = argv[0];
@@ -115,7 +115,7 @@ int tech_set_command(configuration &config, string techDir, int argc, char **arg
 	return 0;
 }
 
-int tech_get_command(configuration &config, string techDir, int argc, char **argv, bool progress, bool debug) {
+int tech_get_command(string workingDir, string techDir, int argc, char **argv, bool progress, bool debug) {
 	std::filesystem::path current = std::filesystem::current_path();
 	string tech = "sky130";
 	std::filesystem::path search = current;
@@ -136,7 +136,7 @@ int tech_get_command(configuration &config, string techDir, int argc, char **arg
 	return 1;
 }
 
-int tech_cells_command(configuration &config, string techDir, string techPath, string cellsDir, int argc, char **argv, bool progress, bool debug) {
+int tech_cells_command(string workingDir, string techDir, string techPath, string cellsDir, int argc, char **argv, bool progress, bool debug) {
 	vector<string> files;
 
 	for (int i = 0; i < argc; i++) {
@@ -212,7 +212,7 @@ int tech_cells_command(configuration &config, string techDir, string techPath, s
 	return 1;
 }
 
-/*int tech_import_command(configuration &config, string techDir, string techPath, string cellsDir, int argc, char **argv, bool progress, bool debug) {
+/*int tech_import_command(string workingDir, string techDir, string techPath, string cellsDir, int argc, char **argv, bool progress, bool debug) {
 	map<string, vector<string> > files;
 
 	for (int i = 0; i < argc; i++) {
@@ -248,7 +248,7 @@ int tech_cells_command(configuration &config, string techDir, string techPath, s
 	return 1;
 }*/
 
-int tech_command(configuration &config, string techDir, string techPath, string cellsDir, int argc, char **argv, bool progress, bool debug) {
+int tech_command(string workingDir, string techDir, string techPath, string cellsDir, int argc, char **argv, bool progress, bool debug) {
 	if (argc == 0) {
 		tech_help();
 	}
@@ -260,19 +260,19 @@ int tech_command(configuration &config, string techDir, string techPath, string 
 			// placeholder for arguments
 		} else if (arg == "list") {
 			++i;
-			return tech_list_command(config, techDir, argc-i, argv+i, progress, debug);
+			return tech_list_command(workingDir, techDir, argc-i, argv+i, progress, debug);
 		} else if (arg == "set") {
 			++i;
-			return tech_set_command(config, techDir, argc-i, argv+i, progress, debug);
+			return tech_set_command(workingDir, techDir, argc-i, argv+i, progress, debug);
 		} else if (arg == "get") {
 			++i;
-			return tech_get_command(config, techDir, argc-i, argv+i, progress, debug);
+			return tech_get_command(workingDir, techDir, argc-i, argv+i, progress, debug);
 		} else if (arg == "cells") {
 			++i;
-			return tech_cells_command(config, techDir, techPath, cellsDir, argc-i, argv+i, progress, debug);
+			return tech_cells_command(workingDir, techDir, techPath, cellsDir, argc-i, argv+i, progress, debug);
 		/*} else if (arg == "import") {
 			++i;
-			return tech_import_command(config, techDir, techPath, cellsDir, argc-i, argv+i, progress, debug);*/
+			return tech_import_command(workingDir, techDir, techPath, cellsDir, argc-i, argv+i, progress, debug);*/
 		} else {
 			tech_help();
 		}

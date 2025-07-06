@@ -4,4 +4,4 @@
 #include <parse/parse.h>
 
 void tech_help();
-int tech_command(configuration &config, string techDir, string techPath, string cellsDir, int argc, char **argv, bool progress=false, bool debug=false);
+int tech_command(string workingDir, string techDir, string techPath, string cellsDir, int argc, char **argv, bool progress=false, bool debug=false);

@@ -3,11 +3,11 @@
 
 #include "version.h"
 #include "build.h"
-#include "unpack.h"
-#include "sim.h"
-#include "show.h"
-#include "test.h"
-#include "compare.h"
+//#include "unpack.h"
+//#include "sim.h"
+//#include "show.h"
+//#include "test.h"
+//#include "compare.h"
 #include "tech.h"
 
 #include <filesystem>
@@ -53,9 +53,7 @@ void print_version() {
 
 int main(int argc, char **argv) {
 	std::filesystem::path current = std::filesystem::current_path();
-
-	configuration config;
-	config.set_working_directory(argv[0]);
+	string workingDir = argv[0];
 
 	if (argc <= 1) {
 		print_help();
@@ -157,25 +155,25 @@ int main(int argc, char **argv) {
 			manualCells = true;
 		} else if (arg == "build") {
 			++i;
-			return build_command(config, techPath, cellsDir, argc-i, argv+i, progress, debug);
+			return build_command(workingDir, techPath, cellsDir, argc-i, argv+i, progress, debug);
 		} else if (arg == "unpack") {
 			++i;
-			return unpack_command(config, techPath, cellsDir, argc-i, argv+i, progress, debug);
+			//return unpack_command(workingDir, techPath, cellsDir, argc-i, argv+i, progress, debug);
 		} else if (arg == "sim") {
 			++i;
-			return sim_command(config, techPath, cellsDir, argc-i, argv+i, debug);
+			//return sim_command(workingDir, techPath, cellsDir, argc-i, argv+i, debug);
 		} else if (arg == "test") {
 			++i;
-			return test_command(config, techPath, cellsDir, argc-i, argv+i);
+			//return test_command(workingDir, techPath, cellsDir, argc-i, argv+i);
 		} else if (arg == "compare") {
 			++i;
-			return compare_command(config, techPath, cellsDir, argc-i, argv+i, progress, debug);
+			//return compare_command(workingDir, techPath, cellsDir, argc-i, argv+i, progress, debug);
 		} else if (arg == "show") {
 			++i;
-			return show_command(config, techPath, cellsDir, argc-i, argv+i, progress, debug);
+			//return show_command(workingDir, techPath, cellsDir, argc-i, argv+i, progress, debug);
 		} else if (arg == "tech") {
 			++i;
-			return tech_command(config, techDir, techPath, cellsDir, argc-i, argv+i, progress, debug);
+			return tech_command(workingDir, techDir, techPath, cellsDir, argc-i, argv+i, progress, debug);
 		} else if (arg == "version") {
 			print_version();
 			return 0;
@@ -189,15 +187,15 @@ int main(int argc, char **argv) {
 			if (arg == "build") {
 				build_help();
 			} else if (arg == "unpack") {
-				unpack_help();
+				//unpack_help();
 			} else if (arg == "sim") {
-				sim_help();
+				//sim_help();
 			} else if (arg == "test") {
-				test_help();
+				//test_help();
 			} else if (arg == "compare") {
-				compare_help();
+				//compare_help();
 			} else if (arg == "show") {
-				show_help();
+				//show_help();
 			} else if (arg == "tech") {
 				tech_help();
 			} else {
