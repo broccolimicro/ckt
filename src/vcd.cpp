@@ -85,7 +85,7 @@ void vcd::create(string prefix, ucs::ConstNetlist v) {
 void vcd::append(uint64_t t, boolean::cube encoding, string error) {
 	static const char values[4] = {'x','0','1','z'};
 	if (t > this->t) {
-		fprintf(fvcd, "#%lu\n", t);
+		fprintf(fvcd, "#%llu\n", t);
 		this->t = t;
 	}
 
@@ -105,7 +105,7 @@ void vcd::append(uint64_t t, boolean::cube encoding, string error) {
 void vcd::append(uint64_t t, boolean::cube encoding, boolean::cube strength, string error) {
 	static const char values[4] = {'x','0','1','z'};
 	if (t > this->t) {
-		fprintf(fvcd, "#%lu\n", t);
+		fprintf(fvcd, "#%llu\n", t);
 		this->t = t;
 	}
 
@@ -135,7 +135,7 @@ void vcd::close() {
 	if (fgtk != nullptr) {
 		fprintf(fgtk, "*1.0 0");
 		for (auto marker = markers.begin(); marker != markers.end(); marker++) {
-			fprintf(fgtk, " %lu", marker->first);
+			fprintf(fgtk, " %llu", marker->first);
 		}
 		fprintf(fgtk, "\n");
 		char id = 'A';
