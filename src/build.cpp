@@ -311,12 +311,11 @@ int build_command(string workingDir, string techPath, string cellsDir, int argc,
 
 		g.post_process();
 		gvdot::render(prefix+".png", chp::export_graph(g, true).to_string());
-		flow::Func fn;
-		chp::synthesizeFunc(fn, g);
 
+		flow::Func fn = chp::synthesizeFuncFromCHP(g);
 		clocked::Module mod = flow::synthesizeModuleFromFunc(fn);
-
 		cout << flow::export_module(mod).to_string() << endl;
+
 	} else {
 		Timer totalTime;
 
@@ -334,12 +333,12 @@ int build_command(string workingDir, string techPath, string cellsDir, int argc,
 					chp::graph &g = std::any_cast<chp::graph&>(j->def);
 					g.name = j->decl.name;
 					g.post_process();
-					gvdot::render(prefix+".png", chp::export_graph(g, true).to_string());
-					flow::Func fn;
-					chp::synthesizeFunc(fn, g);
 
+					string graph_render_filename = "_" + prefix + "_" + g.name + ".png";
+					gvdot::render(graph_render_filename, chp::export_graph(g, true).to_string());
+
+					flow::Func fn = chp::synthesizeFuncFromCHP(g);
 					clocked::Module mod = flow::synthesizeModuleFromFunc(fn);
-
 					cout << flow::export_module(mod).to_string() << endl;
 				}
 			}
