@@ -314,7 +314,7 @@ int build_command(string workingDir, string techPath, string cellsDir, int argc,
 		flow::Func fn;
 		chp::synthesizeFunc(fn, g);
 
-		clocked::Module mod = flow::synthesize_valrdy(fn);
+		clocked::Module mod = flow::synthesizeModuleFromFunc(fn);
 
 		cout << flow::export_module(mod).to_string() << endl;
 	} else {
@@ -338,7 +338,7 @@ int build_command(string workingDir, string techPath, string cellsDir, int argc,
 					flow::Func fn;
 					chp::synthesizeFunc(fn, g);
 
-					clocked::Module mod = flow::synthesize_valrdy(fn);
+					clocked::Module mod = flow::synthesizeModuleFromFunc(fn);
 
 					cout << flow::export_module(mod).to_string() << endl;
 				}
