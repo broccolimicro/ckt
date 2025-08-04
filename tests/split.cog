@@ -1,0 +1,9 @@
+while {
+	c = C.recv()
+	l = L.recv()
+	await c == 0 {
+		L0.send(l)
+	} or await c == 1 {
+		L1.recv(l)
+	}
+}

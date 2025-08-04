@@ -1,0 +1,14 @@
+while {
+	await A.probe() & B.probe() {
+		s = Ad.probe() + Bd.probe() + ci
+
+		await Ac.probe()==0 | Bc.probe()==0 | s[4]~=ci {
+			S.send(s[0:4],0); ci=s[4]
+			await Ac.probe()==0 { A.recv() } and
+			await Bc.probe()==0 { B.recv() }
+		} or await Ac.probe()==1 & Bc.probe()==1 & s[4]==ci {
+			S.send(s[0:4],1); ci=0
+			A.recv() and B.recv()
+		}
+	}
+}
