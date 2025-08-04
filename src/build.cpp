@@ -131,6 +131,7 @@ int build_command(string workingDir, string techPath, string cellsDir, int argc,
 
 		if (arg == "--logic") {
 			if (++i >= argc) {
+				cerr << "ERROR: Expected logic family (raw/cmos)" << endl;
 				printf("expected logic family (raw, cmos)\n");
 			}
 			arg = argv[i];
@@ -144,7 +145,7 @@ int build_command(string workingDir, string techPath, string cellsDir, int argc,
 				// It is here for experimental purposes
 				builder.logic = Build::LOGIC_ADIABATIC;
 			} else {
-				printf("unsupported logic family '%s'\n", argv[i]);
+				cerr << "ERROR: Unsupported logic family '" << argv[i] << "' (expected raw/cmos)" << endl;
 				return is_clean();
 			}
 		} else if (arg == "--all") {
@@ -207,7 +208,7 @@ int build_command(string workingDir, string techPath, string cellsDir, int argc,
 			builder.noGhosts = true;
 		} else if (arg == "-o" or arg == "--out") {
 			if (++i >= argc) {
-				printf("expected output prefix\n");
+				cerr << "ERROR: Expected output prefix" << endl;
 			}
 
 			prefix = argv[i];
@@ -243,7 +244,7 @@ int build_command(string workingDir, string techPath, string cellsDir, int argc,
 				and ext != "prs"
 				and ext != "spi"
 				and ext != "gds") {
-				printf("unrecognized file format '%s'\n", ext.c_str());
+				cerr << "ERROR: Unrecognized file format '" << ext << "' (expected wv/chp/hse/cog/astg/prs/spi/gds)" << endl;
 				return 0;
 			}
 		}
