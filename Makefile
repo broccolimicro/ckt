@@ -1,5 +1,8 @@
 NAME          = lm
 DEPEND        = interpret_sch interpret_prs interpret_hse interpret_chp weaver chp interpret_flow interpret_arithmetic interpret_boolean hse prs sch interpret_phy flow phy petri arithmetic boolean parse_verilog parse_prs parse_cog parse_chp parse_astg parse_spice parse_dot parse_expression parse_ucs parse common
+TEST_DEPEND   = petri arithmetic interpret_arithmetic chp interpret_chp flow interpret_flow parse_chp parse_dot parse_expression parse_ucs parse_verilog parse common
+
+COVERAGE ?= 0
 
 SRCDIR        = src
 TESTDIR       = tests
@@ -14,6 +17,13 @@ LIBFILES      = $(foreach dep,$(DEPEND),../../lib/$(dep)/lib$(dep).a)
 CXXFLAGS      = -std=c++20 -g -Wall -fmessage-length=0 -D CL_HPP_MINIMUM_OPENCL_VERSION=120 -D CL_HPP_TARGET_OPENCL_VERSION=120 -D CL_HPP_ENABLE_EXCEPTIONS 
 LDFLAGS       = 
 
+ifeq ($(COVERAGE),0)
+CXXFLAGS += -O2
+else
+CXXFLAGS += -O0 --coverage -fprofile-arcs -ftest-coverage
+LDFLAGS  += --coverage -fprofile-arcs -ftest-coverage 
+endif
+
 SOURCES	     := $(shell mkdir -p $(SRCDIR); find $(SRCDIR) -name '*.cpp')
 OBJECTS	     := $(SOURCES:%.cpp=build/%.o)
 DEPS         := $(shell mkdir -p build/$(SRCDIR); find build/$(SRCDIR) -name '*.d')
@@ -23,15 +33,6 @@ TESTS        := $(shell mkdir -p tests; find $(TESTDIR) -name '*.cpp')
 TEST_OBJECTS := $(TESTS:%.cpp=build/%.o) build/$(TESTDIR)/gtest_main.o
 TEST_DEPS    := $(shell mkdir -p build/$(TESTDIR); find build/$(TESTDIR) -name '*.d')
 TEST_TARGET   = test
-
-COVERAGE ?= 0
-
-ifeq ($(COVERAGE),0)
-CXXFLAGS += -O2
-else
-CXXFLAGS += -O0 --coverage -fprofile-arcs -ftest-coverage
-LDFLAGS  += --coverage -fprofile-arcs -ftest-coverage 
-endif
 
 ifndef VERSION
 override VERSION = "develop"
