@@ -209,7 +209,7 @@ TEST(CogToVerilog, Buffer) {
 }
 
 
-TEST(CogToVerilog, Reciever) {
+TEST(CogToVerilog, Receiver) {
 	flow::Func func_expected;
 	func_expected.name = "receiver";
 	Operand in     = func_expected.pushNet("in",     flow::Type(flow::Type::FIXED, WIDTH), flow::Net::IN);
