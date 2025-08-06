@@ -1,14 +1,23 @@
+WIDTH=8
 while {
-	await A.probe() & B.probe() {
-		s = Ad.probe() + Bd.probe() + ci
+	s = (Ad.probe() + Bd.probe() + ci) % pow(2, WIDTH) and 
+	co = (Ad.probe() + Bd.probe() + ci) / pow(2, WIDTH)
 
-		await Ac.probe()==0 | Bc.probe()==0 | s[4]~=ci {
-			S.send(s[0:4],0); ci=s[4]
-			await Ac.probe()==0 { A.recv() } and
-			await Bc.probe()==0 { B.recv() }
-		} or await Ac.probe()==1 & Bc.probe()==1 & s[4]==ci {
-			S.send(s[0:4],1); ci=0
-			A.recv() and B.recv()
-		}
+	await Ac.probe()==0 | Bc.probe()==0 | s[WIDTH]~=ci {
+		Sc.send(0) and Sd.send(s[0:WIDTH])
+		ci=co
+
+		//TODO: missing "else -> skip" idioms
+		await Ac.probe()==0 { Ac.recv() and Ad.recv() } and
+		await Bc.probe()==0 { Bc.recv() and Bd.recv() }
+
+	} or await Ac.probe()==1 & Bc.probe()==1 & co~=ci {
+		Sc.send(1) and Sd.send(s[0:WIDTH])
+		ci=co
+
+	} or await Ac.probe()==1 & Bc.probe()==1 & co==ci {
+		Sc.send(0) and Sd.send(s[0:WIDTH])
+		ci=0
+		Ac.recv() and Ad.recv() and Bc.recv() and Bd.recv()
 	}
 }
