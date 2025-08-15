@@ -19,8 +19,12 @@
 
 #include <interpret_flow/export.h>
 #include <interpret_hse/export_cli.h>
+#include <interpret_phy/import.h>
+#include <interpret_phy/export.h>
 
 #include <filesystem>
+
+#include "../format/cell.h"
 
 void Build::set(int target) {
 	stage = stage < target ? target : stage;
@@ -45,73 +49,6 @@ void Build::excl(int target) {
 
 bool Build::has(int target) const {
 	return targets[target];
-}
-
-/*bool canonicalize_hse(const Build &builder, weaver::Module &tbl, Function &func) {
-	func.hg->post_process(true);
-	func.hg->check_variables();
-
-	if (doPostprocess) {
-		export_astg(func.hg->name+"_post.astg", *func.hg);
-	}
-	return true;
-}
-
-bool elaborate_hse(const Build &builder, weaver::Module &tbl, Function &func) {
-	if (progress) printf("Elaborate state space:\n");
-	hse::elaborate(*func.hg, stage >= Build::ENCODE or not noGhosts, true, progress);
-	if (progress) printf("done\n\n");
-	return true;
-}*/
-
-/*bool encode_hse(const Build &builder, weaver::Module &tbl, Function &func) {
-	hse::encoder enc;
-	enc.base = &func.hg;
-	enc.variables = &func.v;
-
-	if (progress) {
-		printf("Identify state conflicts:\n");
-	}
-	enc.check(!inverting, progress);
-	if (progress) {
-		printf("done\n\n");
-	}
-
-	if (has(Build::CONFLICTS)) {
-		print_conflicts(enc);
-	}
-
-	if (not get(Build::ENCODE)) {
-		if (progress) printf("compiled in %gs\n\n", totalTime.since());
-		complete();
-		return is_clean();
-	}
-
-	if (progress) printf("Insert state variables:\n");
-	if (not enc.insert_state_variables(20, !inverting, progress, false)) {
-		if (progress) printf("compiled in %gs\n\n", totalTime.since());
-		complete();
-		return 1;
-	}
-	if (progress) printf("done\n\n");
-
-	if (has(Build::ENCODE)) {
-		string suffix = stage == Build::ENCODE ? "" : "_complete";
-		export_astg(prefix+suffix+".astg", hg, v);
-	}
-
-	if (enc.conflicts.size() > 0) {
-		// state variable insertion failed
-		print_conflicts(enc);
-		if (progress) printf("compiled in %gs\n\n", totalTime.since());
-		complete();
-		return is_clean();
-	}
-	return true;
-}*/
-
-/*void hse_to_prs(const Build &builder, weaver::Module &tbl, Structure &strct, const Function &func) {
-	
 }
 
 void doPlacement(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=nullptr, map<int, gdstk::Cell*> *cells=nullptr, bool report_progress=false) {
@@ -153,7 +90,7 @@ void doPlacement(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=
 	if (report_progress) {
 		printf("done\t%gs\n\n", total.since());
 	}
-}*/
+}
 
 void Build::build(weaver::Program &prgm) {
 	for (int i = 0; i < (int)prgm.mods.size(); i++) {
@@ -249,7 +186,7 @@ bool Build::flowToValRdy(weaver::Program &prgm, int modIdx, int termIdx) const {
 
 	const weaver::Decl &decl = prgm.mods[modIdx].terms[termIdx].decl;
 	if (decl.ret.defined() or decl.recv.defined()) {
-		printf("error: function must be a full process for synthesis\n");
+		printf("error: flow must be a full process for synthesis\n");
 		return false;
 	}
 
@@ -285,7 +222,7 @@ bool Build::hseToPrs(weaver::Program &prgm, int modIdx, int termIdx) const {
 
 	const weaver::Decl &decl = prgm.mods[modIdx].terms[termIdx].decl;
 	if (decl.ret.defined() or decl.recv.defined()) {
-		printf("error: function must be a full process for synthesis\n");
+		printf("error: protocol must be a full process for synthesis\n");
 		return false;
 	}
 
@@ -296,7 +233,7 @@ bool Build::hseToPrs(weaver::Program &prgm, int modIdx, int termIdx) const {
 	int dstIdx = prgm.mods[cktIdx].createTerm(weaver::Term::procOf(cktKind, name, args));
 
 	hse::graph &hg = std::any_cast<hse::graph&>(prgm.mods[modIdx].terms[termIdx].def);
-
+	hg.name = decl.name;
 	hg.post_process(true);
 	hg.check_variables();
 
@@ -371,7 +308,7 @@ bool Build::prsToSpi(weaver::Program &prgm, int modIdx, int termIdx) {
 
 	const weaver::Decl &decl = prgm.mods[modIdx].terms[termIdx].decl;
 	if (decl.ret.defined() or decl.recv.defined()) {
-		printf("error: function must be a full process for synthesis\n");
+		printf("error: circuit must be a full process for synthesis\n");
 		return false;
 	}
 
@@ -455,6 +392,71 @@ bool Build::prsToSpi(weaver::Program &prgm, int modIdx, int termIdx) {
 }
 
 bool Build::spiToGds(weaver::Program &prgm, int modIdx, int termIdx) {
+	// Verify expected format of the term
+	if (prgm.mods[modIdx].terms[termIdx].dialect().name != "__spice__") {
+		printf("error: dialect '%s' not supported for translation from spice to gds.\n",
+			prgm.mods[modIdx].terms[termIdx].dialect().name.c_str());
+		return false;
+	}
+
+	// Create dialect and module
+	int gdsKind = weaver::Term::getDialect("__gds__");
+	int gdsIdx = prgm.createModule("__gds__");
+
+	const weaver::Decl &decl = prgm.mods[modIdx].terms[termIdx].decl;
+	if (decl.ret.defined() or decl.recv.defined()) {
+		printf("error: spice must be a full process for synthesis\n");
+		return false;
+	}
+
+	// Create the new term in the module
+	string name = prgm.mods[modIdx].name + "_" + decl.name;
+	vector<weaver::Instance> args = decl.args;
+
+	int dstIdx = prgm.mods[gdsIdx].createTerm(weaver::Term::procOf(gdsKind, name, args));
+
+	sch::Netlist &net = std::any_cast<sch::Netlist&>(prgm.mods[modIdx].terms[termIdx].def);
+
+	if (noCells) {
+		for (int i = 0; i < (int)net.subckts.size(); i++) {
+			net.subckts[i].isCell = true;
+		}
+	}
+
+	if (progress) printf("Break subckts into cells:\n");
+	Timer cellsTmr;
+	net.mapCells(tech, progress);
+	if (progress) printf("done\t%gs\n\n", cellsTmr.since());
+
+	if (not get(Build::CELLS)) {
+		return true;
+	}
+
+	phy::Library lib(tech);
+
+	map<int, gdstk::Cell*> cells;
+
+	gdstk::GdsWriter gds = {};
+	gds = gdstk::gdswriter_init((name+".gds").c_str(), name.c_str(), ((double)tech.dbunit)*1e-6, ((double)tech.dbunit)*1e-6, 4, nullptr, nullptr);
+	
+	cell::update_library(lib, net, &gds, &cells, progress, debug);
+
+	if (not get(Build::PLACE)) {
+		gds.close();
+		return true;
+	}
+
+	doPlacement(lib, net, &gds, &cells, progress);
+
+	if (not get(Build::ROUTE)) {
+		gds.close();
+		return true;
+	}
+
+	gds.close();
+
+	prgm.mods[gdsIdx].terms[dstIdx].def = lib;
+	return true;
 }
 
 bool Build::emit(string path, const weaver::Program &prgm, int modIdx, int termIdx) const {
