@@ -85,12 +85,15 @@ struct Build {
 
 	// TODO(edward.bingham) generalize this into lowering and analysis stages, create a DAG to generalize the compilation algorithm
 	bool chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const;
-	bool flowToValRdy(weaver::Program &prgm, int modIdx, int termIdx) const;
+	bool flowToVerilog(weaver::Program &prgm, int modIdx, int termIdx) const;
 
 	bool hseToPrs(weaver::Program &prgm, int modIdx, int termIdx) const;
 	bool prsToSpi(weaver::Program &prgm, int modIdx, int termIdx);
 	bool spiToGds(weaver::Program &prgm, int modIdx, int termIdx);
 
-	bool emit(string path, const weaver::Program &prgm, int modIdx, int termIdx) const;
+	bool emitVerilog(string path, const weaver::Program &prgm, int modIdx, int termIdx) const;
+	bool emitPrs(string path, const weaver::Program &prgm, int modIdx, int termIdx) const;
+	bool emitSpice(string path, const weaver::Program &prgm, int modIdx, int termIdx) const;
+	bool emitGds(string path, const weaver::Program &prgm, int modIdx, int termIdx) const;
 };
 

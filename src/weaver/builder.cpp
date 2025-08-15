@@ -19,6 +19,8 @@
 
 #include <interpret_flow/export.h>
 #include <interpret_hse/export_cli.h>
+#include <interpret_prs/export.h>
+#include <interpret_sch/export.h>
 #include <interpret_phy/import.h>
 #include <interpret_phy/export.h>
 
@@ -99,7 +101,7 @@ void Build::build(weaver::Program &prgm) {
 			if (dialectName == "func") {
 				chpToFlow(prgm, i, j);
 			} else if (dialectName == "__flow__") {
-				flowToValRdy(prgm, i, j);
+				flowToVerilog(prgm, i, j);
 			} else if (dialectName == "proto") {
 				hseToPrs(prgm, i, j);
 			} else if (dialectName == "ckt") {
@@ -112,11 +114,11 @@ void Build::build(weaver::Program &prgm) {
 }
 
 string Build::getBuildDir(string dialectName) const {
-	if (dialectName == "__valrdy__") {
+	if (dialectName == "__verilog__") {
 		return "rtl";
-	} else if (dialectName == "__spi__") {
+	} else if (dialectName == "__spice__") {
 		return "spi";
-	} else if (dialectName == "__gds__") {
+	} else if (dialectName == "__layout__") {
 		return "gds";
 	} else if (dialectName == "ckt") {
 		return "ckt";
@@ -127,7 +129,17 @@ string Build::getBuildDir(string dialectName) const {
 void Build::emit(string path, const weaver::Program &prgm) const {
 	for (int i = 0; i < (int)prgm.mods.size(); i++) {
 		for (int j = 0; j < (int)prgm.mods[i].terms.size(); j++) {
-			emit(path+"/"+getBuildDir(prgm.mods[i].terms[j].dialect().name), prgm, i, j);
+			string dialectName = prgm.mods[i].terms[j].dialect().name;
+			string buildDir = path+"/"+getBuildDir(dialectName);
+			if (dialectName == "__verilog__") {
+				emitVerilog(buildDir, prgm, i, j);
+			} else if (dialectName == "ckt") {
+				emitPrs(buildDir, prgm, i, j);
+			} else if (dialectName == "__spice__") {
+				emitSpice(buildDir, prgm, i, j);
+			} else if (dialectName == "__layout__") {
+				emitGds(buildDir, prgm, i, j);
+			}
 		}
 	}
 }
@@ -172,7 +184,7 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 	return true;
 }
 
-bool Build::flowToValRdy(weaver::Program &prgm, int modIdx, int termIdx) const {
+bool Build::flowToVerilog(weaver::Program &prgm, int modIdx, int termIdx) const {
 	// Verify expected format of the term
 	if (prgm.mods[modIdx].terms[termIdx].dialect().name != "__flow__") {
 		printf("error: dialect '%s' not supported for translation from flow to val-rdy.\n",
@@ -181,8 +193,8 @@ bool Build::flowToValRdy(weaver::Program &prgm, int modIdx, int termIdx) const {
 	}
 
 	// Create dialect and module
-	int valrdyKind = weaver::Term::getDialect("__valrdy__");
-	int valrdyIdx = prgm.createModule("__valrdy__");
+	int verilogKind = weaver::Term::getDialect("__verilog__");
+	int verilogIdx = prgm.createModule("__verilog__");
 
 	const weaver::Decl &decl = prgm.mods[modIdx].terms[termIdx].decl;
 	if (decl.ret.defined() or decl.recv.defined()) {
@@ -190,21 +202,21 @@ bool Build::flowToValRdy(weaver::Program &prgm, int modIdx, int termIdx) const {
 		return false;
 	}
 
-	// Create the new term in the valrdy module
+	// Create the new term in the verilog module
 	string name = prgm.mods[modIdx].name + "_" + decl.name;
-	// TODO(edward.bingham) merge weaver type system and valrdy types?
+	// TODO(edward.bingham) merge weaver type system and verilog types?
 	vector<weaver::Instance> args = decl.args;
 
-	int dstIdx = prgm.mods[valrdyIdx].createTerm(weaver::Term::procOf(valrdyKind, name, args));
+	int dstIdx = prgm.mods[verilogIdx].createTerm(weaver::Term::procOf(verilogKind, name, args));
 
 	// Do the synthesis
 	flow::Func &fn = std::any_cast<flow::Func&>(prgm.mods[modIdx].terms[termIdx].def);
 
 	for (auto i = args.begin(); i != args.end(); i++) {
-		// TODO(edward.bingham) pass the variable declarations over to valrdy
+		// TODO(edward.bingham) pass the variable declarations over to verilog
 	}
 
-	prgm.mods[valrdyIdx].terms[dstIdx].def = flow::synthesizeModuleFromFunc(fn);
+	prgm.mods[verilogIdx].terms[dstIdx].def = flow::synthesizeModuleFromFunc(fn);
 	return true;
 }
 
@@ -400,8 +412,8 @@ bool Build::spiToGds(weaver::Program &prgm, int modIdx, int termIdx) {
 	}
 
 	// Create dialect and module
-	int gdsKind = weaver::Term::getDialect("__gds__");
-	int gdsIdx = prgm.createModule("__gds__");
+	int gdsKind = weaver::Term::getDialect("__layout__");
+	int gdsIdx = prgm.createModule("__layout__");
 
 	const weaver::Decl &decl = prgm.mods[modIdx].terms[termIdx].decl;
 	if (decl.ret.defined() or decl.recv.defined()) {
@@ -436,46 +448,107 @@ bool Build::spiToGds(weaver::Program &prgm, int modIdx, int termIdx) {
 
 	map<int, gdstk::Cell*> cells;
 
-	gdstk::GdsWriter gds = {};
-	gds = gdstk::gdswriter_init((name+".gds").c_str(), name.c_str(), ((double)tech.dbunit)*1e-6, ((double)tech.dbunit)*1e-6, 4, nullptr, nullptr);
+	//gdstk::GdsWriter gds = {};
+	//gds = gdstk::gdswriter_init((name+".gds").c_str(), name.c_str(), ((double)tech.dbunit)*1e-6, ((double)tech.dbunit)*1e-6, 4, nullptr, nullptr);
 	
-	cell::update_library(lib, net, &gds, &cells, progress, debug);
+	cell::update_library(lib, net, nullptr, &cells, progress, debug);
 
 	if (not get(Build::PLACE)) {
-		gds.close();
+		//gds.close();
+		prgm.mods[gdsIdx].terms[dstIdx].def = lib;
 		return true;
 	}
 
-	doPlacement(lib, net, &gds, &cells, progress);
+	doPlacement(lib, net, nullptr, &cells, progress);
 
 	if (not get(Build::ROUTE)) {
-		gds.close();
+		//gds.close();
+		prgm.mods[gdsIdx].terms[dstIdx].def = lib;
 		return true;
 	}
 
-	gds.close();
-
+	//gds.close();
 	prgm.mods[gdsIdx].terms[dstIdx].def = lib;
 	return true;
 }
 
-bool Build::emit(string path, const weaver::Program &prgm, int modIdx, int termIdx) const {
+bool Build::emitVerilog(string path, const weaver::Program &prgm, int modIdx, int termIdx) const {
+	if (prgm.mods[modIdx].terms[termIdx].dialect().name != "__verilog__") {
+		printf("internal:%s:%d: expected clocked module.\n", __FILE__, __LINE__);
+		return false;
+	}
+
 	std::filesystem::create_directories(path);
 	
-	if (prgm.mods[modIdx].terms[termIdx].dialect().name == "__valrdy__") {
-		string filename = path+"/"+prgm.mods[modIdx].terms[termIdx].decl.name+".v";
-		FILE *fptr = fopen(filename.c_str(), "w");
-		if (fptr == nullptr) {
-			printf("error: unable to write to file '%s'\n", filename.c_str());
-			return false;
-		}
-		
-		const clocked::Module &mod = std::any_cast<const clocked::Module&>(prgm.mods[modIdx].terms[termIdx].def);
-		fprintf(fptr, "%s\n", flow::export_module(mod).to_string().c_str());
-
-		fclose(fptr);
+	string filename = path+"/"+prgm.mods[modIdx].terms[termIdx].decl.name+".v";
+	FILE *fptr = fopen(filename.c_str(), "w");
+	if (fptr == nullptr) {
+		printf("error: unable to write to file '%s'\n", filename.c_str());
+		return false;
 	}
+	
+	const clocked::Module &mod = std::any_cast<const clocked::Module&>(prgm.mods[modIdx].terms[termIdx].def);
+	fprintf(fptr, "%s\n", flow::export_module(mod).to_string().c_str());
+
+	fclose(fptr);
 	return true;
 }
 
+bool Build::emitPrs(string path, const weaver::Program &prgm, int modIdx, int termIdx) const {
+	if (prgm.mods[modIdx].terms[termIdx].dialect().name != "ckt") {
+		printf("internal:%s:%d: expected production rule set.\n", __FILE__, __LINE__);
+		return false;
+	}
+
+	std::filesystem::create_directories(path);
+	
+	string filename = path+"/"+prgm.mods[modIdx].terms[termIdx].decl.name+".prs";
+	FILE *fptr = fopen(filename.c_str(), "w");
+	if (fptr == nullptr) {
+		printf("error: unable to write to file '%s'\n", filename.c_str());
+		return false;
+	}
+	
+	const prs::production_rule_set &pr = std::any_cast<const prs::production_rule_set&>(prgm.mods[modIdx].terms[termIdx].def);
+	fprintf(fptr, "%s\n", prs::export_production_rule_set(pr).to_string().c_str());
+
+	fclose(fptr);
+	return true;
+}
+
+bool Build::emitSpice(string path, const weaver::Program &prgm, int modIdx, int termIdx) const {
+	if (prgm.mods[modIdx].terms[termIdx].dialect().name != "__spice__") {
+		printf("internal:%s:%d: expected spice netlist.\n", __FILE__, __LINE__);
+		return false;
+	}
+
+	std::filesystem::create_directories(path);
+	
+	string filename = path+"/"+prgm.mods[modIdx].terms[termIdx].decl.name+".spi";
+	FILE *fptr = fopen(filename.c_str(), "w");
+	if (fptr == nullptr) {
+		printf("error: unable to write to file '%s'\n", filename.c_str());
+		return false;
+	}
+	
+	const sch::Netlist &net = std::any_cast<const sch::Netlist&>(prgm.mods[modIdx].terms[termIdx].def);
+	fprintf(fptr, "%s\n", sch::export_netlist(tech, net).to_string().c_str());
+
+	fclose(fptr);
+	return true;
+}
+
+bool Build::emitGds(string path, const weaver::Program &prgm, int modIdx, int termIdx) const {
+	if (prgm.mods[modIdx].terms[termIdx].dialect().name != "__layout__") {
+		printf("internal:%s:%d: expected layout.\n", __FILE__, __LINE__);
+		return false;
+	}
+
+	std::filesystem::create_directories(path);
+	
+	string name = prgm.mods[modIdx].terms[termIdx].decl.name;
+	const phy::Library &lib = std::any_cast<const phy::Library&>(prgm.mods[modIdx].terms[termIdx].def);
+	phy::export_library(name, path+"/"+name+".gds", lib);
+	return true;
+}
 
