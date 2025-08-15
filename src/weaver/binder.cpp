@@ -21,6 +21,9 @@ string Binder::findWorkingDir() const {
 }
 
 string Binder::findProjectRoot(string workingDir) const {
+	if (workingDir.empty()) {
+		workingDir = findWorkingDir();
+	}
 	std::filesystem::path search = std::filesystem::absolute(workingDir);
 	while (not search.empty()) {
 		if (std::filesystem::exists(search / "lm.mod")) {
@@ -210,6 +213,9 @@ void Binder::loadModule(int index, const parse_ucs::source &syntax) {
 }
 
 void Binder::load(string path) {
+	if (path.empty()) {
+		path = findWorkingDir() + "/top.wv";
+	}
 	// TODO(edward.bingham) Implement modules appropriately:
 	// 1. load top.wv from current directory
 	// 2. import paths are relative to project root, so find project root

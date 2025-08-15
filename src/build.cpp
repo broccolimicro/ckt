@@ -66,7 +66,6 @@
 
 #include <filesystem>
 
-#include "weaver/symbol.h"
 #include "weaver/builder.h"
 #include "weaver/binder.h"
 #include "format/dot.h"
@@ -84,15 +83,48 @@ std::any factory(const parse::syntax *syntax, tokenizer *tokens) {
 
 }
 
+namespace hse {
+
+std::any factory(const parse::syntax *syntax, tokenizer *tokens) {
+	graph g;
+	if (syntax != nullptr) {
+		import_hse(g, *(const parse_cog::composition *)syntax, tokens, true);
+		g.post_process(true);
+		g.check_variables();
+	}
+	return g;
+}
+
+}
+
+namespace prs {
+
+std::any factory(const parse::syntax *syntax, tokenizer *tokens) {
+	prs::production_rule_set pr;
+	if (syntax != nullptr) {
+		prs::import_production_rule_set(*(const parse_prs::production_rule_set *)syntax, pr, -1, -1, prs::attributes(), 0, tokens, true);
+	}
+	return pr;
+}
+
+}
+
 void build_help() {
 	printf("\nUsage: lm build [options] <file>\n");
 	printf("Synthesize the production rules that implement the behavioral description.\n");
 
 	printf("\nOptions:\n");
-	printf(" --logic <family>      pick the logic family you want to synthesize to. The following logic families are supported:\n");
+	printf(" --logic <family>      select the logic family for synthesis:\n");
 	printf("         raw           do not require inverting logic\n");
 	printf("         cmos          require inverting logic (default)\n");
 	printf("\n");
+
+	printf(" --timing <family>     select the timing family for synthesis:\n");
+	printf("         mixed         do not constrain the timing family (default\n");
+	printf("         qdi           strictly use quasi-delay insensitive handshakes\n");
+	printf("         clocked       strictly use clocked val-rdy logic\n");
+	printf("\n");
+
 	printf(" --all          save all intermediate stages\n");
 	printf(" -o,--out       set the filename prefix for the saved intermediate stages\n\n");
 	printf(" -g,--graph     save the elaborated astg\n");
@@ -131,8 +163,7 @@ int build_command(string workingDir, string techPath, string cellsDir, int argc,
 
 		if (arg == "--logic") {
 			if (++i >= argc) {
-				cerr << "ERROR: Expected logic family (raw/cmos)" << endl;
-				printf("expected logic family (raw, cmos)\n");
+				printf("error: expected logic family (raw, cmos)\n");
 			}
 			arg = argv[i];
 
@@ -146,6 +177,24 @@ int build_command(string workingDir, string techPath, string cellsDir, int argc,
 				builder.logic = Build::LOGIC_ADIABATIC;
 			} else {
 				cerr << "ERROR: Unsupported logic family '" << argv[i] << "' (expected raw/cmos)" << endl;
+				return is_clean();
+			}
+		} else if (arg == "--timing") {
+			if (++i >= argc) {
+				printf("error: expected timing family (mixed, qdi, clocked)\n");
+			}
+			arg = argv[i];
+
+			if (arg == "mixed") {
+				builder.timing = Build::TIMING_MIXED;
+			} else if (arg == "qdi") {
+				builder.timing = Build::TIMING_QDI;
+			} else if (arg == "clocked") {
+				// This is not an officially supported timing family
+				// It is here for experimental purposes
+				builder.timing = Build::TIMING_CLOCKED;
+			} else {
+				printf("error: unsupported timing family '%s' (expected mixed, qdi, or clocked)\n", argv[i]);
 				return is_clean();
 			}
 		} else if (arg == "--all") {
@@ -255,15 +304,6 @@ int build_command(string workingDir, string techPath, string cellsDir, int argc,
 		inverting = true;
 	}
 
-
-	parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
-	//parse_ucs::function::registry.insert({"chp", parse_ucs::language(&parse_chp::produce, &parse_chp::expect, &parse_chp::register_syntax)});
-	//parse_ucs::function::registry.insert({"hse", parse_ucs::language(&parse_chp::produce, &parse_chp::expect, &parse_chp::register_syntax)});
-	//parse_ucs::function::registry.insert({"struct", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
-	//parse_ucs::function::registry.insert({"spice", parse_ucs::language(&parse_spice::produce, &parse_spice::expect, &parse_spice::register_syntax)});
-
-	weaver::Term::pushDialect("func", chp::factory);
-
 	if (format == "chp" or format == "cog") {
 		// Set up tokenizer
 		tokenizer tokens;
@@ -320,32 +360,24 @@ int build_command(string workingDir, string techPath, string cellsDir, int argc,
 	} else {
 		Timer totalTime;
 
+		parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
+		//parse_ucs::function::registry.insert({"chp", parse_ucs::language(&parse_chp::produce, &parse_chp::expect, &parse_chp::register_syntax)});
+		parse_ucs::function::registry.insert({"proto", parse_ucs::language(&parse_chp::produce, &parse_chp::expect, &parse_chp::register_syntax)});
+		parse_ucs::function::registry.insert({"ckt", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
+		//parse_ucs::function::registry.insert({"spice", parse_ucs::language(&parse_spice::produce, &parse_spice::expect, &parse_spice::register_syntax)});
+
+		weaver::Term::pushDialect("func", chp::factory);
+		weaver::Term::pushDialect("proto", chp::factory);
+		weaver::Term::pushDialect("ckt", prs::factory);
+
 		weaver::Program prgm;
-		weaver::Binder bd(prgm);
-		if (filename == "") {
-			string workingDir = bd.findWorkingDir();
-			filename = workingDir + "/top.wv";
-		}
 		loadGlobalTypes(prgm);
+
+		weaver::Binder bd(prgm);
 		bd.load(filename);
-		for (auto i = prgm.mods.begin(); i != prgm.mods.end(); i++) {
-			for (auto j = i->terms.begin(); j != i->terms.end(); j++) {
-				if (weaver::Term::dialects[j->kind].name == "func") {
-					chp::graph &g = std::any_cast<chp::graph&>(j->def);
-					g.name = j->decl.name;
-					g.post_process();
-
-					string graph_render_filename = "_" + prefix + "_" + g.name + ".png";
-					gvdot::render(graph_render_filename, chp::export_graph(g, true).to_string());
-
-					flow::Func fn = chp::synthesizeFuncFromCHP(g);
-					clocked::Module mod = flow::synthesizeModuleFromFunc(fn);
-					cout << flow::export_module(mod).to_string() << endl;
-				}
-			}
-		}
-			
+		builder.build(prgm);
 		prgm.print();
+		builder.emit(bd.findProjectRoot()+"/build", prgm);
 	}
 
 	if (!is_clean()) {

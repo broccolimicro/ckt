@@ -25,7 +25,7 @@ struct Binder {
 
 	// Managing the project
 	string findWorkingDir() const;
-	string findProjectRoot(string workingDir) const;
+	string findProjectRoot(string workingDir="") const;
 
 	// Reading source files
 	void readPath(tokenizer &tokens, string path, string root="");
@@ -39,7 +39,7 @@ struct Binder {
 	// Loading the program
 	void loadSymbols(int index, const parse_ucs::source &syntax);
 	void loadModule(int index, const parse_ucs::source &syntax);
-	void load(string path);
+	void load(string path="");
 };
 
 }

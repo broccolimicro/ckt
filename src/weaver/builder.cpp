@@ -3,62 +3,15 @@
 #include <common/standard.h>
 #include <common/timer.h>
 #include <common/text.h>
-#include <parse/parse.h>
-#include <parse/default/block_comment.h>
-#include <parse/default/line_comment.h>
-#include <parse/default/new_line.h>
 
-#include <parse_ucs/source.h>
-#include <parse_cog/factory.h>
-#include <parse_chp/factory.h>
-#include <parse_prs/factory.h>
-#include <parse_spice/factory.h>
-
-#include <chp/graph.h>
-//#include <chp/simulator.h>
-//#include <parse_chp/composition.h>
-#include <interpret_chp/import.h>
-#include <interpret_chp/export.h>
-
-#include <hse/graph.h>
-#include <hse/simulator.h>
-#include <hse/encoder.h>
-#include <hse/elaborator.h>
-#include <hse/synthesize.h>
-#include <interpret_hse/import.h>
-#include <interpret_hse/export.h>
-#include <interpret_hse/export_cli.h>
-
-#include <prs/production_rule.h>
-#include <prs/bubble.h>
-#include <prs/synthesize.h>
-#include <interpret_prs/import.h>
-#include <interpret_prs/export.h>
-
-#include <sch/Netlist.h>
-#include <sch/Tapeout.h>
-#include <sch/Placer.h>
-#include <interpret_sch/import.h>
-#include <interpret_sch/export.h>
-
-#include <phy/Tech.h>
-#include <phy/Script.h>
-#include <phy/Layout.h>
-#include <phy/Library.h>
-#include <interpret_phy/import.h>
-#include <interpret_phy/export.h>
-
-//#include <parse_expression/expression.h>
-//#include <parse_expression/assignment.h>
-//#include <parse_expression/composition.h>
-#include <interpret_boolean/export.h>
-#include <interpret_boolean/import.h>
-#include <interpret_arithmetic/export.h>
-#include <interpret_arithmetic/import.h>
+#include <chp/synthesize.h>
+#include <flow/synthesize.h>
+#include <interpret_flow/export.h>
 
 #include <filesystem>
 
-//#include "cell.h"
+static const string valrdyBuildDir = "rtl";
+static const string prsBuildDir = "prs";
 
 void Build::set(int target) {
 	stage = stage < target ? target : stage;
@@ -192,4 +145,122 @@ void doPlacement(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=
 		printf("done\t%gs\n\n", total.since());
 	}
 }*/
+
+void Build::build(weaver::Program &prgm) const {
+	for (int i = 0; i < (int)prgm.mods.size(); i++) {
+		for (int j = 0; j < (int)prgm.mods[i].terms.size(); j++) {
+			string dialectName = prgm.mods[i].terms[j].dialect().name;
+			if (dialectName == "func") {
+				chpToFlow(prgm, i, j);
+			} else if (dialectName == "__flow__") {
+				flowToValRdy(prgm, i, j);
+			}
+		}
+	}
+}
+
+void Build::emit(string path, const weaver::Program &prgm) const {
+	for (int i = 0; i < (int)prgm.mods.size(); i++) {
+		for (int j = 0; j < (int)prgm.mods[i].terms.size(); j++) {
+			emit(path, prgm, i, j);
+		}
+	}
+}
+
+bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
+	// Verify expected format of the term
+	if (prgm.mods[modIdx].terms[termIdx].dialect().name != "func") {
+		printf("error: dialect '%s' not supported for translation from chp to flow.\n",
+			prgm.mods[modIdx].terms[termIdx].dialect().name.c_str());
+		return false;
+	}
+
+	// Create dialect and module
+	int flowKind = weaver::Term::getDialect("__flow__");
+	int flowIdx = prgm.createModule("__flow__");
+
+	const weaver::Decl &decl = prgm.mods[modIdx].terms[termIdx].decl;
+	if (decl.ret.defined() or decl.recv.defined()) {
+		printf("error: function must be a full process for synthesis\n");
+		return false;
+	}
+
+	// Create the new term in the flow module
+	string name = prgm.mods[modIdx].name + "_" + decl.name;
+	// TODO(edward.bingham) merge weaver type system and flow types?
+	vector<weaver::Instance> args = decl.args;
+
+	int dstIdx = prgm.mods[flowIdx].createTerm(weaver::Term::procOf(flowKind, name, args));
+
+	// Do the synthesis
+	chp::graph &g = std::any_cast<chp::graph&>(prgm.mods[modIdx].terms[termIdx].def);
+	g.name = name;
+	g.post_process();	
+
+	//string graph_render_filename = "_" + prefix + "_" + g.name + ".png";
+	//gvdot::render(graph_render_filename, chp::export_graph(g, true).to_string());
+
+	for (auto i = args.begin(); i != args.end(); i++) {
+		// TODO(edward.bingham) pass the variable declarations over to flow
+	}
+
+	prgm.mods[flowIdx].terms[dstIdx].def = chp::synthesizeFuncFromCHP(g);
+	return true;
+}
+
+bool Build::flowToValRdy(weaver::Program &prgm, int modIdx, int termIdx) const {
+	// Verify expected format of the term
+	if (prgm.mods[modIdx].terms[termIdx].dialect().name != "__flow__") {
+		printf("error: dialect '%s' not supported for translation from flow to val-rdy.\n",
+			prgm.mods[modIdx].terms[termIdx].dialect().name.c_str());
+		return false;
+	}
+
+	// Create dialect and module
+	int valrdyKind = weaver::Term::getDialect("__valrdy__");
+	int valrdyIdx = prgm.createModule("__valrdy__");
+
+	const weaver::Decl &decl = prgm.mods[modIdx].terms[termIdx].decl;
+	if (decl.ret.defined() or decl.recv.defined()) {
+		printf("error: function must be a full process for synthesis\n");
+		return false;
+	}
+
+	// Create the new term in the valrdy module
+	string name = prgm.mods[modIdx].name + "_" + decl.name;
+	// TODO(edward.bingham) merge weaver type system and valrdy types?
+	vector<weaver::Instance> args = decl.args;
+
+	int dstIdx = prgm.mods[valrdyIdx].createTerm(weaver::Term::procOf(valrdyKind, name, args));
+
+	// Do the synthesis
+	flow::Func &fn = std::any_cast<flow::Func&>(prgm.mods[modIdx].terms[termIdx].def);
+
+	for (auto i = args.begin(); i != args.end(); i++) {
+		// TODO(edward.bingham) pass the variable declarations over to valrdy
+	}
+
+	prgm.mods[valrdyIdx].terms[dstIdx].def = flow::synthesizeModuleFromFunc(fn);
+	return true;
+}
+
+bool Build::emit(string path, const weaver::Program &prgm, int modIdx, int termIdx) const {
+	if (prgm.mods[modIdx].terms[termIdx].dialect().name == "__valrdy__") {
+		std::filesystem::create_directories(path+"/"+valrdyBuildDir);
+
+		string filename = path+"/"+valrdyBuildDir+"/"+prgm.mods[modIdx].terms[termIdx].decl.name+".v";
+		FILE *fptr = fopen(filename.c_str(), "w");
+		if (fptr == nullptr) {
+			printf("error: unable to write to file '%s'\n", filename.c_str());
+			return false;
+		}
+		
+		const clocked::Module &mod = std::any_cast<const clocked::Module&>(prgm.mods[modIdx].terms[termIdx].def);
+		fprintf(fptr, "%s\n", flow::export_module(mod).to_string().c_str());
+
+		fclose(fptr);
+	}
+	return true;
+}
+
 
