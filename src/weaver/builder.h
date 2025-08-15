@@ -66,19 +66,24 @@ struct Build {
 	vector<bool> targets;
 
 	void set(int target);
-	bool get(int target);
+	bool get(int target) const;
 
 	void inclAll();
 	void incl(int target);
 	void excl(int target);
-	bool has(int target);
+	bool has(int target) const;
 
 	void build(weaver::Program &prgm) const;
+	string getBuildDir(string dialectName) const;
 	void emit(string path, const weaver::Program &prgm) const;
 
-	// TODO(edward.bingham) generalize this into compilation and analysis stages
+	// TODO(edward.bingham) generalize this into lowering and analysis stages, create a DAG to generalize the compilation algorithm
 	bool chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const;
 	bool flowToValRdy(weaver::Program &prgm, int modIdx, int termIdx) const;
+
+	bool hseToPrs(weaver::Program &prgm, int modIdx, int termIdx) const;
+	bool prsToSpi(weaver::Program &prgm, int modIdx, int termIdx) const;
+	bool spiToGds(weaver::Program &prgm, int modIdx, int termIdx) const;
 
 	bool emit(string path, const weaver::Program &prgm, int modIdx, int termIdx) const;
 };

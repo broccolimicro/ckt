@@ -5,20 +5,21 @@
 #include <common/text.h>
 
 #include <chp/synthesize.h>
+#include <hse/elaborator.h>
+#include <hse/encoder.h>
+#include <hse/synthesize.h>
 #include <flow/synthesize.h>
 #include <interpret_flow/export.h>
+#include <interpret_hse/export_cli.h>
 
 #include <filesystem>
-
-static const string valrdyBuildDir = "rtl";
-static const string prsBuildDir = "prs";
 
 void Build::set(int target) {
 	stage = stage < target ? target : stage;
 	targets[target] = true;
 }
 
-bool Build::get(int target) {
+bool Build::get(int target) const {
 	return stage < 0 or stage >= target;
 }
 
@@ -34,7 +35,7 @@ void Build::excl(int target) {
 	targets[target] = false;
 }
 
-bool Build::has(int target) {
+bool Build::has(int target) const {
 	return targets[target];
 }
 
@@ -42,16 +43,16 @@ bool Build::has(int target) {
 	func.hg->post_process(true);
 	func.hg->check_variables();
 
-	if (builder.doPostprocess) {
+	if (doPostprocess) {
 		export_astg(func.hg->name+"_post.astg", *func.hg);
 	}
 	return true;
 }
 
 bool elaborate_hse(const Build &builder, weaver::Module &tbl, Function &func) {
-	if (builder.progress) printf("Elaborate state space:\n");
-	hse::elaborate(*func.hg, builder.stage >= Build::ENCODE or not builder.noGhosts, true, builder.progress);
-	if (builder.progress) printf("done\n\n");
+	if (progress) printf("Elaborate state space:\n");
+	hse::elaborate(*func.hg, stage >= Build::ENCODE or not noGhosts, true, progress);
+	if (progress) printf("done\n\n");
 	return true;
 }*/
 
@@ -68,11 +69,11 @@ bool elaborate_hse(const Build &builder, weaver::Module &tbl, Function &func) {
 		printf("done\n\n");
 	}
 
-	if (builder.has(Build::CONFLICTS)) {
+	if (has(Build::CONFLICTS)) {
 		print_conflicts(enc);
 	}
 
-	if (not builder.get(Build::ENCODE)) {
+	if (not get(Build::ENCODE)) {
 		if (progress) printf("compiled in %gs\n\n", totalTime.since());
 		complete();
 		return is_clean();
@@ -86,8 +87,8 @@ bool elaborate_hse(const Build &builder, weaver::Module &tbl, Function &func) {
 	}
 	if (progress) printf("done\n\n");
 
-	if (builder.has(Build::ENCODE)) {
-		string suffix = builder.stage == Build::ENCODE ? "" : "_complete";
+	if (has(Build::ENCODE)) {
+		string suffix = stage == Build::ENCODE ? "" : "_complete";
 		export_astg(prefix+suffix+".astg", hg, v);
 	}
 
@@ -154,15 +155,34 @@ void Build::build(weaver::Program &prgm) const {
 				chpToFlow(prgm, i, j);
 			} else if (dialectName == "__flow__") {
 				flowToValRdy(prgm, i, j);
+			} else if (dialectName == "proto") {
+				hseToPrs(prgm, i, j);
+			} else if (dialectName == "ckt") {
+				prsToSpi(prgm, i, j);
+			} else if (dialectName == "__spice__") {
+				spiToGds(prgm, i, j);
 			}
 		}
 	}
 }
 
+string Build::getBuildDir(string dialectName) const {
+	if (dialectName == "__valrdy__") {
+		return "rtl";
+	} else if (dialectName == "__spi__") {
+		return "spi";
+	} else if (dialectName == "__gds__") {
+		return "gds";
+	} else if (dialectName == "ckt") {
+		return "ckt";
+	}
+	return "dbg";
+}
+
 void Build::emit(string path, const weaver::Program &prgm) const {
 	for (int i = 0; i < (int)prgm.mods.size(); i++) {
 		for (int j = 0; j < (int)prgm.mods[i].terms.size(); j++) {
-			emit(path, prgm, i, j);
+			emit(path+"/"+getBuildDir(prgm.mods[i].terms[j].dialect().name), prgm, i, j);
 		}
 	}
 }
@@ -194,7 +214,6 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 
 	// Do the synthesis
 	chp::graph &g = std::any_cast<chp::graph&>(prgm.mods[modIdx].terms[termIdx].def);
-	g.name = name;
 	g.post_process();	
 
 	//string graph_render_filename = "_" + prefix + "_" + g.name + ".png";
@@ -244,11 +263,103 @@ bool Build::flowToValRdy(weaver::Program &prgm, int modIdx, int termIdx) const {
 	return true;
 }
 
-bool Build::emit(string path, const weaver::Program &prgm, int modIdx, int termIdx) const {
-	if (prgm.mods[modIdx].terms[termIdx].dialect().name == "__valrdy__") {
-		std::filesystem::create_directories(path+"/"+valrdyBuildDir);
+bool Build::hseToPrs(weaver::Program &prgm, int modIdx, int termIdx) const {
+	// Verify expected format of the term
+	if (prgm.mods[modIdx].terms[termIdx].dialect().name != "proto") {
+		printf("error: dialect '%s' not supported for translation from hse to prs.\n",
+			prgm.mods[modIdx].terms[termIdx].dialect().name.c_str());
+		return false;
+	}
 
-		string filename = path+"/"+valrdyBuildDir+"/"+prgm.mods[modIdx].terms[termIdx].decl.name+".v";
+	// Create dialect and module
+	int cktKind = weaver::Term::getDialect("ckt");
+	int cktIdx = prgm.createModule("__ckt__");
+
+	const weaver::Decl &decl = prgm.mods[modIdx].terms[termIdx].decl;
+	if (decl.ret.defined() or decl.recv.defined()) {
+		printf("error: function must be a full process for synthesis\n");
+		return false;
+	}
+
+	// Create the new term in the module
+	string name = prgm.mods[modIdx].name + "_" + decl.name;
+	vector<weaver::Instance> args = decl.args;
+
+	int dstIdx = prgm.mods[cktIdx].createTerm(weaver::Term::procOf(cktKind, name, args));
+
+	hse::graph &hg = std::any_cast<hse::graph&>(prgm.mods[modIdx].terms[termIdx].def);
+
+	hg.post_process(true);
+	hg.check_variables();
+
+	if (progress) printf("Elaborate state space:\n");
+	hse::elaborate(hg, stage >= Build::ENCODE or not noGhosts, true, progress);
+	if (progress) printf("done\n\n");
+
+	if (not is_clean()) {
+		return false;
+	}
+
+	if (not get(Build::CONFLICTS)) {
+		return true;
+	}
+
+	bool inverting = false;
+	if (logic == Build::LOGIC_CMOS) {
+		inverting = true;
+	}
+
+	hse::encoder enc;
+	enc.base = &hg;
+
+	if (progress) printf("Identify state conflicts:\n");
+	enc.check(!inverting, progress);
+	if (progress) printf("done\n\n");
+
+	if (has(Build::CONFLICTS)) {
+		print_conflicts(enc);
+	}
+
+	if (not get(Build::ENCODE)) {
+		return true;
+	}
+
+	if (progress) printf("Insert state variables:\n");
+	if (not enc.insert_state_variables(20, !inverting, progress, false)) {
+		return false;
+	}
+	if (progress) printf("done\n\n");
+
+	if (enc.conflicts.size() > 0) {
+		// state variable insertion failed
+		print_conflicts(enc);
+		return false;
+	}
+
+	if (not get(Build::RULES)) {
+		return true;
+	}
+
+	if (progress) printf("Synthesize production rules:\n");
+	prs::production_rule_set pr;
+	hse::synthesize_rules(&pr, &hg, !inverting, progress);
+	if (progress) printf("done\n\n");
+
+	prgm.mods[cktIdx].terms[dstIdx].def = pr;
+	return true;
+}
+
+bool Build::prsToSpi(weaver::Program &prgm, int modIdx, int termIdx) const {
+}
+
+bool Build::spiToGds(weaver::Program &prgm, int modIdx, int termIdx) const {
+}
+
+bool Build::emit(string path, const weaver::Program &prgm, int modIdx, int termIdx) const {
+	std::filesystem::create_directories(path);
+	
+	if (prgm.mods[modIdx].terms[termIdx].dialect().name == "__valrdy__") {
+		string filename = path+"/"+prgm.mods[modIdx].terms[termIdx].decl.name+".v";
 		FILE *fptr = fopen(filename.c_str(), "w");
 		if (fptr == nullptr) {
 			printf("error: unable to write to file '%s'\n", filename.c_str());

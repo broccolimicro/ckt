@@ -299,11 +299,6 @@ int build_command(string workingDir, string techPath, string cellsDir, int argc,
 		}
 	}
 
-	bool inverting = false;
-	if (builder.logic == Build::LOGIC_CMOS) {
-		inverting = true;
-	}
-
 	if (format == "chp" or format == "cog") {
 		// Set up tokenizer
 		tokenizer tokens;
@@ -362,12 +357,12 @@ int build_command(string workingDir, string techPath, string cellsDir, int argc,
 
 		parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
 		//parse_ucs::function::registry.insert({"chp", parse_ucs::language(&parse_chp::produce, &parse_chp::expect, &parse_chp::register_syntax)});
-		parse_ucs::function::registry.insert({"proto", parse_ucs::language(&parse_chp::produce, &parse_chp::expect, &parse_chp::register_syntax)});
+		parse_ucs::function::registry.insert({"proto", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
 		parse_ucs::function::registry.insert({"ckt", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
 		//parse_ucs::function::registry.insert({"spice", parse_ucs::language(&parse_spice::produce, &parse_spice::expect, &parse_spice::register_syntax)});
 
 		weaver::Term::pushDialect("func", chp::factory);
-		weaver::Term::pushDialect("proto", chp::factory);
+		weaver::Term::pushDialect("proto", hse::factory);
 		weaver::Term::pushDialect("ckt", prs::factory);
 
 		weaver::Program prgm;
