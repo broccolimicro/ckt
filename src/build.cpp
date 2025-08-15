@@ -151,6 +151,8 @@ int build_command(string workingDir, string techPath, string cellsDir, int argc,
 	Build builder;
 	builder.progress = progress;
 	builder.debug = debug;
+	builder.techPath = techPath;
+	builder.cellsDir = cellsDir;
 
 	tokenizer tokens;
 	

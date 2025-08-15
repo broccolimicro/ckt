@@ -5,10 +5,18 @@
 #include <common/text.h>
 
 #include <chp/synthesize.h>
+#include <flow/synthesize.h>
+
 #include <hse/elaborator.h>
 #include <hse/encoder.h>
 #include <hse/synthesize.h>
-#include <flow/synthesize.h>
+#include <prs/bubble.h>
+#include <prs/synthesize.h>
+#include <sch/Netlist.h>
+#include <sch/Tapeout.h>
+#include <sch/Placer.h>
+#include <phy/Script.h>
+
 #include <interpret_flow/export.h>
 #include <interpret_hse/export_cli.h>
 
@@ -147,7 +155,7 @@ void doPlacement(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=
 	}
 }*/
 
-void Build::build(weaver::Program &prgm) const {
+void Build::build(weaver::Program &prgm) {
 	for (int i = 0; i < (int)prgm.mods.size(); i++) {
 		for (int j = 0; j < (int)prgm.mods[i].terms.size(); j++) {
 			string dialectName = prgm.mods[i].terms[j].dialect().name;
@@ -349,10 +357,104 @@ bool Build::hseToPrs(weaver::Program &prgm, int modIdx, int termIdx) const {
 	return true;
 }
 
-bool Build::prsToSpi(weaver::Program &prgm, int modIdx, int termIdx) const {
+bool Build::prsToSpi(weaver::Program &prgm, int modIdx, int termIdx) {
+	// Verify expected format of the term
+	if (prgm.mods[modIdx].terms[termIdx].dialect().name != "ckt") {
+		printf("error: dialect '%s' not supported for translation from prs to spi.\n",
+			prgm.mods[modIdx].terms[termIdx].dialect().name.c_str());
+		return false;
+	}
+
+	// Create dialect and module
+	int spiKind = weaver::Term::getDialect("__spice__");
+	int spiIdx = prgm.createModule("__spice__");
+
+	const weaver::Decl &decl = prgm.mods[modIdx].terms[termIdx].decl;
+	if (decl.ret.defined() or decl.recv.defined()) {
+		printf("error: function must be a full process for synthesis\n");
+		return false;
+	}
+
+	// Create the new term in the module
+	string name = prgm.mods[modIdx].name + "_" + decl.name;
+	vector<weaver::Instance> args = decl.args;
+
+	int dstIdx = prgm.mods[spiIdx].createTerm(weaver::Term::procOf(spiKind, name, args));
+
+	prs::production_rule_set &pr = std::any_cast<prs::production_rule_set&>(prgm.mods[modIdx].terms[termIdx].def);
+
+	bool inverting = false;
+	if (logic == Build::LOGIC_CMOS) {
+		inverting = true;
+	}
+
+	if (inverting and not pr.cmos_implementable()) {
+		if (progress) {
+			printf("Bubble reshuffle production rules:\n");
+			printf("  %s...", pr.name.c_str());
+			fflush(stdout);
+		}
+		prs::bubble bub;
+		bub.load_prs(pr);
+
+		int step = 0;
+		//if (has(Build::BUBBLE) and debug) {
+		//	gvdot::render(pr.name+"_bubble0.png", export_bubble(bub, pr).to_string());
+		//}
+		for (auto i = bub.net.begin(); i != bub.net.end(); i++) {
+			auto result = bub.step(i);
+			//if (has(Build::BUBBLE) and debug and result.second) {
+			//	gvdot::render(pr.name+"_bubble" + to_string(++step) + ".png", export_bubble(bub, pr).to_string());
+			//}
+		}
+		auto result = bub.complete();
+		//if (has(Build::BUBBLE) and debug and result) {
+		//	gvdot::render(pr.name+"_bubble" + to_string(++step) + ".png", export_bubble(bub, pr).to_string());
+		//}
+
+		bub.save_prs(&pr);
+		if (progress) {
+			printf("[%sDONE%s]\n", KGRN, KNRM);
+			printf("done\n\n");
+		}
+	}
+
+	if (not get(Build::KEEPERS)) {
+		return true;
+	}
+
+	if (logic == Build::LOGIC_CMOS or logic == Build::LOGIC_RAW) {
+		if (progress) printf("Insert keepers:\n");
+		pr.add_keepers(true, false, 1, progress);
+		if (progress) printf("done\n\n");
+	}
+
+	if (not get(Build::SIZE)) {
+		return true;
+	}
+
+	if (progress) printf("Size production rules:\n");
+	pr.size_devices(0.1, progress);
+	if (progress) printf("done\n\n");
+
+	if (tech.path.empty() and not phy::loadTech(tech, techPath, cellsDir)) {
+		cout << "Unable to load techfile \'" + techPath + "\'." << endl;
+		return false;
+	}
+	
+	sch::Netlist net;
+	if (progress) printf("Build netlist:\n");
+	net.subckts.push_back(prs::build_netlist(tech, pr, progress));
+	if (progress) printf("done\n\n");
+	if (debug) {
+		net.subckts.back().print();
+	}
+
+	prgm.mods[spiIdx].terms[dstIdx].def = net;
+	return true;
 }
 
-bool Build::spiToGds(weaver::Program &prgm, int modIdx, int termIdx) const {
+bool Build::spiToGds(weaver::Program &prgm, int modIdx, int termIdx) {
 }
 
 bool Build::emit(string path, const weaver::Program &prgm, int modIdx, int termIdx) const {

@@ -4,6 +4,7 @@
 #include <parse/parse.h>
 
 #include <weaver/program.h>
+#include <phy/Tech.h>
 
 struct Build {
 	Build() {
@@ -65,6 +66,11 @@ struct Build {
 	
 	vector<bool> targets;
 
+	string techPath;
+	string cellsDir;
+
+	phy::Tech tech;
+
 	void set(int target);
 	bool get(int target) const;
 
@@ -73,7 +79,7 @@ struct Build {
 	void excl(int target);
 	bool has(int target) const;
 
-	void build(weaver::Program &prgm) const;
+	void build(weaver::Program &prgm);
 	string getBuildDir(string dialectName) const;
 	void emit(string path, const weaver::Program &prgm) const;
 
@@ -82,8 +88,8 @@ struct Build {
 	bool flowToValRdy(weaver::Program &prgm, int modIdx, int termIdx) const;
 
 	bool hseToPrs(weaver::Program &prgm, int modIdx, int termIdx) const;
-	bool prsToSpi(weaver::Program &prgm, int modIdx, int termIdx) const;
-	bool spiToGds(weaver::Program &prgm, int modIdx, int termIdx) const;
+	bool prsToSpi(weaver::Program &prgm, int modIdx, int termIdx);
+	bool spiToGds(weaver::Program &prgm, int modIdx, int termIdx);
 
 	bool emit(string path, const weaver::Program &prgm, int modIdx, int termIdx) const;
 };
