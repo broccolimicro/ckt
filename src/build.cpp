@@ -159,8 +159,6 @@ int build_command(string workingDir, string techPath, string cellsDir, int argc,
 	tokenizer tokens;
 	
 	string filename = "";
-	string prefix = "";
-	string format = "";
 	
 	for (int i = 0; i < argc; i++) {
 		string arg = argv[i];
@@ -259,127 +257,41 @@ int build_command(string workingDir, string techPath, string cellsDir, int argc,
 			builder.noCells = true;
 		} else if (arg == "--no-ghosts") {
 			builder.noGhosts = true;
-		} else if (arg == "-o" or arg == "--out") {
-			if (++i >= argc) {
-				cerr << "ERROR: Expected output prefix" << endl;
-			}
-
-			prefix = argv[i];
 		} else {
 			string path = extractPath(arg);
 			string opt = (arg.size() > path.size() ? arg.substr(path.size()+1) : "");
 
-			size_t dot = path.find_last_of(".");
-			string ext = "";
-			if (dot != string::npos) {
-				ext = path.substr(dot+1);
-				if (ext == "spice"
-					or ext == "sp"
-					or ext == "s") {
-					ext = "spi";
-				}
-			} else {
-				ext = "wv";
-			}
-
 			filename = path;
-			format = ext;
-
-			if (prefix == "") {
-				prefix = dot != string::npos ? filename.substr(0, dot) : filename;
-			}
-
-			if (ext != "wv"
-				and ext != "chp"
-				and ext != "hse"
-				and ext != "cog"
-				and ext != "astg"
-				and ext != "prs"
-				and ext != "spi"
-				and ext != "gds") {
-				cerr << "ERROR: Unrecognized file format '" << ext << "' (expected wv/chp/hse/cog/astg/prs/spi/gds)" << endl;
-				return 0;
-			}
 		}
 	}
 
-	if (format == "chp" or format == "cog") {
-		// Set up tokenizer
-		tokenizer tokens;
-		tokens.register_token<parse::block_comment>(false);
-		tokens.register_token<parse::line_comment>(false);
+	Timer totalTime;
 
-		if (format == "cog") {
-			parse_cog::register_syntax(tokens);
-		} else if (format == "chp") {
-			parse_chp::register_syntax(tokens);
-		}
+	parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
+	//parse_ucs::function::registry.insert({"chp", parse_ucs::language(&parse_chp::produce, &parse_chp::expect, &parse_chp::register_syntax)});
+	parse_ucs::function::registry.insert({"proto", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
+	parse_ucs::function::registry.insert({"ckt", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
+	//parse_ucs::function::registry.insert({"spice", parse_ucs::language(&parse_spice::produce, &parse_spice::expect, &parse_spice::register_syntax)});
 
-		ifstream fin;
-		fin.open(filename.c_str(), ios::binary | ios::in);
-		if (!fin.is_open()) {
-			tokens.error("file not found '" + filename + "'", __FILE__, __LINE__);
-			return 1;
-		} else {
-			fin.seekg(0, ios::end);
-			int size = (int)fin.tellg();
-			string buffer(size, ' ');
-			fin.seekg(0, ios::beg);
-			fin.read(&buffer[0], size);
-			fin.clear();
-			tokens.insert(filename, buffer, nullptr);
-		}
+	weaver::Term::pushDialect("func", chp::factory);
+	weaver::Term::pushDialect("proto", hse::factory);
+	weaver::Term::pushDialect("ckt", prs::factory);
 
-		chp::graph g;
+	weaver::Binder::pushDialect("wv", wvFactory);
+	weaver::Binder::pushDialect("cog", cogFactory);
+	weaver::Binder::pushDialect("cogw", cogwFactory);
+	weaver::Binder::pushDialect("prs", prsFactory);
+	weaver::Binder::pushDialect("spi", spiFactory);
+	weaver::Binder::pushDialect("gds", gdsFactory);
 
-		// Parse input
-		if (format == "cog") {
-			tokens.increment(false);
-			tokens.expect<parse_cog::composition>();
-			if (tokens.decrement(__FILE__, __LINE__)) {
-				parse_cog::composition syntax(tokens);
-				chp::import_chp(g, syntax, &tokens, true);
-			}
-		} else if (format == "chp") {
-			tokens.increment(false);
-			tokens.expect<parse_chp::composition>();
-			if (tokens.decrement(__FILE__, __LINE__)) {
-				parse_chp::composition syntax(tokens);
-				chp::import_chp(g, syntax, &tokens, true);
-			}
-		}
+	weaver::Program prgm;
+	loadGlobalTypes(prgm);
 
-		g.post_process();
-		gvdot::render(prefix+".png", chp::export_graph(g, true).to_string());
-
-		flow::Func fn = chp::synthesizeFuncFromCHP(g);
-		clocked::Module mod = flow::synthesizeModuleFromFunc(fn);
-		cout << flow::export_module(mod).to_string() << endl;
-
-	} else {
-		Timer totalTime;
-
-		parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
-		//parse_ucs::function::registry.insert({"chp", parse_ucs::language(&parse_chp::produce, &parse_chp::expect, &parse_chp::register_syntax)});
-		parse_ucs::function::registry.insert({"proto", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
-		parse_ucs::function::registry.insert({"ckt", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
-		//parse_ucs::function::registry.insert({"spice", parse_ucs::language(&parse_spice::produce, &parse_spice::expect, &parse_spice::register_syntax)});
-
-		weaver::Term::pushDialect("func", chp::factory);
-		weaver::Term::pushDialect("proto", hse::factory);
-		weaver::Term::pushDialect("ckt", prs::factory);
-
-		weaver::Binder::pushDialect("wv", wvFactory);
-
-		weaver::Program prgm;
-		loadGlobalTypes(prgm);
-
-		weaver::Binder bd(prgm);
-		bd.load(filename);
-		builder.build(prgm);
-		prgm.print();
-		builder.emit(bd.findProjectRoot()+"/build", prgm);
-	}
+	weaver::Binder bd(prgm);
+	bd.load(filename);
+	builder.build(prgm);
+	prgm.print();
+	builder.emit(bd.findProjectRoot()+"/build", prgm);
 
 	if (!is_clean()) {
 		complete();

@@ -205,7 +205,7 @@ void Binder::loadModule(int index, const parse_ucs::source &syntax) {
 
 void Binder::load(string path) {
 	if (path.empty()) {
-		path = findWorkingDir() + "/top.wv";
+		path = findProjectRoot() + "/top.wv";
 	}
 
 	size_t dot = path.find_last_of(".");

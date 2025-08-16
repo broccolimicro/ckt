@@ -435,6 +435,11 @@ bool Build::spiToGds(weaver::Program &prgm, int modIdx, int termIdx) {
 		}
 	}
 
+	if (tech.path.empty() and not phy::loadTech(tech, techPath, cellsDir)) {
+		cout << "Unable to load techfile \'" + techPath + "\'." << endl;
+		return false;
+	}
+
 	if (progress) printf("Break subckts into cells:\n");
 	Timer cellsTmr;
 	net.mapCells(tech, progress);
