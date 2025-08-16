@@ -1,13 +1,22 @@
 #include "binder.h"
 
-#include <parse/parse.h>
-#include <parse/default/block_comment.h>
-#include <parse/default/line_comment.h>
-#include <parse/default/new_line.h>
-
 #include <filesystem>
 
 namespace weaver {
+
+vector<Binder::Dialect> Binder::dialects;
+
+Binder::Dialect::Dialect() {
+	factory = nullptr;
+}
+
+Binder::Dialect::Dialect(string name, Factory factory) {
+	this->name = name;
+	this->factory = factory;
+}
+
+Binder::Dialect::~Dialect() {
+}
 
 Binder::Binder(Program &prgm) : prgm(prgm) {
 	loadGlobalTypes(this->prgm);
@@ -16,26 +25,22 @@ Binder::Binder(Program &prgm) : prgm(prgm) {
 Binder::~Binder() {
 }
 
-string Binder::findWorkingDir() const {
-	return std::filesystem::current_path();
+int Binder::pushDialect(string name, Dialect::Factory factory) {
+	// Register a new dialect with the given name and factory function
+	dialects.push_back(Dialect(name, factory));
+	// Return the index of the newly registered dialect
+	return (int)dialects.size()-1;
 }
 
-string Binder::findProjectRoot(string workingDir) const {
-	if (workingDir.empty()) {
-		workingDir = findWorkingDir();
-	}
-	std::filesystem::path search = std::filesystem::absolute(workingDir);
-	while (not search.empty()) {
-		if (std::filesystem::exists(search / "lm.mod")) {
-			return search.string();
-		} else if (search.parent_path() == search) {
-			printf("error: unable to find project root\n");
-			return "";
+int Binder::findDialect(string name) {
+	// Search for a dialect with the given name
+	for (int i = 0; i < (int)dialects.size(); i++) {
+		if (dialects[i].name == name) {
+			return i;
 		}
-		search = search.parent_path();
 	}
-	printf("error: unable to find project root\n");
-	return "";
+	// Return NONE if no matching dialect is found
+	return Binder::NONE;
 }
 
 void Binder::readPath(tokenizer &tokens, string path, string root) {
@@ -66,40 +71,26 @@ void Binder::readPath(tokenizer &tokens, string path, string root) {
 	}
 }
 
-parse_ucs::source Binder::parsePath(string path, string root) {
-	size_t dot = path.find_last_of(".");
-	size_t slash = path.find_last_of("/");
-	if (slash == string::npos) {
-		slash = 0u;
-	} else {
-		slash += 1;
-	}
+string Binder::findWorkingDir() const {
+	return std::filesystem::current_path();
+}
 
-	string format = "";
-	if (dot != string::npos) {
-		format = path.substr(dot+1);
-	} else {
-		dot = path.size();
+string Binder::findProjectRoot(string workingDir) const {
+	if (workingDir.empty()) {
+		workingDir = findWorkingDir();
 	}
-
-	if (format != "wv") {
-		printf("error: unrecognized source format '%s'\n", format.c_str());
+	std::filesystem::path search = std::filesystem::absolute(workingDir);
+	while (not search.empty()) {
+		if (std::filesystem::exists(search / "lm.mod")) {
+			return search.string();
+		} else if (search.parent_path() == search) {
+			printf("error: unable to find project root\n");
+			return "";
+		}
+		search = search.parent_path();
 	}
-
-	tokenizer tokens;
-	tokens.register_token<parse::block_comment>(false);
-	tokens.register_token<parse::line_comment>(false);
-	parse_ucs::source::register_syntax(tokens);
-	readPath(tokens, path, root);
-
-	tokens.increment(true);
-	tokens.expect<parse_ucs::source>();
-	parse_ucs::source result;
-	result.name = path.substr(slash, dot-slash);
-	if (tokens.decrement(__FILE__, __LINE__)) {
-		result.parse(tokens);
-	}
-	return result;
+	printf("error: unable to find project root\n");
+	return "";
 }
 
 /*void Binder::addIncludePath(string path) {
@@ -216,42 +207,20 @@ void Binder::load(string path) {
 	if (path.empty()) {
 		path = findWorkingDir() + "/top.wv";
 	}
-	// TODO(edward.bingham) Implement modules appropriately:
-	// 1. load top.wv from current directory
-	// 2. import paths are relative to project root, so find project root
 
-	// TODO(edward.bingham) find project root and load all files
-
-	// walk import tree
-	string root = findProjectRoot(path);
-	int offset = (int)prgm.mods.size();
-
-	vector<parse_ucs::source> src;
-	vector<string> stack;
-	stack.push_back(path);
-	for (int i = 0; i < (int)stack.size(); i++) {
-		src.push_back(parsePath(stack[i], root));
-
-		for (auto j = src.back().incl.begin(); j != src.back().incl.end(); j++) {
-			for (auto k = j->path.begin(); k != j->path.end(); k++) {
-				if (find(stack.begin(), stack.end(), k->second) == stack.end()) {
-					string modPath = k->second.substr(1, k->second.size()-2)+".wv";
-					stack.push_back(modPath);
-				}
-			}
-		}
+	size_t dot = path.find_last_of(".");
+	string ext = "";
+	if (dot != string::npos) {
+		ext = path.substr(dot+1);
 	}
 
-	// load symbols to break dependency chains
-	prgm.mods.resize(offset+src.size());
-	for (int i = 0; i < (int)src.size(); i++) {
-		loadSymbols(i+offset, src[i]);
+	int kind = findDialect(ext);
+	if (kind == Binder::NONE) {
+		printf("error: unrecognized dialect '%s'\n", ext.c_str());
+		return;
 	}
 
-	// link up all of the dependencies
-	for (int i = 0; i < (int)src.size(); i++) {
-		loadModule(i+offset, src[i]);
-	}
+	dialects[kind].factory(*this, path);
 }
 
 }

@@ -70,6 +70,8 @@
 #include "weaver/binder.h"
 #include "format/dot.h"
 
+#include "dialect.h"
+
 namespace chp {
 
 std::any factory(const parse::syntax *syntax, tokenizer *tokens) {
@@ -366,6 +368,8 @@ int build_command(string workingDir, string techPath, string cellsDir, int argc,
 		weaver::Term::pushDialect("func", chp::factory);
 		weaver::Term::pushDialect("proto", hse::factory);
 		weaver::Term::pushDialect("ckt", prs::factory);
+
+		weaver::Binder::pushDialect("wv", wvFactory);
 
 		weaver::Program prgm;
 		loadGlobalTypes(prgm);
