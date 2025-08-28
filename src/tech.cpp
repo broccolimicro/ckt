@@ -71,7 +71,7 @@ void tech_help() {
 	//printf("  drop [cell name...]     delete these cells from your cell library\n");
 }
 
-int tech_cells_command(string workingDir, string techDir, string techPath, string cellsDir, int argc, char **argv, bool progress, bool debug) {
+int tech_cells_command(string workingDir, string techDir, string techPath, string cellsDir, int argc, char **argv) {
 	vector<string> files;
 
 	for (int i = 0; i < argc; i++) {
@@ -147,7 +147,7 @@ int tech_cells_command(string workingDir, string techDir, string techPath, strin
 	return 1;
 }
 
-/*int tech_import_command(string workingDir, string techDir, string techPath, string cellsDir, int argc, char **argv, bool progress, bool debug) {
+/*int tech_import_command(string workingDir, string techDir, string techPath, string cellsDir, int argc, char **argv) {
 	map<string, vector<string> > files;
 
 	for (int i = 0; i < argc; i++) {
@@ -213,6 +213,7 @@ int tech_command(int argc, char **argv) {
 			if (i < argc) {
 				proj.setTech(argv[i]);
 			}
+			proj.writeMod();
 			return 0;
 		} else if (arg == "get") {
 			++i;
@@ -220,10 +221,10 @@ int tech_command(int argc, char **argv) {
 			return 0;
 		} else if (arg == "cells") {
 			++i;
-			return tech_cells_command(proj.workDir, proj.techDir, proj.tech.path, proj.tech.lib, argc-i, argv+i, progress, debug);
+			return tech_cells_command(proj.workDir, proj.techDir, proj.tech.path, proj.tech.lib, argc-i, argv+i);
 		/*} else if (arg == "import") {
 			++i;
-			return tech_import_command(workingDir, techDir, techPath, cellsDir, argc-i, argv+i, progress, debug);*/
+			return tech_import_command(workingDir, techDir, techPath, cellsDir, argc-i, argv+i);*/
 		} else {
 			tech_help();
 		}

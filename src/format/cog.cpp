@@ -54,3 +54,21 @@ void loadCogw(weaver::Project &proj, weaver::Program &prgm, const weaver::Source
 	prgm.mods[modIdx].terms[termIdx].def = g;
 }
 
+std::any factoryCog(const parse::syntax *syntax, tokenizer *tokens) {
+	chp::graph g;
+	if (syntax != nullptr) {
+		chp::import_chp(g, *(const parse_cog::composition *)syntax, tokens, true);
+		//g.post_process(true);
+	}
+	return g;
+}
+
+std::any factoryCogw(const parse::syntax *syntax, tokenizer *tokens) {
+	hse::graph g;
+	if (syntax != nullptr) {
+		hse::import_hse(g, *(const parse_cog::composition *)syntax, tokens, true);
+		g.post_process(true);
+		g.check_variables();
+	}
+	return g;
+}

@@ -5,35 +5,32 @@
 #include <parse/default/block_comment.h>
 #include <parse/default/line_comment.h>
 
+#include <parse_ucs/source.h>
+#include <parse_astg/factory.h>
+#include <parse_cog/factory.h>
+#include <parse_chp/factory.h>
+#include <parse_prs/factory.h>
+#include <parse_spice/factory.h>
+
 #include <chp/graph.h>
-//#include <chp/simulator.h>
-//#include <parse_chp/composition.h>
-#include <interpret_chp/import.h>
-#include <interpret_chp/export.h>
-
 #include <hse/graph.h>
-#include <hse/simulator.h>
-#include <hse/encoder.h>
 #include <hse/elaborator.h>
-#include <hse/synthesize.h>
-#include <interpret_hse/import.h>
-#include <interpret_hse/export.h>
-
 #include <prs/production_rule.h>
 #include <prs/bubble.h>
-//#include <parse_prs/production_rule_set.h>
-#include <interpret_prs/import.h>
-#include <interpret_prs/export.h>
 
-//#include <parse_expression/expression.h>
-//#include <parse_expression/assignment.h>
-//#include <parse_expression/composition.h>
-#include <interpret_boolean/export.h>
-#include <interpret_boolean/import.h>
-#include <interpret_arithmetic/export.h>
-#include <interpret_arithmetic/import.h>
+#include "weaver/project.h"
 
 #include "format/dot.h"
+#include "format/cog.h"
+#include "format/spice.h"
+#include "format/gds.h"
+#include "format/verilog.h"
+#include "format/prs.h"
+#include "format/wv.h"
+#include "format/astg.h"
+
+#include <interpret_chp/export.h>
+#include <interpret_hse/export.h>
 
 void show_help() {
 	printf("Usage: lm show [options] file...\n");
@@ -50,27 +47,17 @@ void show_help() {
 	printf(" -s,--sync       Render half synchronization actions\n");
 }
 
-void loadPath(string path, tokenizer &tokens) {
-	ifstream fin;
-	fin.open(path.c_str(), ios::binary | ios::in);
-	fin.seekg(0, ios::end);
-	int size = (int)fin.tellg();
-	string buffer(size, ' ');
-	fin.seekg(0, ios::beg);
-	fin.read(&buffer[0], size);
-	fin.clear();
-	tokens.insert(path, buffer);
-}
-
 int show_command(int argc, char **argv) {
-	tokenizer tokens;
-	tokens.register_token<parse::block_comment>(false);
-	tokens.register_token<parse::line_comment>(false);
+	weaver::Project proj;
+	if (proj.hasMod()) {
+		proj.readMod();
+	} else {
+		printf("please initialize your module with the following.\n\nlm mod init my_module\n");
+		return 1;
+	}
 
 	string filename = "";
-	string format = "";
-
-	string ofilename = "a.png";
+	string term = "";
 
 	int encodings = -1;
 
@@ -108,155 +95,64 @@ int show_command(int argc, char **argv) {
 			states = true;
 		} else if (arg == "-pn" or arg == "--petri") {
 			petri = true;
-		} else if (arg == "-o") {
-			if (++i >= argc) {
-				error("", "expected output filename", __FILE__, __LINE__);
-				return 1;
-			}
-
-			ofilename = argv[i];
 		} else {
 			filename = argv[i];
-			size_t dot = filename.find_last_of(".");
-			if (dot == string::npos) {
-				printf("unrecognized file format\n");
-				return 1;
-			}
-			format = filename.substr(dot+1);
-			if (format != "chp"
-				and format != "hse"
-				and format != "cog"
-				and format != "astg"
-				and format != "prs") {
-				printf("unrecognized file format '%s'\n", format.c_str());
-				return 0;
-			}
 		}
 	}
 
-	if (filename == "") {
-		printf("expected filename\n");
-		return 0;
+	parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
+	//parse_ucs::function::registry.insert({"chp", parse_ucs::language(&parse_chp::produce, &parse_chp::expect, &parse_chp::register_syntax)});
+	parse_ucs::function::registry.insert({"proto", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
+	parse_ucs::function::registry.insert({"circ", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
+	//parse_ucs::function::registry.insert({"spice", parse_ucs::language(&parse_spice::produce, &parse_spice::expect, &parse_spice::register_syntax)});
+
+	weaver::Term::pushDialect("func", factoryCog);
+	weaver::Term::pushDialect("proto", factoryCogw);
+	weaver::Term::pushDialect("circ", factoryPrs);
+
+	proj.pushFiletype("", "wv", "", readWv, loadWv);
+	proj.pushFiletype("func", "cog", "", readCog, loadCog);
+	proj.pushFiletype("proto", "cogw", "", readCog, loadCogw);
+	proj.pushFiletype("circ", "prs", "ckt", readPrs, loadPrs, writePrs);
+	proj.pushFiletype("spice", "spi", "spi", readSpice, loadSpice, writeSpice);
+	proj.pushFiletype("verilog", "v", "rtl", nullptr, nullptr, writeVerilog);
+	proj.pushFiletype("layout", "gds", "gds", nullptr, nullptr, writeGds);
+	proj.pushFiletype("func", "astg", "state", readAstg, loadAstg, writeAstg);
+	proj.pushFiletype("proto", "astgw", "state", readAstg, loadAstgw, writeAstgw);
+
+	weaver::Program prgm;
+	loadGlobalTypes(prgm);
+
+	if (filename.empty()) {
+		filename = "top.wv";
 	}
 
-	if (format == "chp" or format == "cog") {
-		chp::graph cg;
-		cout << "here1" << endl;
+	proj.incl(filename);
+	proj.load(prgm);
 
-		if (format == "chp") {
-			parse_chp::composition::register_syntax(tokens);
-			loadPath(filename, tokens);
+	fs::create_directories(proj.rootDir / proj.BUILD / "dbg");
 
-			tokens.increment(false);
-			tokens.expect<parse_chp::composition>();
-			while (tokens.decrement(__FILE__, __LINE__))
-			{
-				parse_chp::composition syntax(tokens);
-				chp::import_chp(cg, syntax, &tokens, true);
-
-				tokens.increment(false);
-				tokens.expect<parse_chp::composition>();
+	for (auto i = prgm.mods.begin(); i != prgm.mods.end(); i++) {
+		for (auto j = i->terms.begin(); j != i->terms.end(); j++) {
+			if (j->kind < 0) {
+				printf("internal:%s:%d: dialect not defined for term '%s'\n", __FILE__, __LINE__, j->decl.name.c_str());
+				continue;
 			}
-		} else {
-			cout << "here2" << endl;
-			parse_cog::composition::register_syntax(tokens);
-			loadPath(filename, tokens);
-
-			tokens.increment(false);
-			tokens.expect<parse_cog::composition>();
-			while (tokens.decrement(__FILE__, __LINE__))
-			{
-				parse_cog::composition syntax(tokens);
-				cout << syntax.to_string() << endl;
-				chp::import_chp(cg, syntax, &tokens, true);
-				cg.print();
-
-				tokens.increment(false);
-				tokens.expect<parse_cog::composition>();
+			string outPath = proj.buildPath("dbg", j->decl.name+".png").string();
+			if (j->dialect().name == "func") {
+				gvdot::render(outPath, chp::export_graph(std::any_cast<const chp::graph&>(j->def), labels).to_string());
+			} else if (j->dialect().name == "proto") {
+				hse::graph &g = std::any_cast<hse::graph&>(j->def);
+				if (states) {
+					hse::graph sg = hse::to_state_graph(g, true);
+					gvdot::render(outPath, hse::export_graph(sg, horiz, labels, notations, ghost, encodings).to_string());
+				} else if (petri) {
+					hse::graph pn = hse::to_petri_net(g, true);
+					gvdot::render(outPath, hse::export_graph(pn, horiz, labels, notations, ghost, encodings).to_string());
+				} else {
+					gvdot::render(outPath, hse::export_graph(g, horiz, labels, notations, ghost, encodings).to_string());
+				}
 			}
-		}
-		
-		if (process) {
-			cg.post_process();
-		}
-
-		if (is_clean()) {
-			gvdot::render(ofilename, export_graph(cg, labels).to_string());
-		}
-	} else if (format == "hse" or format == "astg" or format == "cog") {
-		hse::graph hg;
-
-		if (format == "hse") {
-			parse_chp::composition::register_syntax(tokens);
-			loadPath(filename, tokens);
-
-			tokens.increment(false);
-			tokens.expect<parse_chp::composition>();
-			while (tokens.decrement(__FILE__, __LINE__))
-			{
-				parse_chp::composition syntax(tokens);
-				hse::import_hse(hg, syntax, &tokens, true);
-
-				tokens.increment(false);
-				tokens.expect<parse_chp::composition>();
-			}
-		} else if (format == "astg") {
-			parse_astg::graph::register_syntax(tokens);
-			loadPath(filename, tokens);
-			
-			tokens.increment(false);
-			tokens.expect<parse_astg::graph>();
-			while (tokens.decrement(__FILE__, __LINE__))
-			{
-				parse_astg::graph syntax(tokens);
-				hse::import_hse(hg, syntax, &tokens);
-
-				tokens.increment(false);
-				tokens.expect<parse_astg::graph>();
-			}
-		} else if (format == "cog") {
-			parse_cog::composition::register_syntax(tokens);
-			loadPath(filename, tokens);
-
-			tokens.increment(false);
-			tokens.expect<parse_cog::composition>();
-			while (tokens.decrement(__FILE__, __LINE__))
-			{
-				parse_cog::composition syntax(tokens);
-				hse::import_hse(hg, syntax, &tokens, true);
-
-				tokens.increment(false);
-				tokens.expect<parse_cog::composition>();
-			}
-		}
-		if (process) {
-			hg.post_process(true);
-		}
-		hg.check_variables();
-
-		if (is_clean()) {
-			if (states) {
-				hse::graph sg = hse::to_state_graph(hg, true);
-				gvdot::render(ofilename, export_graph(sg, horiz, labels, notations, ghost, encodings).to_string());
-			} else if (petri) {
-				hse::graph pn = hse::to_petri_net(hg, true);
-				gvdot::render(ofilename, export_graph(hg, horiz, labels, notations, ghost, encodings).to_string());
-			} else {
-				gvdot::render(ofilename, export_graph(hg, horiz, labels, notations, ghost, encodings).to_string());
-			}
-		}
-	} else if (format == "prs") {
-		prs::production_rule_set pr;
-
-		parse_prs::production_rule_set::register_syntax(tokens);
-		loadPath(filename, tokens);
-
-		tokens.increment(false);
-		tokens.expect<parse_prs::production_rule_set>();
-		if (tokens.decrement(__FILE__, __LINE__))
-		{
-			parse_prs::production_rule_set syntax(tokens);
-			prs::import_production_rule_set(syntax, pr, -1, -1, prs::attributes(), 0, &tokens, true);
 		}
 	}
 

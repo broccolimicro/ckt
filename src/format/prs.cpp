@@ -48,3 +48,11 @@ void writePrs(fs::path path, const weaver::Project &proj, const weaver::Program 
 	fout.write(buffer.c_str(), buffer.size());
 	fout.close();
 }
+
+std::any factoryPrs(const parse::syntax *syntax, tokenizer *tokens) {
+	prs::production_rule_set pr;
+	if (syntax != nullptr) {
+		prs::import_production_rule_set(*(const parse_prs::production_rule_set *)syntax, pr, -1, -1, prs::attributes(), 0, tokens, true);
+	}
+	return pr;
+}

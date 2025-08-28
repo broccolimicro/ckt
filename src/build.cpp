@@ -76,45 +76,7 @@
 #include "format/verilog.h"
 #include "format/prs.h"
 #include "format/wv.h"
-
-namespace chp {
-
-std::any factory(const parse::syntax *syntax, tokenizer *tokens) {
-	graph g;
-	if (syntax != nullptr) {
-		import_chp(g, *(const parse_cog::composition *)syntax, tokens, true);
-		//g.post_process(true);
-	}
-	return g;
-}
-
-}
-
-namespace hse {
-
-std::any factory(const parse::syntax *syntax, tokenizer *tokens) {
-	graph g;
-	if (syntax != nullptr) {
-		import_hse(g, *(const parse_cog::composition *)syntax, tokens, true);
-		g.post_process(true);
-		g.check_variables();
-	}
-	return g;
-}
-
-}
-
-namespace prs {
-
-std::any factory(const parse::syntax *syntax, tokenizer *tokens) {
-	prs::production_rule_set pr;
-	if (syntax != nullptr) {
-		prs::import_production_rule_set(*(const parse_prs::production_rule_set *)syntax, pr, -1, -1, prs::attributes(), 0, tokens, true);
-	}
-	return pr;
-}
-
-}
+#include "format/astg.h"
 
 void build_help() {
 	printf("\nUsage: lm build [options] <file>\n");
@@ -307,9 +269,9 @@ int build_command(int argc, char **argv) {
 	parse_ucs::function::registry.insert({"circ", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
 	//parse_ucs::function::registry.insert({"spice", parse_ucs::language(&parse_spice::produce, &parse_spice::expect, &parse_spice::register_syntax)});
 
-	weaver::Term::pushDialect("func", chp::factory);
-	weaver::Term::pushDialect("proto", hse::factory);
-	weaver::Term::pushDialect("circ", prs::factory);
+	weaver::Term::pushDialect("func", factoryCog);
+	weaver::Term::pushDialect("proto", factoryCogw);
+	weaver::Term::pushDialect("circ", factoryPrs);
 
 	proj.pushFiletype("", "wv", "", readWv, loadWv);
 	proj.pushFiletype("func", "cog", "", readCog, loadCog);
@@ -318,6 +280,8 @@ int build_command(int argc, char **argv) {
 	proj.pushFiletype("spice", "spi", "spi", readSpice, loadSpice, writeSpice);
 	proj.pushFiletype("verilog", "v", "rtl", nullptr, nullptr, writeVerilog);
 	proj.pushFiletype("layout", "gds", "gds", nullptr, nullptr, writeGds);
+	proj.pushFiletype("func", "astg", "state", readAstg, loadAstg, writeAstg);
+	proj.pushFiletype("proto", "astgw", "state", readAstg, loadAstgw, writeAstgw);
 
 	weaver::Program prgm;
 	loadGlobalTypes(prgm);
