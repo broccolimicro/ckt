@@ -16,56 +16,6 @@
 #include <parse_prs/factory.h>
 #include <parse_spice/factory.h>
 
-#include <chp/graph.h>
-//#include <chp/simulator.h>
-//#include <parse_chp/composition.h>
-#include <interpret_chp/import.h>
-#include <interpret_chp/export.h>
-
-#include <hse/graph.h>
-#include <hse/simulator.h>
-#include <hse/encoder.h>
-#include <hse/elaborator.h>
-#include <hse/synthesize.h>
-#include <interpret_hse/import.h>
-#include <interpret_hse/export.h>
-#include <interpret_hse/export_cli.h>
-
-#include <prs/production_rule.h>
-#include <prs/bubble.h>
-#include <prs/synthesize.h>
-#include <interpret_prs/import.h>
-#include <interpret_prs/export.h>
-
-#include <sch/Netlist.h>
-#include <sch/Tapeout.h>
-#include <sch/Placer.h>
-#include <interpret_sch/import.h>
-#include <interpret_sch/export.h>
-
-#include <phy/Tech.h>
-#include <phy/Script.h>
-#include <phy/Layout.h>
-#include <phy/Library.h>
-#include <interpret_phy/import.h>
-#include <interpret_phy/export.h>
-
-//#include <parse_expression/expression.h>
-//#include <parse_expression/assignment.h>
-//#include <parse_expression/composition.h>
-#include <interpret_boolean/export.h>
-#include <interpret_boolean/import.h>
-#include <interpret_arithmetic/export.h>
-#include <interpret_arithmetic/import.h>
-
-#include <chp/synthesize.h>
-#include <flow/func.h>
-#include <flow/module.h>
-#include <flow/synthesize.h>
-#include <interpret_flow/export.h>
-
-#include <filesystem>
-
 #include "weaver/builder.h"
 #include "weaver/project.h"
 #include "format/dot.h"
@@ -279,7 +229,7 @@ int build_command(int argc, char **argv) {
 	proj.pushFiletype("circ", "prs", "ckt", readPrs, loadPrs, writePrs);
 	proj.pushFiletype("spice", "spi", "spi", readSpice, loadSpice, writeSpice);
 	proj.pushFiletype("verilog", "v", "rtl", nullptr, nullptr, writeVerilog);
-	proj.pushFiletype("layout", "gds", "gds", nullptr, nullptr, writeGds);
+	proj.pushFiletype("layout", "gds", "gds", nullptr, loadGds, writeGds);
 	proj.pushFiletype("func", "astg", "state", readAstg, loadAstg, writeAstg);
 	proj.pushFiletype("proto", "astgw", "state", readAstg, loadAstgw, writeAstgw);
 

@@ -124,31 +124,34 @@ bool Project::read(Program &prgm, fs::path path) {
 		return false;
 	}
 
-	ifstream fin;
-	fin.open(path.string().c_str(), ios::binary | ios::in);
-	if (not fin.is_open()) {
-		printf("error: file not found '%s'", path.string().c_str());
-		return false;
+	fs::path canon = path;
+	if (not canon.is_absolute()) {
+		canon = workDir / canon;
 	}
-
-	if (not path.is_absolute()) {
-		path = workDir / path;
-	}
-
-	fin.seekg(0, ios::end);
-	int size = (int)fin.tellg();
-	string buffer(size, ' ');
-	fin.seekg(0, ios::beg);
-	fin.read(&buffer[0], size);
-	fin.close();
 
 	sources.push_back(Source());
-	sources.back().path = fs::relative(path, workDir);
-	sources.back().modName = fs::path(modName) / fs::relative(path, rootDir);
+	sources.back().path = fs::relative(canon, workDir);
+	sources.back().modName = fs::path(modName) / fs::relative(canon, rootDir);
 	sources.back().filetype = filetype;
 	sources.back().tokens = unique_ptr<tokenizer>(new tokenizer());
 
-	filetype->read(*this, sources.back(), buffer);
+	if (filetype->read != nullptr) {
+		ifstream fin;
+		fin.open(path.string().c_str(), ios::binary | ios::in);
+		if (not fin.is_open()) {
+			printf("error: file not found '%s'", path.string().c_str());
+			return false;
+		}
+
+		fin.seekg(0, ios::end);
+		int size = (int)fin.tellg();
+		string buffer(size, ' ');
+		fin.seekg(0, ios::beg);
+		fin.read(&buffer[0], size);
+		fin.close();
+
+		filetype->read(*this, sources.back(), buffer);
+	}
 	return true;
 }
 
@@ -162,7 +165,9 @@ bool Project::load(Program &prgm) {
 	}
 
 	while (not sources.empty()) {
-		sources.back().filetype->load(*this, prgm, sources.back());
+		if (sources.back().filetype->load != nullptr) {
+			sources.back().filetype->load(*this, prgm, sources.back());
+		}
 		sources.pop_back();
 	}
 

@@ -3,7 +3,7 @@
 
 #include "version.h"
 #include "build.h"
-//#include "unpack.h"
+#include "unpack.h"
 #include "sim.h"
 #include "show.h"
 //#include "test.h"
@@ -23,7 +23,7 @@ void print_help() {
 	printf("\nUsage: lm <command> [arguments]\n");
 	printf("Execute a sub-command:\n");
 	printf("  build         compile the behavioral specification\n");
-	//printf("  unpack        decompile the structural specification\n");
+	printf("  unpack        decompile the structural specification\n");
 	printf("  sim           simulate the described circuit\n");
 	//printf("  test          verify the behavior/structure of the circuit\n");
 	//printf("  compare       ensure that two circuit specifications match\n");
@@ -31,7 +31,6 @@ void print_help() {
 	printf("\n");
 	printf("  mod           manage this module\n");
 	printf("  tech          manage the technology node and cell libraries\n");
-	//printf("  depend        manage your project's dependencies\n");
 	printf("\n");
 	printf("  help          display this help text or more information about a command\n");
 	printf("  version       display version information\n");
@@ -59,7 +58,7 @@ int main(int argc, char **argv) {
 			return build_command(argc-i, argv+i);
 		} else if (arg == "unpack") {
 			++i;
-			//return unpack_command(argc-i, argv+i);
+			return unpack_command(argc-i, argv+i);
 		} else if (arg == "sim") {
 			++i;
 			return sim_command(argc-i, argv+i);
@@ -91,7 +90,7 @@ int main(int argc, char **argv) {
 			if (arg == "build") {
 				build_help();
 			} else if (arg == "unpack") {
-				//unpack_help();
+				unpack_help();
 			} else if (arg == "sim") {
 				sim_help();
 			} else if (arg == "test") {

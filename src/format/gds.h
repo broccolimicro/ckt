@@ -2,5 +2,5 @@
 
 #include "../weaver/project.h"
 
-void readGds(weaver::Project &proj, weaver::Program &prgm, string path, string buffer);
+void loadGds(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source);
 void writeGds(fs::path path, const weaver::Project &proj, const weaver::Program &prgm, int modIdx, int termIdx);

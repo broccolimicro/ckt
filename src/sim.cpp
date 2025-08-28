@@ -1016,10 +1016,6 @@ void prsim(prs::production_rule_set &pr, bool debug) {//, vector<prs::term_index
 }
 
 int sim_command(int argc, char **argv) {
-	tokenizer tokens;
-	tokens.register_token<parse::block_comment>(false);
-	tokens.register_token<parse::line_comment>(false);
-	
 	string filename = "";
 	string term = "";
 
@@ -1061,10 +1057,8 @@ int sim_command(int argc, char **argv) {
 	}
 
 	parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
-	//parse_ucs::function::registry.insert({"chp", parse_ucs::language(&parse_chp::produce, &parse_chp::expect, &parse_chp::register_syntax)});
 	parse_ucs::function::registry.insert({"proto", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
 	parse_ucs::function::registry.insert({"circ", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
-	//parse_ucs::function::registry.insert({"spice", parse_ucs::language(&parse_spice::produce, &parse_spice::expect, &parse_spice::register_syntax)});
 
 	weaver::Term::pushDialect("func", factoryCog);
 	weaver::Term::pushDialect("proto", factoryCogw);
@@ -1084,7 +1078,7 @@ int sim_command(int argc, char **argv) {
 	proj.pushFiletype("circ", "prs", "ckt", readPrs, loadPrs, writePrs);
 	proj.pushFiletype("spice", "spi", "spi", readSpice, loadSpice, writeSpice);
 	proj.pushFiletype("verilog", "v", "rtl", nullptr, nullptr, writeVerilog);
-	proj.pushFiletype("layout", "gds", "gds", nullptr, nullptr, writeGds);
+	proj.pushFiletype("layout", "gds", "gds", nullptr, loadGds, writeGds);
 	proj.pushFiletype("func", "astg", "state", readAstg, loadAstg, writeAstg);
 	proj.pushFiletype("proto", "astgw", "state", readAstg, loadAstgw, writeAstgw);
 
