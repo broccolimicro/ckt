@@ -62,7 +62,7 @@ void loadPath(string path, tokenizer &tokens) {
 	tokens.insert(path, buffer);
 }
 
-int show_command(string workingDir, string techPath, string cellsDir, int argc, char **argv) {
+int show_command(int argc, char **argv) {
 	tokenizer tokens;
 	tokens.register_token<parse::block_comment>(false);
 	tokens.register_token<parse::line_comment>(false);

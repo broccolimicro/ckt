@@ -45,6 +45,8 @@
 #include <interpret_arithmetic/export.h>
 #include <interpret_arithmetic/import.h>
 
+#include "weaver/project.h"
+
 #include <filesystem>
 #include <chrono>
 #define KNRM  "\x1B[0m"
@@ -67,73 +69,6 @@ void tech_help() {
 	//printf("  check [cell name...]    run DRC/LVS checks against your cells\n");
 	//printf("  push [cell name...]     share your cell layouts with others using the same technology\n");
 	//printf("  drop [cell name...]     delete these cells from your cell library\n");
-}
-
-int tech_list_command(string workingDir, string techDir, int argc, char **argv, bool progress, bool debug) {
-	if (not std::filesystem::exists(techDir)) {
-		return 1;
-	}
-
-	for (const auto &entry : std::filesystem::directory_iterator(techDir)) {
-		if (entry.is_directory() and entry.path().stem().string()[0] != '_') {
-			printf("%s\n", entry.path().stem().c_str());
-		}
-	}
-	return 1;
-}
-
-int tech_set_command(string workingDir, string techDir, int argc, char **argv, bool progress, bool debug) {
-	string tech = "sky130";
-	if (argc >= 1) {
-		tech = argv[0];
-	}
-
-	if (not std::filesystem::exists(techDir + "/" + tech)) {
-		printf("tech directory '%s' not found\n", (techDir + "/" + tech).c_str());
-		printf("the tech directory may be specified using the $LOOM_TECH variable\n");
-	}
-
-	std::filesystem::path current = std::filesystem::current_path();
-	std::filesystem::path search = current;
-	while (not search.empty()) {
-		if (std::filesystem::exists(search / "lm.mod") or std::filesystem::exists(search / ".git")) {
-			string path = (search / "lm.mod").string();
-			FILE *fptr = fopen(path.c_str(), "w");
-			if (fptr != nullptr) {
-				fprintf(fptr, "%s\n", tech.c_str());
-				fclose(fptr);
-				fptr = nullptr;
-			}
-			return 1;
-		} else if (search.parent_path() == search) {
-			printf("unable to find project root\n");
-			return 0;
-		}
-		search = search.parent_path();
-	}
-	printf("unable to find project root\n");
-	return 0;
-}
-
-int tech_get_command(string workingDir, string techDir, int argc, char **argv, bool progress, bool debug) {
-	std::filesystem::path current = std::filesystem::current_path();
-	string tech = "sky130";
-	std::filesystem::path search = current;
-	while (not search.empty()) {
-		std::ifstream fptr(search / "lm.mod");
-		if (fptr) {
-			tech = "";
-			getline(fptr, tech, '\n');
-			fptr.close();
-			break;
-		} else if (search.parent_path() == search) {
-			break;
-		}
-		search = search.parent_path();
-	}
-
-	printf("%s\n", tech.c_str());
-	return 1;
 }
 
 int tech_cells_command(string workingDir, string techDir, string techPath, string cellsDir, int argc, char **argv, bool progress, bool debug) {
@@ -167,8 +102,8 @@ int tech_cells_command(string workingDir, string techDir, string techPath, strin
 		return 0;
 	}
 
-	phy::Tech tech;
-	if (not phy::loadTech(tech, techPath, cellsDir)) {
+	phy::Tech tech(techPath, cellsDir);
+	if (not phy::loadTech(tech)) {
 		cout << "techfile does not exist \'" + techPath + "\'." << endl;
 		return 1;
 	}
@@ -248,9 +183,17 @@ int tech_cells_command(string workingDir, string techDir, string techPath, strin
 	return 1;
 }*/
 
-int tech_command(string workingDir, string techDir, string techPath, string cellsDir, int argc, char **argv, bool progress, bool debug) {
+int tech_command(int argc, char **argv) {
 	if (argc == 0) {
 		tech_help();
+	}
+
+	weaver::Project proj;
+	if (proj.hasMod()) {
+		proj.readMod();
+	} else {
+		printf("please initialize your module with the following.\n\nlm mod init my_module\n");
+		return 1;
 	}
 
 	for (int i = 0; i < argc; i++) {
@@ -260,16 +203,24 @@ int tech_command(string workingDir, string techDir, string techPath, string cell
 			// placeholder for arguments
 		} else if (arg == "list") {
 			++i;
-			return tech_list_command(workingDir, techDir, argc-i, argv+i, progress, debug);
+			auto techs = proj.listTech();
+			for (auto i = techs.begin(); i != techs.end(); i++) {
+				printf("%s\n", i->c_str());
+			}
+			return 0;
 		} else if (arg == "set") {
 			++i;
-			return tech_set_command(workingDir, techDir, argc-i, argv+i, progress, debug);
+			if (i < argc) {
+				proj.setTech(argv[i]);
+			}
+			return 0;
 		} else if (arg == "get") {
 			++i;
-			return tech_get_command(workingDir, techDir, argc-i, argv+i, progress, debug);
+			printf("%s\n", proj.techName.c_str());
+			return 0;
 		} else if (arg == "cells") {
 			++i;
-			return tech_cells_command(workingDir, techDir, techPath, cellsDir, argc-i, argv+i, progress, debug);
+			return tech_cells_command(proj.workDir, proj.techDir, proj.tech.path, proj.tech.lib, argc-i, argv+i, progress, debug);
 		/*} else if (arg == "import") {
 			++i;
 			return tech_import_command(workingDir, techDir, techPath, cellsDir, argc-i, argv+i, progress, debug);*/

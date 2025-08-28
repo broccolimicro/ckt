@@ -13,6 +13,8 @@
 #include <filesystem>
 #include <fstream>
 
+#include "weaver/project.h"
+
 namespace fs = std::filesystem;
 
 void print_help() {
@@ -26,6 +28,7 @@ void print_help() {
 	printf("  compare       ensure that two circuit specifications match\n");
 	printf("  show          visualize the described circuit\n");
 	printf("\n");
+	printf("  mod           manage this module\n");
 	printf("  tech          manage the technology node and cell libraries\n");
 	//printf("  depend        manage your project's dependencies\n");
 	printf("\n");
@@ -33,15 +36,6 @@ void print_help() {
 	printf("  version       display version information\n");
 	
 	printf("\nUse \"lm help <command>\" for more information about a command.\n");
-
-	printf("\nGeneral Options:\n");
-	printf(" -h,--help        display this help message\n");
-	printf(" -v,--verbose     display verbose messages\n");
-	printf(" -d,--debug       display internal debugging messages\n");
-	printf(" -p,--progress    display progress information\n");
-	printf("\n");
-	printf(" -t,--tech <techfile>    manually specify the technology file and arguments\n");
-	printf(" -c,--cells <celldir>    manually specify the cell directory\n");
 }
 
 void print_version() {
@@ -52,128 +46,34 @@ void print_version() {
 }
 
 int main(int argc, char **argv) {
-	std::filesystem::path current = std::filesystem::current_path();
-	string workingDir = argv[0];
-
 	if (argc <= 1) {
 		print_help();
 		return 0;
 	}
 
-	char *loom_tech = std::getenv("LOOM_TECH");
-#if defined(_WIN32) || defined(_WIN64)
-	string techDir = "C:\\Program Files (x86)\\Loom\\share\\tech";
-#else
-	string techDir = "/usr/local/share/tech";
-#endif
-	if (loom_tech != nullptr) {
-		techDir = string(loom_tech);
-		if ((int)techDir.size() > 1 and techDir.back() == '/') {
-			techDir.pop_back();
-		}
-	}
-	string techPath;
-	string cellsDir;
-	bool manualCells = false;
-
-	if (not techDir.empty()) {
-		string tech = "sky130";
-		std::filesystem::path search = current;
-		while (not search.empty()) {
-			std::ifstream fptr(search / "lm.mod");
-			if (fptr) {
-				tech = "";
-				getline(fptr, tech, '\n');
-				fptr.close();
-				break;
-			} else if (search.parent_path() == search) {
-				break;
-			}
-			search = search.parent_path();
-		}
-
-		techPath = escapePath((fs::path(techDir) / tech / "tech.py").string());
-		cellsDir = (fs::path(techDir) / tech / "cells").string();
-	} else {
-		techPath = "";
-		cellsDir = "cells";
-	}
-
-	bool progress = false;
-	bool debug = false;
-	for (int i = 1; i < argc; i++)
-	{
+	for (int i = 1; i < argc; i++) {
 		string arg = argv[i];
-		if (arg == "--verbose" or arg == "-v") {
-			set_verbose(true);
-		} else if (arg == "--debug" or arg == "-d") {
-			set_debug(true);
-			debug = true;
-		} else if (arg == "--progress" or arg == "-p") {
-			progress = true;
-		} else if (arg == "--tech" or arg == "-t") {
-			if (++i >= argc) {
-				printf("expected path to tech file.\n");
-				return 0;
-			}
-			arg = argv[i];
-
-			string path = extractPath(arg);
-			string opt = (arg.size() > path.size() ? arg.substr(path.size()+1) : "");
-
-			size_t dot = path.find_last_of(".");
-			string ext = "";
-			if (dot != string::npos) {
-				ext = path.substr(dot+1);
-			}
-
-			if (ext == "py") {
-				techPath = arg;
-				if (not manualCells) {
-					cellsDir = "cells";
-				}
-			} else if (ext == "") {
-				if (not techDir.empty()) {
-					techPath = escapePath((fs::path(techDir) / path / "tech.py").string()) + opt;
-					if (not manualCells) {
-						cellsDir = (fs::path(techDir) / path / "cells").string();
-					}
-				} else {
-					techPath = path+".py" + opt;
-					if (not manualCells) {
-						cellsDir = "cells";
-					}
-				}
-			}
-		} else if (arg == "--cells" or arg == "-c") {
-			if (++i >= argc) {
-				printf("expected path to cell directory.\n");
-				return 0;
-			}
-
-			cellsDir = argv[i];
-			manualCells = true;
-		} else if (arg == "build") {
+		if (arg == "build") {
 			++i;
-			return build_command(workingDir, techPath, cellsDir, argc-i, argv+i, progress, debug);
+			return build_command(argc-i, argv+i);
 		} else if (arg == "unpack") {
 			++i;
-			//return unpack_command(workingDir, techPath, cellsDir, argc-i, argv+i, progress, debug);
+			//return unpack_command(argc-i, argv+i);
 		} else if (arg == "sim") {
 			++i;
-			//return sim_command(workingDir, techPath, cellsDir, argc-i, argv+i, debug);
+			//return sim_command(argc-i, argv+i);
 		} else if (arg == "test") {
 			++i;
-			//return test_command(workingDir, techPath, cellsDir, argc-i, argv+i);
+			//return test_command(argc-i, argv+i);
 		} else if (arg == "compare") {
 			++i;
-			//return compare_command(workingDir, techPath, cellsDir, argc-i, argv+i, progress, debug);
+			//return compare_command(argc-i, argv+i);
 		} else if (arg == "show") {
 			++i;
-			return show_command(workingDir, techPath, cellsDir, argc-i, argv+i);
+			return show_command(argc-i, argv+i);
 		} else if (arg == "tech") {
 			++i;
-			return tech_command(workingDir, techDir, techPath, cellsDir, argc-i, argv+i, progress, debug);
+			return tech_command(argc-i, argv+i);
 		} else if (arg == "version") {
 			print_version();
 			return 0;

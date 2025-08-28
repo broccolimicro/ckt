@@ -67,10 +67,15 @@
 #include <filesystem>
 
 #include "weaver/builder.h"
-#include "weaver/binder.h"
+#include "weaver/project.h"
 #include "format/dot.h"
 
-#include "dialect.h"
+#include "format/cog.h"
+#include "format/spice.h"
+#include "format/gds.h"
+#include "format/verilog.h"
+#include "format/prs.h"
+#include "format/wv.h"
 
 namespace chp {
 
@@ -116,6 +121,13 @@ void build_help() {
 	printf("Synthesize the production rules that implement the behavioral description.\n");
 
 	printf("\nOptions:\n");
+	printf(" -v,--verbose     display verbose messages\n");
+	printf(" -d,--debug       display internal debugging messages\n");
+	printf(" -p,--progress    display progress information\n");
+	printf("\n");
+	printf(" -t,--tech <techfile>    manually specify the technology file and arguments\n");
+	printf(" -c,--cells <celldir>    manually specify the cell directory\n");
+	printf("\n");
 	printf(" --logic <family>      select the logic family for synthesis:\n");
 	printf("         raw           do not require inverting logic\n");
 	printf("         cmos          require inverting logic (default)\n");
@@ -149,21 +161,43 @@ void build_help() {
 	printf(" *.astg         asynchronous signal transition graph\n");
 }
 
-int build_command(string workingDir, string techPath, string cellsDir, int argc, char **argv, bool progress, bool debug) {
-	Build builder;
-	builder.progress = progress;
-	builder.debug = debug;
-	builder.techPath = techPath;
-	builder.cellsDir = cellsDir;
+int build_command(int argc, char **argv) {
+	weaver::Project proj;
+	if (proj.hasMod()) {
+		proj.readMod();
+	} else {
+		printf("please initialize your module with the following.\n\nlm mod init my_module\n");
+		return 1;
+	}
 
-	tokenizer tokens;
+	Build builder(proj);
 	
 	string filename = "";
-	
+	bool manualCells = false;
 	for (int i = 0; i < argc; i++) {
 		string arg = argv[i];
 
-		if (arg == "--logic") {
+		if (arg == "--verbose" or arg == "-v") {
+			set_verbose(true);
+		} else if (arg == "--debug" or arg == "-d") {
+			set_debug(true);
+			builder.debug = true;
+		} else if (arg == "--progress" or arg == "-p") {
+			builder.progress = true;
+		} else if (arg == "--tech" or arg == "-t") {
+			if (++i >= argc) {
+				printf("expected path to tech file.\n");
+				return 0;
+			}
+			proj.setTechPath(argv[i], not manualCells);
+		} else if (arg == "--cells" or arg == "-c") {
+			if (++i >= argc) {
+				printf("expected path to cell directory.\n");
+				return 0;
+			}
+			proj.setCellsDir(argv[i]);
+			manualCells = true;
+		} else if (arg == "--logic") {
 			if (++i >= argc) {
 				printf("error: expected logic family (raw, cmos)\n");
 			}
@@ -270,28 +304,33 @@ int build_command(string workingDir, string techPath, string cellsDir, int argc,
 	parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
 	//parse_ucs::function::registry.insert({"chp", parse_ucs::language(&parse_chp::produce, &parse_chp::expect, &parse_chp::register_syntax)});
 	parse_ucs::function::registry.insert({"proto", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
-	parse_ucs::function::registry.insert({"ckt", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
+	parse_ucs::function::registry.insert({"circ", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
 	//parse_ucs::function::registry.insert({"spice", parse_ucs::language(&parse_spice::produce, &parse_spice::expect, &parse_spice::register_syntax)});
 
 	weaver::Term::pushDialect("func", chp::factory);
 	weaver::Term::pushDialect("proto", hse::factory);
-	weaver::Term::pushDialect("ckt", prs::factory);
+	weaver::Term::pushDialect("circ", prs::factory);
 
-	weaver::Binder::pushDialect("wv", wvFactory);
-	weaver::Binder::pushDialect("cog", cogFactory);
-	weaver::Binder::pushDialect("cogw", cogwFactory);
-	weaver::Binder::pushDialect("prs", prsFactory);
-	weaver::Binder::pushDialect("spi", spiFactory);
-	weaver::Binder::pushDialect("gds", gdsFactory);
+	proj.pushFiletype("", "wv", "", readWv, loadWv);
+	proj.pushFiletype("func", "cog", "", readCog, loadCog);
+	proj.pushFiletype("proto", "cogw", "", readCog, loadCogw);
+	proj.pushFiletype("circ", "prs", "ckt", readPrs, loadPrs, writePrs);
+	proj.pushFiletype("spice", "spi", "spi", readSpice, loadSpice);
+	proj.pushFiletype("verilog", "v", "rtl", nullptr, nullptr, writeVerilog);
+	proj.pushFiletype("layout", "gds", "gds", nullptr, nullptr, writeGds);
 
 	weaver::Program prgm;
 	loadGlobalTypes(prgm);
 
-	weaver::Binder bd(prgm);
-	bd.load(filename);
+	if (filename.empty()) {
+		filename = "top.wv";
+	}
+
+	proj.incl(filename);
+	proj.load(prgm);
 	builder.build(prgm);
 	prgm.print();
-	builder.emit(bd.findProjectRoot()+"/build", prgm);
+	proj.save(prgm);
 
 	if (!is_clean()) {
 		complete();

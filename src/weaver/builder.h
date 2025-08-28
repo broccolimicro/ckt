@@ -6,23 +6,11 @@
 #include <weaver/program.h>
 #include <phy/Tech.h>
 
+#include "project.h"
+
 struct Build {
-	Build() {
-		logic = LOGIC_CMOS;
-		timing = TIMING_MIXED;
-		stage = -1;
-
-		doPreprocess = false;
-		doPostprocess = false;
-
-		noCells = false;
-		noGhosts = false;
-		
-		targets.resize(ROUTE+1, false);
-	}
-
-	~Build() {
-	}
+	Build(weaver::Project &proj);
+	~Build();
 
 	enum {
 		LOGIC_RAW = 0,
@@ -51,6 +39,8 @@ struct Build {
 		ROUTE = 11
 	};
 
+	weaver::Project &proj;
+
 	int logic;
 	int timing;
 	int stage;
@@ -66,11 +56,6 @@ struct Build {
 	
 	vector<bool> targets;
 
-	string techPath;
-	string cellsDir;
-
-	phy::Tech tech;
-
 	void set(int target);
 	bool get(int target) const;
 
@@ -80,8 +65,6 @@ struct Build {
 	bool has(int target) const;
 
 	void build(weaver::Program &prgm);
-	string getBuildDir(string dialectName) const;
-	void emit(string path, const weaver::Program &prgm) const;
 
 	// TODO(edward.bingham) generalize this into lowering and analysis stages, create a DAG to generalize the compilation algorithm
 	bool chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const;
@@ -90,10 +73,5 @@ struct Build {
 	bool hseToPrs(weaver::Program &prgm, int modIdx, int termIdx) const;
 	bool prsToSpi(weaver::Program &prgm, int modIdx, int termIdx);
 	bool spiToGds(weaver::Program &prgm, int modIdx, int termIdx);
-
-	bool emitVerilog(string path, const weaver::Program &prgm, int modIdx, int termIdx) const;
-	bool emitPrs(string path, const weaver::Program &prgm, int modIdx, int termIdx) const;
-	bool emitSpice(string path, const weaver::Program &prgm, int modIdx, int termIdx) const;
-	bool emitGds(string path, const weaver::Program &prgm, int modIdx, int termIdx) const;
 };
 
