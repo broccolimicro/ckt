@@ -107,6 +107,13 @@ bool areEquivalent(flow::Func &real, flow::Func &expected) {
 	auto expected_nets = to_unordered_multiset<flow::Net>(expected.nets);
 	EXPECT_EQ(real_nets, expected_nets); 
 
+	if (real_nets != expected_nets) {
+		std::copy(real_nets.begin(), real_nets.end(), std::ostream_iterator<flow::Net>(cout, "\n"));
+		cout << endl;
+		std::copy(expected_nets.begin(), expected_nets.end(), std::ostream_iterator<flow::Net>(cout, "\n"));
+	}
+	else { std::copy(real_nets.begin(), real_nets.end(), std::ostream_iterator<flow::Net>(cout, "\n")); }
+
 	EXPECT_EQ(real.conds.size(), expected.conds.size());
 	//std::sort(real.conds.begin(), real.conds.end());
 	//std::sort(expected.conds.begin(), expected.conds.end());
@@ -122,16 +129,19 @@ flow::Func testFuncSynthesisFromCog(flow::Func &expected, bool render=true) {
 	string filenameWithoutExtension = (TEST_DIR / expected.name).string();
 	string cogFilename = filenameWithoutExtension + ".cog";
 	string cogRaw = readStringFromFile(cogFilename, false);
+	cout << "```cog" << endl << cogRaw << endl << "```" << endl;
+
 	chp::graph g = importCHPFromCogString(cogRaw);
-	g.post_process(true, false);  //TODO: ... true, true)
+	g.post_process(true, false);  //TODO: ... true, true) , should be called internally from other transformations
 	g.name = expected.name;
 
+	g.flatten(true);
 	if (render) {
 		string graphvizRaw = chp::export_graph(g, true).to_string();
 		gvdot::render(filenameWithoutExtension + ".png", graphvizRaw);
 	}
-
 	flow::Func real = chp::synthesizeFuncFromCHP(g);
+
 	EXPECT_EQ(real.name, expected.name);
 	EXPECT_TRUE(areEquivalent(real, expected));
 
@@ -147,7 +157,7 @@ parse_verilog::module_def synthesizeVerilogFromFunc(const flow::Func &func) {
 	clocked::Module mod = synthesizeModuleFromFunc(func);
 	parse_verilog::module_def mod_v = flow::export_module(mod);
 	string verilog = mod_v.to_string();
-	cout << verilog << endl;
+	cout << "```verilog" << endl << verilog << endl << "```" << endl;
 
 	auto write_verilog_file = [](const string &data, const string &filename) {
 		std::ofstream export_file(filename);
@@ -278,6 +288,7 @@ TEST(CogToVerilog, Copy) {
 	Operand L =  func_expected.pushNet("L",  flow::Type(flow::Type::TypeName::FIXED, WIDTH), flow::Net::IN);
 	Operand R0 = func_expected.pushNet("R0", flow::Type(flow::Type::TypeName::FIXED, WIDTH), flow::Net::OUT);
 	Operand R1 = func_expected.pushNet("R1", flow::Type(flow::Type::TypeName::FIXED, WIDTH), flow::Net::OUT);
+//TODO: Operand l REG ??
 	Expression exprL(L);
 
 	int branch0 = func_expected.pushCond(Expression::boolOf(true));
