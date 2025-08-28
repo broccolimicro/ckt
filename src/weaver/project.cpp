@@ -324,13 +324,13 @@ void Project::writeMod() {
 	parse_ucs::attribute modAttr;
 	modAttr.valid = true;
 	modAttr.name = "module";
-	modAttr.value = modName;
+	modAttr.value = "\"" + modName + "\"";
 	result.attrs.push_back(modAttr);
 
 	parse_ucs::attribute techAttr;
 	techAttr.valid = true;
 	techAttr.name = "tech";
-	techAttr.value = techName;
+	techAttr.value = "\"" + techName + "\"";
 	result.attrs.push_back(techAttr);
 
 	ofstream fout;
@@ -338,6 +338,12 @@ void Project::writeMod() {
 	string buf = result.to_string("");
 	fout.write(buf.c_str(), buf.size());
 	fout.close();
+}
+
+void Project::vendor() const {
+}
+
+void Project::tidy() {
 }
 
 fs::path Project::buildPath(string dir, string filename) const {

@@ -91,6 +91,9 @@ struct Project {
 	void readMod();
 	void writeMod();
 
+	void vendor() const;
+	void tidy();
+
 	fs::path buildPath(string dialect, string filename) const;
 };
 

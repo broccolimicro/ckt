@@ -9,6 +9,7 @@
 //#include "test.h"
 //#include "compare.h"
 #include "tech.h"
+#include "mod.h"
 
 #include <filesystem>
 #include <fstream>
@@ -74,6 +75,9 @@ int main(int argc, char **argv) {
 		} else if (arg == "tech") {
 			++i;
 			return tech_command(argc-i, argv+i);
+		} else if (arg == "mod") {
+			++i;
+			return mod_command(argc-i, argv+i);
 		} else if (arg == "version") {
 			print_version();
 			return 0;
@@ -98,6 +102,8 @@ int main(int argc, char **argv) {
 				show_help();
 			} else if (arg == "tech") {
 				tech_help();
+			} else if (arg == "mod") {
+				mod_help();
 			} else {
 				printf("unrecognized command '%s'\n", argv[i]);
 				return 0;
