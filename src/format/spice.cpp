@@ -41,10 +41,10 @@ void loadSpice(weaver::Project &proj, weaver::Program &prgm, const weaver::Sourc
 	prgm.mods[modIdx].terms[termIdx].def = net;
 }
 
-void writeSpice(string path, const weaver::Project &proj, const weaver::Program &prgm, int modIdx, int termIdx) {
-	ofstream fout(path.c_str(), ios::out);
+void writeSpice(fs::path path, const weaver::Project &proj, const weaver::Program &prgm, int modIdx, int termIdx) {
+	ofstream fout(path.string().c_str(), ios::out);
 	if (not fout.is_open()) {
-		printf("error: unable to write to file '%s'\n", path.c_str());
+		printf("error: unable to write to file '%s'\n", path.string().c_str());
 		return;
 	}
 

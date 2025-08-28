@@ -81,7 +81,7 @@ const Filetype *Project::getDialect(string dialect) const {
 
 bool Project::incl(fs::path path, fs::path from) {
 	if (from.empty()) {
-		from = rootDir;
+		from = workDir;
 	}
 
 	fs::path filename;
@@ -100,6 +100,7 @@ bool Project::incl(fs::path path, fs::path from) {
 		}
 	}
 	if (filename.empty()) {
+		printf("error: file not found '%s'", path.string().c_str());
 		return false;
 	}
 	
@@ -113,7 +114,7 @@ bool Project::incl(fs::path path, fs::path from) {
 
 bool Project::read(Program &prgm, fs::path path) {
 	if (path.empty()) {
-		path = rootDir / "top.wv";
+		return false;
 	}
 
 	string ext = path.extension().string().substr(1);

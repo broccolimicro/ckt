@@ -315,7 +315,7 @@ int build_command(int argc, char **argv) {
 	proj.pushFiletype("func", "cog", "", readCog, loadCog);
 	proj.pushFiletype("proto", "cogw", "", readCog, loadCogw);
 	proj.pushFiletype("circ", "prs", "ckt", readPrs, loadPrs, writePrs);
-	proj.pushFiletype("spice", "spi", "spi", readSpice, loadSpice);
+	proj.pushFiletype("spice", "spi", "spi", readSpice, loadSpice, writeSpice);
 	proj.pushFiletype("verilog", "v", "rtl", nullptr, nullptr, writeVerilog);
 	proj.pushFiletype("layout", "gds", "gds", nullptr, nullptr, writeGds);
 

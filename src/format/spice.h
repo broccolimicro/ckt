@@ -4,4 +4,4 @@
 
 void readSpice(weaver::Project &proj, weaver::Source &source, string buffer);
 void loadSpice(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source);
-void writeSpice(string path, const weaver::Project &proj, const weaver::Program &prgm, int modIdx, int termIdx);
+void writeSpice(fs::path path, const weaver::Project &proj, const weaver::Program &prgm, int modIdx, int termIdx);
