@@ -48,14 +48,6 @@ void show_help() {
 }
 
 int show_command(int argc, char **argv) {
-	weaver::Project proj;
-	if (proj.hasMod()) {
-		proj.readMod();
-	} else {
-		printf("please initialize your module with the following.\n\nlm mod init my_module\n");
-		return 1;
-	}
-
 	string filename = "";
 	string term = "";
 
@@ -97,6 +89,11 @@ int show_command(int argc, char **argv) {
 			petri = true;
 		} else {
 			filename = argv[i];
+			size_t pos = filename.find_last_of(':');
+			if (pos != string::npos) {
+				term = filename.substr(pos+1);
+				filename = filename.substr(0, pos);
+			}
 		}
 	}
 
@@ -109,6 +106,14 @@ int show_command(int argc, char **argv) {
 	weaver::Term::pushDialect("func", factoryCog);
 	weaver::Term::pushDialect("proto", factoryCogw);
 	weaver::Term::pushDialect("circ", factoryPrs);
+
+	weaver::Project proj;
+	if (proj.hasMod()) {
+		proj.readMod();
+	} else if (term.empty()) {
+		printf("please initialize your module with the following.\n\nlm mod init my_module\n");
+		return 1;
+	}
 
 	proj.pushFiletype("", "wv", "", readWv, loadWv);
 	proj.pushFiletype("func", "cog", "", readCog, loadCog);
@@ -127,10 +132,16 @@ int show_command(int argc, char **argv) {
 		filename = "top.wv";
 	}
 
+	if (fs::path(filename).extension().empty()) {
+		filename += ".wv";
+	}
+
 	proj.incl(filename);
 	proj.load(prgm);
 
-	fs::create_directories(proj.rootDir / proj.BUILD / "dbg");
+	if (term.empty()) {
+		fs::create_directories(proj.rootDir / proj.BUILD / "dbg");
+	}
 
 	for (auto i = prgm.mods.begin(); i != prgm.mods.end(); i++) {
 		for (auto j = i->terms.begin(); j != i->terms.end(); j++) {
@@ -138,7 +149,14 @@ int show_command(int argc, char **argv) {
 				printf("internal:%s:%d: dialect not defined for term '%s'\n", __FILE__, __LINE__, j->decl.name.c_str());
 				continue;
 			}
-			string outPath = proj.buildPath("dbg", j->decl.name+".png").string();
+			if (not term.empty() and j->decl.name != term) {
+				continue;
+			}
+
+			string outPath = proj.workDir / (j->decl.name + ".png");
+			if (term.empty()) {
+				outPath = proj.buildPath("dbg", j->decl.name+".png").string();
+			}
 			if (j->dialect().name == "func") {
 				gvdot::render(outPath, chp::export_graph(std::any_cast<const chp::graph&>(j->def), labels).to_string());
 			} else if (j->dialect().name == "proto") {

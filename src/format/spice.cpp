@@ -34,9 +34,9 @@ void loadSpice(weaver::Project &proj, weaver::Program &prgm, const weaver::Sourc
 	sch::import_netlist(proj.tech, net, *(parse_spice::netlist*)source.syntax.get(), source.tokens.get());
 
 	int kind = weaver::Term::getDialect("__spice__");
-	int modIdx = prgm.createModule("__other__");
+	int modIdx = prgm.getModule(source.modName.string());
 
-	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, source.path.stem().string(), vector<weaver::Instance>()));
+	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, source.modName.stem().string(), vector<weaver::Instance>()));
 
 	prgm.mods[modIdx].terms[termIdx].def = net;
 }

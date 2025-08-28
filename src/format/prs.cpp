@@ -29,9 +29,9 @@ void loadPrs(weaver::Project &proj, weaver::Program &prgm, const weaver::Source 
 	prs::import_production_rule_set(*(parse_prs::production_rule_set*)source.syntax.get(), pr, -1, -1, prs::attributes(), 0, source.tokens.get(), true);
 
 	int kind = weaver::Term::getDialect("ckt");
-	int modIdx = prgm.createModule("__other__");
+	int modIdx = prgm.getModule(source.modName.string());
 
-	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, source.path.stem().string(), vector<weaver::Instance>()));
+	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, source.modName.stem().string(), vector<weaver::Instance>()));
 
 	prgm.mods[modIdx].terms[termIdx].def = pr;
 }

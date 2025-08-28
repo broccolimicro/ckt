@@ -131,6 +131,10 @@ bool Project::read(Program &prgm, fs::path path) {
 		return false;
 	}
 
+	if (not path.is_absolute()) {
+		path = workDir / path;
+	}
+
 	fin.seekg(0, ios::end);
 	int size = (int)fin.tellg();
 	string buffer(size, ' ');
@@ -139,7 +143,8 @@ bool Project::read(Program &prgm, fs::path path) {
 	fin.close();
 
 	sources.push_back(Source());
-	sources.back().path = path;
+	sources.back().path = fs::relative(path, workDir);
+	sources.back().modName = fs::path(modName) / fs::relative(path, rootDir);
 	sources.back().filetype = filetype;
 	sources.back().tokens = unique_ptr<tokenizer>(new tokenizer());
 

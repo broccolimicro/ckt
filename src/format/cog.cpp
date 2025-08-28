@@ -32,9 +32,9 @@ void loadCog(weaver::Project &proj, weaver::Program &prgm, const weaver::Source 
 	chp::import_chp(g, *(parse_cog::composition*)source.syntax.get(), source.tokens.get(), true);
 
 	int kind = weaver::Term::getDialect("func");
-	int modIdx = prgm.createModule("__other__");
+	int modIdx = prgm.getModule(source.modName.string());
 
-	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, source.path.stem().string(), vector<weaver::Instance>()));
+	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, source.modName.stem().string(), vector<weaver::Instance>()));
 
 	prgm.mods[modIdx].terms[termIdx].def = g;
 }
@@ -47,9 +47,9 @@ void loadCogw(weaver::Project &proj, weaver::Program &prgm, const weaver::Source
 	g.check_variables();
 
 	int kind = weaver::Term::getDialect("proto");
-	int modIdx = prgm.createModule("__other__");
+	int modIdx = prgm.getModule(source.modName.string());
 
-	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, source.path.stem().string(), vector<weaver::Instance>()));
+	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, source.modName.stem().string(), vector<weaver::Instance>()));
 
 	prgm.mods[modIdx].terms[termIdx].def = g;
 }

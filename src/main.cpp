@@ -4,7 +4,7 @@
 #include "version.h"
 #include "build.h"
 //#include "unpack.h"
-//#include "sim.h"
+#include "sim.h"
 #include "show.h"
 //#include "test.h"
 //#include "compare.h"
@@ -18,14 +18,14 @@
 namespace fs = std::filesystem;
 
 void print_help() {
-	printf("Loom is a high level synthesis and simulation engine for self-timed circuits.\n");
-	printf("\nUsage: lm [options] <command> [arguments]\n");
+	printf("Loom is a circuit synthesis and simulation engine.\n");
+	printf("\nUsage: lm <command> [arguments]\n");
 	printf("Execute a sub-command:\n");
 	printf("  build         compile the behavioral specification\n");
-	printf("  unpack        decompile the structural specification\n");
+	//printf("  unpack        decompile the structural specification\n");
 	printf("  sim           simulate the described circuit\n");
-	printf("  test          verify the behavior/structure of the circuit\n");
-	printf("  compare       ensure that two circuit specifications match\n");
+	//printf("  test          verify the behavior/structure of the circuit\n");
+	//printf("  compare       ensure that two circuit specifications match\n");
 	printf("  show          visualize the described circuit\n");
 	printf("\n");
 	printf("  mod           manage this module\n");
@@ -61,7 +61,7 @@ int main(int argc, char **argv) {
 			//return unpack_command(argc-i, argv+i);
 		} else if (arg == "sim") {
 			++i;
-			//return sim_command(argc-i, argv+i);
+			return sim_command(argc-i, argv+i);
 		} else if (arg == "test") {
 			++i;
 			//return test_command(argc-i, argv+i);
@@ -89,7 +89,7 @@ int main(int argc, char **argv) {
 			} else if (arg == "unpack") {
 				//unpack_help();
 			} else if (arg == "sim") {
-				//sim_help();
+				sim_help();
 			} else if (arg == "test") {
 				//test_help();
 			} else if (arg == "compare") {

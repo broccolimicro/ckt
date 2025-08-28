@@ -147,7 +147,7 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 
 	// Create dialect and module
 	int flowKind = weaver::Term::getDialect("flow");
-	int flowIdx = prgm.createModule("__flow__");
+	int flowIdx = prgm.getModule(prgm.mods[modIdx].name + ">>flow");
 
 	const weaver::Decl &decl = prgm.mods[modIdx].terms[termIdx].decl;
 	if (decl.ret.defined() or decl.recv.defined()) {
@@ -156,7 +156,7 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 	}
 
 	// Create the new term in the flow module
-	string name = prgm.mods[modIdx].name + "_" + decl.name;
+	string name = decl.name;
 	// TODO(edward.bingham) merge weaver type system and flow types?
 	vector<weaver::Instance> args = decl.args;
 
@@ -188,7 +188,7 @@ bool Build::flowToVerilog(weaver::Program &prgm, int modIdx, int termIdx) const 
 
 	// Create dialect and module
 	int verilogKind = weaver::Term::getDialect("verilog");
-	int verilogIdx = prgm.createModule("__verilog__");
+	int verilogIdx = prgm.getModule(prgm.mods[modIdx].name + ">>verilog");
 
 	const weaver::Decl &decl = prgm.mods[modIdx].terms[termIdx].decl;
 	if (decl.ret.defined() or decl.recv.defined()) {
@@ -197,7 +197,7 @@ bool Build::flowToVerilog(weaver::Program &prgm, int modIdx, int termIdx) const 
 	}
 
 	// Create the new term in the verilog module
-	string name = prgm.mods[modIdx].name + "_" + decl.name;
+	string name = decl.name;
 	// TODO(edward.bingham) merge weaver type system and verilog types?
 	vector<weaver::Instance> args = decl.args;
 
@@ -225,7 +225,7 @@ bool Build::hseToPrs(weaver::Program &prgm, int modIdx, int termIdx) const {
 
 	// Create dialect and module
 	int cktKind = weaver::Term::getDialect("circ");
-	int cktIdx = prgm.createModule("__ckt__");
+	int cktIdx = prgm.getModule(prgm.mods[modIdx].name + ">>circ");
 
 	const weaver::Decl &decl = prgm.mods[modIdx].terms[termIdx].decl;
 	if (decl.ret.defined() or decl.recv.defined()) {
@@ -234,7 +234,7 @@ bool Build::hseToPrs(weaver::Program &prgm, int modIdx, int termIdx) const {
 	}
 
 	// Create the new term in the module
-	string name = prgm.mods[modIdx].name + "_" + decl.name;
+	string name = decl.name;
 	vector<weaver::Instance> args = decl.args;
 
 	hse::graph &hg = std::any_cast<hse::graph&>(prgm.mods[modIdx].terms[termIdx].def);
@@ -317,7 +317,7 @@ bool Build::prsToSpi(weaver::Program &prgm, int modIdx, int termIdx) {
 
 	// Create dialect and module
 	int spiKind = weaver::Term::getDialect("spice");
-	int spiIdx = prgm.createModule("__spice__");
+	int spiIdx = prgm.getModule(prgm.mods[modIdx].name + ">>spice");
 
 	const weaver::Decl &decl = prgm.mods[modIdx].terms[termIdx].decl;
 	if (decl.ret.defined() or decl.recv.defined()) {
@@ -326,7 +326,7 @@ bool Build::prsToSpi(weaver::Program &prgm, int modIdx, int termIdx) {
 	}
 
 	// Create the new term in the module
-	string name = prgm.mods[modIdx].name + "_" + decl.name;
+	string name = decl.name;
 	vector<weaver::Instance> args = decl.args;
 
 	prs::production_rule_set &pr = std::any_cast<prs::production_rule_set&>(prgm.mods[modIdx].terms[termIdx].def);
@@ -413,7 +413,7 @@ bool Build::spiToGds(weaver::Program &prgm, int modIdx, int termIdx) {
 
 	// Create dialect and module
 	int gdsKind = weaver::Term::getDialect("layout");
-	int gdsIdx = prgm.createModule("__layout__");
+	int gdsIdx = prgm.getModule(prgm.mods[modIdx].name + ">>layout");
 
 	const weaver::Decl &decl = prgm.mods[modIdx].terms[termIdx].decl;
 	if (decl.ret.defined() or decl.recv.defined()) {
@@ -422,7 +422,7 @@ bool Build::spiToGds(weaver::Program &prgm, int modIdx, int termIdx) {
 	}
 
 	// Create the new term in the module
-	string name = prgm.mods[modIdx].name + "_" + decl.name;
+	string name = decl.name;
 	vector<weaver::Instance> args = decl.args;
 
 	sch::Netlist &net = std::any_cast<sch::Netlist&>(prgm.mods[modIdx].terms[termIdx].def);
