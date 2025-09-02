@@ -74,8 +74,8 @@ bool Build::has(int target) const {
 	return targets[target];
 }
 
-void doPlacement(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=nullptr, map<int, gdstk::Cell*> *cells=nullptr, bool report_progress=false) {
-	if (report_progress) {
+void doPlacement(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=nullptr, map<int, gdstk::Cell*> *cells=nullptr, bool progress=false, bool debug=false) {
+	if (progress) {
 		printf("Placing Cells:\n");
 	}
 
@@ -83,19 +83,19 @@ void doPlacement(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=
 		lib.macros.resize(lst.subckts.size(), Layout(*lib.tech));
 	}
 
-	sch::Placer placer(lib, lst);
+	sch::Placer placer(lib, lst, 0, 0, progress, debug);
 
 	Timer total;
 	for (int i = 0; i < (int)lst.subckts.size(); i++) {
 		if (not lst.subckts[i].isCell) {
-			if (report_progress) {
+			if (progress) {
 				printf("  %s...", lst.subckts[i].name.c_str());
 				fflush(stdout);
 			}
 			Timer tmr;
 			lib.macros[i].name = lst.subckts[i].name;
 			placer.place(i);
-			if (report_progress) {
+			if (progress) {
 				int area = 0;
 				for (auto j = lst.subckts[i].inst.begin(); j != lst.subckts[i].inst.end(); j++) {
 					if (lst.subckts[j->subckt].isCell) {
@@ -110,7 +110,7 @@ void doPlacement(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=
 		}
 	}
 
-	if (report_progress) {
+	if (progress) {
 		printf("done\t%gs\n\n", total.since());
 	}
 }
@@ -281,7 +281,7 @@ bool Build::hseToPrs(weaver::Program &prgm, int modIdx, int termIdx) const {
 
 	if (get(Build::ENCODE)) {
 		if (progress) printf("Insert state variables:\n");
-		if (not enc.insert_state_variables(20, !inverting, progress, true)) {
+		if (not enc.insert_state_variables(20, !inverting, progress, debug)) {
 			return false;
 		}
 		if (progress) printf("done\n\n");
@@ -455,7 +455,7 @@ bool Build::spiToGds(weaver::Program &prgm, int modIdx, int termIdx) {
 	}
 
 	if (get(Build::PLACE)) {
-		doPlacement(lib, net, nullptr, &cells, progress);
+		doPlacement(lib, net, nullptr, &cells, progress, debug);
 	}
 
 	int dstIdx = prgm.mods[gdsIdx].createTerm(weaver::Term::procOf(gdsKind, name, args));
