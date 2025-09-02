@@ -13,40 +13,24 @@
 #include <parse_spice/factory.h>
 
 #include <chp/graph.h>
-//#include <chp/simulator.h>
-//#include <parse_chp/composition.h>
-#include <interpret_chp/import.h>
-#include <interpret_chp/export.h>
-
 #include <hse/graph.h>
-#include <hse/simulator.h>
-#include <hse/encoder.h>
 #include <hse/elaborator.h>
-#include <hse/synthesize.h>
-#include <interpret_hse/import.h>
-#include <interpret_hse/export.h>
-
 #include <prs/production_rule.h>
 #include <prs/bubble.h>
-//#include <parse_prs/production_rule_set.h>
-#include <interpret_prs/import.h>
-#include <interpret_prs/export.h>
 
-//#include <parse_expression/expression.h>
-//#include <parse_expression/assignment.h>
-//#include <parse_expression/composition.h>
-#include <interpret_boolean/export.h>
-#include <interpret_boolean/import.h>
-#include <interpret_arithmetic/export.h>
-#include <interpret_arithmetic/import.h>
+#include "weaver/project.h"
 
-#ifdef GRAPHVIZ_SUPPORTED
-namespace graphviz
-{
-	#include <graphviz/cgraph.h>
-	#include <graphviz/gvc.h>
-}
-#endif
+#include "format/dot.h"
+#include "format/cog.h"
+#include "format/spice.h"
+#include "format/gds.h"
+#include "format/verilog.h"
+#include "format/prs.h"
+#include "format/wv.h"
+#include "format/astg.h"
+
+#include <interpret_chp/export.h>
+#include <interpret_hse/export.h>
 
 void show_help() {
 	printf("Usage: lm show [options] file...\n");
@@ -63,51 +47,9 @@ void show_help() {
 	printf(" -s,--sync       Render half synchronization actions\n");
 }
 
-void render(string filename, string format, string content) {
-	if (format == "dot") {
-		FILE *file = fopen(filename.c_str(), "w");
-		fprintf(file, "%s\n", content.c_str());
-		fclose(file);
-	} else {
-#ifdef GRAPHVIZ_SUPPORTED
-		graphviz::Agraph_t* G = graphviz::agmemread(content.c_str());
-		graphviz::GVC_t* gvc = graphviz::gvContext();
-		graphviz::gvLayout(gvc, G, "dot");
-		graphviz::gvRenderFilename(gvc, G, format.c_str(), filename.c_str());
-		graphviz::gvFreeLayout(gvc, G);
-		graphviz::agclose(G);
-		graphviz::gvFreeContext(gvc);
-#else
-		
-		string tfilename = filename.substr(0, filename.find_last_of("."));
-		FILE *temp = NULL;
-		int num = 0;
-		for (; temp == NULL; num++)
-			temp = fopen((tfilename + (num > 0 ? to_string(num) : "") + ".dot").c_str(), "wx");
-		num--;
-		tfilename += (num > 0 ? to_string(num) : "") + ".dot";
-
-		fprintf(temp, "%s\n", content.c_str());
-		fclose(temp);
-
-		if (system(("dot -T" + format + " " + tfilename + " > " + filename).c_str()) != 0)
-			error("", "Graphviz DOT not supported", __FILE__, __LINE__);
-		else if (system(("rm -f " + tfilename).c_str()) != 0)
-			warning("", "Temporary files not cleaned up", __FILE__, __LINE__);
-#endif
-	}
-}
-
-int show_command(configuration &config, string techPath, string cellsDir, int argc, char **argv, bool progress, bool debug) {
-	tokenizer tokens;
-	tokens.register_token<parse::block_comment>(false);
-	tokens.register_token<parse::line_comment>(false);
-
+int show_command(int argc, char **argv) {
 	string filename = "";
-	string format = "";
-
-	string ofilename = "a.png";
-	string oformat = "png";
+	string term = "";
 
 	int encodings = -1;
 
@@ -145,157 +87,90 @@ int show_command(configuration &config, string techPath, string cellsDir, int ar
 			states = true;
 		} else if (arg == "-pn" or arg == "--petri") {
 			petri = true;
-		} else if (arg == "-o") {
-			if (++i >= argc) {
-				error("", "expected output filename", __FILE__, __LINE__);
-				return 1;
-			}
-
-			ofilename = argv[i];
-			size_t dot = ofilename.find_last_of(".");
-			if (dot == string::npos) {
-				printf("unrecognized file format\n");
-				return 1;
-			}
-			oformat = ofilename.substr(dot+1);
 		} else {
 			filename = argv[i];
-			size_t dot = filename.find_last_of(".");
-			if (dot == string::npos) {
-				printf("unrecognized file format\n");
-				return 1;
-			}
-			format = filename.substr(dot+1);
-			if (format != "chp"
-				and format != "hse"
-				and format != "cog"
-				and format != "astg"
-				and format != "prs") {
-				printf("unrecognized file format '%s'\n", format.c_str());
-				return 0;
+			size_t pos = filename.find_last_of(':');
+			if (pos != string::npos) {
+				term = filename.substr(pos+1);
+				filename = filename.substr(0, pos);
 			}
 		}
 	}
 
-	if (filename == "") {
-		printf("expected filename\n");
-		return 0;
+	parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
+	//parse_ucs::function::registry.insert({"chp", parse_ucs::language(&parse_chp::produce, &parse_chp::expect, &parse_chp::register_syntax)});
+	parse_ucs::function::registry.insert({"proto", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
+	parse_ucs::function::registry.insert({"circ", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
+	//parse_ucs::function::registry.insert({"spice", parse_ucs::language(&parse_spice::produce, &parse_spice::expect, &parse_spice::register_syntax)});
+
+	weaver::Term::pushDialect("func", factoryCog);
+	weaver::Term::pushDialect("proto", factoryCogw);
+	weaver::Term::pushDialect("circ", factoryPrs);
+
+	weaver::Project proj;
+	if (proj.hasMod()) {
+		proj.readMod();
+	} else if (term.empty()) {
+		printf("please initialize your module with the following.\n\nlm mod init my_module\n");
+		return 1;
 	}
 
-	if (format == "chp") {
-		chp::graph cg;
+	proj.pushFiletype("", "wv", "", readWv, loadWv);
+	proj.pushFiletype("func", "cog", "", readCog, loadCog);
+	proj.pushFiletype("proto", "cogw", "", readCog, loadCogw);
+	proj.pushFiletype("circ", "prs", "ckt", readPrs, loadPrs, writePrs);
+	proj.pushFiletype("spice", "spi", "spi", readSpice, loadSpice, writeSpice);
+	proj.pushFiletype("verilog", "v", "rtl", nullptr, nullptr, writeVerilog);
+	proj.pushFiletype("layout", "gds", "gds", nullptr, nullptr, writeGds);
+	proj.pushFiletype("func", "astg", "state", readAstg, loadAstg, writeAstg);
+	proj.pushFiletype("proto", "astgw", "state", readAstg, loadAstgw, writeAstgw);
 
-		if (format == "chp") {
-			parse_chp::register_syntax(tokens);
-			config.load(tokens, filename, "");
+	weaver::Program prgm;
+	loadGlobalTypes(prgm);
 
-			tokens.increment(false);
-			tokens.expect<parse_chp::composition>();
-			while (tokens.decrement(__FILE__, __LINE__))
-			{
-				parse_chp::composition syntax(tokens);
-				chp::import_chp(cg, syntax, &tokens, true);
+	if (filename.empty()) {
+		filename = "top.wv";
+	}
 
-				tokens.increment(false);
-				tokens.expect<parse_chp::composition>();
+	if (fs::path(filename).extension().empty()) {
+		filename += ".wv";
+	}
+
+	proj.incl(filename);
+	proj.load(prgm);
+
+	if (term.empty()) {
+		fs::create_directories(proj.rootDir / proj.BUILD / "dbg");
+	}
+
+	for (auto i = prgm.mods.begin(); i != prgm.mods.end(); i++) {
+		for (auto j = i->terms.begin(); j != i->terms.end(); j++) {
+			if (j->kind < 0) {
+				printf("internal:%s:%d: dialect not defined for term '%s'\n", __FILE__, __LINE__, j->decl.name.c_str());
+				continue;
 			}
-		} else {
-			parse_cog::register_syntax(tokens);
-			config.load(tokens, filename, "");
-
-			tokens.increment(false);
-			tokens.expect<parse_cog::composition>();
-			while (tokens.decrement(__FILE__, __LINE__))
-			{
-				parse_cog::composition syntax(tokens);
-				chp::import_chp(cg, syntax, &tokens, true);
-
-				tokens.increment(false);
-				tokens.expect<parse_cog::composition>();
+			if (not term.empty() and j->decl.name != term) {
+				continue;
 			}
-		}
-		
-		if (process) {
-			cg.post_process(true);
-		}
 
-		if (is_clean()) {
-			render(ofilename, oformat, export_graph(cg, labels).to_string());
-		}
-	} else if (format == "hse" or format == "astg" or format == "cog") {
-		hse::graph hg;
-
-		if (format == "hse") {
-			parse_chp::register_syntax(tokens);
-			config.load(tokens, filename, "");
-
-			tokens.increment(false);
-			tokens.expect<parse_chp::composition>();
-			while (tokens.decrement(__FILE__, __LINE__))
-			{
-				parse_chp::composition syntax(tokens);
-				hse::import_hse(hg, syntax, &tokens, true);
-
-				tokens.increment(false);
-				tokens.expect<parse_chp::composition>();
+			string outPath = proj.workDir / (j->decl.name + ".png");
+			if (term.empty()) {
+				outPath = proj.buildPath("dbg", j->decl.name+".png").string();
 			}
-		} else if (format == "astg") {
-			parse_astg::register_syntax(tokens);
-			config.load(tokens, filename, "");
-			
-			tokens.increment(false);
-			tokens.expect<parse_astg::graph>();
-			while (tokens.decrement(__FILE__, __LINE__))
-			{
-				parse_astg::graph syntax(tokens);
-				hse::import_hse(hg, syntax, &tokens);
-
-				tokens.increment(false);
-				tokens.expect<parse_astg::graph>();
+			if (j->dialect().name == "func") {
+				gvdot::render(outPath, chp::export_graph(j->as<chp::graph>(), labels).to_string());
+			} else if (j->dialect().name == "proto") {
+				hse::graph &g = j->as<hse::graph>();
+				if (states) {
+					hse::graph sg = hse::to_state_graph(g, true);
+					gvdot::render(outPath, hse::export_graph(sg, horiz, labels, notations, ghost, encodings).to_string());
+				} else if (petri) {
+					hse::graph pn = hse::to_petri_net(g, true);
+					gvdot::render(outPath, hse::export_graph(pn, horiz, labels, notations, ghost, encodings).to_string());
+				} else {
+					gvdot::render(outPath, hse::export_graph(g, horiz, labels, notations, ghost, encodings).to_string());
+				}
 			}
-		} else if (format == "cog") {
-			parse_cog::register_syntax(tokens);
-			config.load(tokens, filename, "");
-
-			tokens.increment(false);
-			tokens.expect<parse_cog::composition>();
-			while (tokens.decrement(__FILE__, __LINE__))
-			{
-				parse_cog::composition syntax(tokens);
-				hse::import_hse(hg, syntax, &tokens, true);
-
-				tokens.increment(false);
-				tokens.expect<parse_cog::composition>();
-			}
-		}
-		if (process) {
-			hg.post_process(true, false, true, debug);
-		}
-		hg.check_variables();
-
-		if (is_clean()) {
-			if (states) {
-				hse::graph sg = hse::to_state_graph(hg, true);
-				render(ofilename, oformat, export_graph(sg, horiz, labels, notations, ghost, encodings).to_string());
-			} else if (petri) {
-				hse::graph pn = hse::to_petri_net(hg, true);
-				render(ofilename, oformat, export_graph(hg, horiz, labels, notations, ghost, encodings).to_string());
-			} else {
-				render(ofilename, oformat, export_graph(hg, horiz, labels, notations, ghost, encodings).to_string());
-			}
-		}
-	} else if (format == "prs") {
-		prs::production_rule_set pr;
-
-		parse_prs::register_syntax(tokens);
-		config.load(tokens, filename, "");
-
-		tokens.increment(false);
-		tokens.expect<parse_prs::production_rule_set>();
-		if (tokens.decrement(__FILE__, __LINE__))
-		{
-			parse_prs::production_rule_set syntax(tokens);
-			prs::import_production_rule_set(syntax, pr, -1, -1, prs::attributes(), 0, &tokens, true);
 		}
 	}
 

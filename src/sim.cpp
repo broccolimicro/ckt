@@ -1,5 +1,4 @@
 #include "sim.h"
-#include "vcd.h"
 
 #include <common/standard.h>
 #include <parse/parse.h>
@@ -15,28 +14,32 @@
 
 #include <chp/graph.h>
 #include <chp/simulator.h>
-#include <interpret_chp/import.h>
-#include <interpret_chp/export.h>
-#include <interpret_arithmetic/export.h>
-#include <interpret_arithmetic/import.h>
-
 #include <hse/graph.h>
 #include <hse/simulator.h>
-#include <hse/elaborator.h>
-#include <interpret_hse/import.h>
-#include <interpret_hse/export.h>
-#include <interpret_hse/export_cli.h>
-
-#include <parse_expression/expression.h>
-#include <parse_expression/assignment.h>
-#include <parse_expression/composition.h>
 #include <prs/production_rule.h>
 #include <prs/simulator.h>
 
-#include <interpret_prs/import.h>
-#include <interpret_prs/export.h>
-#include <interpret_boolean/export.h>
+#include "weaver/project.h"
+
+#include "format/dot.h"
+#include "format/cog.h"
+#include "format/spice.h"
+#include "format/gds.h"
+#include "format/verilog.h"
+#include "format/prs.h"
+#include "format/wv.h"
+#include "format/astg.h"
+
+#include "format/vcd.h"
+
+#include <interpret_arithmetic/import.h>
+#include <interpret_arithmetic/export.h>
 #include <interpret_boolean/import.h>
+#include <interpret_boolean/export.h>
+
+#include <interpret_hse/export_cli.h>
+#include <interpret_chp/export_cli.h>
+#include <interpret_prs/export.h>
 
 void sim_help() {
 	printf("Usage: lm sim [options] <ckt-file> [sim-file]\n");
@@ -383,7 +386,7 @@ void chpsim(chp::graph &g, vector<chp::term_index> steps = vector<chp::term_inde
 					}
 
 					/*for (auto h = sim.history.begin(); h != sim.history.end(); h++) {
-						printf("%s->%s; ", export_expression(h->first, v).to_string().c_str(), export_composition(g.transitions[h->second.index].local_action[h->second.term], v).to_string().c_str());
+						printf("%s->%s; ", export_expression(h->first, g).to_string().c_str(), export_composition(g.transitions[h->second.index].local_action[h->second.term], g).to_string().c_str());
 					}
 					printf("\n");*/
 
@@ -450,7 +453,7 @@ void chpsim(chp::graph &g, vector<chp::term_index> steps = vector<chp::term_inde
 
 }
 
-void hsesim(hse::graph &g, string prefix, vector<hse::term_index> steps = vector<hse::term_index>()) {
+void hsesim(hse::graph &g, vector<hse::term_index> steps = vector<hse::term_index>()) {
 	hse::simulator sim;
 	sim.base = &g;
 
@@ -462,7 +465,7 @@ void hsesim(hse::graph &g, string prefix, vector<hse::term_index> steps = vector
 	//vector<pair<uint64_t, > > events;
 
 	vcd dump;
-	dump.create(prefix, g);
+	dump.create(g.name, g);
 
 	int seed = 0;
 	srand(seed);
@@ -575,7 +578,7 @@ void hsesim(hse::graph &g, string prefix, vector<hse::term_index> steps = vector
 
 			for (int i = 0; i < (int)tokens.size(); i++)
 			{
-				printf("%s {\n", export_composition(sim.encoding.flipped_mask(g.places[sim.tokens[tokens[i][0]].index].mask), g).to_string().c_str());
+				printf("%s {\n", boolean::export_composition(sim.encoding.flipped_mask(g.places[sim.tokens[tokens[i][0]].index].mask), g).to_string().c_str());
 				for (int j = 0; j < (int)tokens[i].size(); j++) {
 					int virt = -1;
 					for (int k = 0; k < (int)sim.loaded.size() and virt < 0; k++) {
@@ -786,12 +789,12 @@ void hsesim(hse::graph &g, string prefix, vector<hse::term_index> steps = vector
 	dump.close();
 }
 
-void prsim(prs::production_rule_set &pr, string prefix, bool debug) {//, vector<prs::term_index> steps = vector<prs::term_index>()) {
+void prsim(prs::production_rule_set &pr, bool debug) {//, vector<prs::term_index> steps = vector<prs::term_index>()) {
 	prs::globals g(pr);
 	prs::simulator sim(&pr, debug);
 
 	vcd dump;
-	dump.create(prefix, pr);
+	dump.create(pr.name, pr);
 
 	tokenizer assignment_parser(false);
 	parse_expression::composition::register_syntax(assignment_parser);
@@ -1012,42 +1015,31 @@ void prsim(prs::production_rule_set &pr, string prefix, bool debug) {//, vector<
 	dump.close();
 }
 
-int sim_command(configuration &config, string techPath, string cellsDir, int argc, char **argv, bool debug) {
-	tokenizer tokens;
-	tokens.register_token<parse::block_comment>(false);
-	tokens.register_token<parse::line_comment>(false);
-	
-	string prefix = "";
+int sim_command(int argc, char **argv) {
 	string filename = "";
-	string format = "";
+	string term = "";
 
 	string sfilename = "";
+	bool debug;
 
 	for (int i = 0; i < argc; i++) {
 		string arg = argv[i];
 
 		if (arg[0] == '-') {
-			//if (arg == "--myflag") {
-			//	myflag = true;
-			//} else {
+			if (arg == "--verbose" or arg == "-v") {
+				set_verbose(true);
+			} else if (arg == "--debug" or arg == "-d") {
+				set_debug(true);
+				debug = true;
+			} else {
 				printf("unrecognized flag '%s'\n", argv[i]);
-			//}
+			}
 		} else if (filename == "") {
 			filename = argv[i];
-			size_t dot = filename.find_last_of(".");
-			if (dot == string::npos) {
-				printf("unrecognized file format\n");
-				return 0;
-			}
-			format = filename.substr(dot+1);
-			prefix = filename.substr(0, dot);
-			if (format != "chp"
-				and format != "hse"
-				and format != "cog"
-				and format != "astg"
-				and format != "prs") {
-				printf("unrecognized file format '%s'\n", format.c_str());
-				return 0;
+			size_t pos = filename.find_last_of(':');
+			if (pos != string::npos) {
+				term = filename.substr(pos+1);
+				filename = filename.substr(0, pos);
 			}
 		} else {
 			sfilename = argv[i];
@@ -1064,148 +1056,128 @@ int sim_command(configuration &config, string techPath, string cellsDir, int arg
 		}
 	}
 
-	if (filename == "") {
-		printf("expected filename\n");
-		return 0;
+	parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
+	parse_ucs::function::registry.insert({"proto", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
+	parse_ucs::function::registry.insert({"circ", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
+
+	weaver::Term::pushDialect("func", factoryCog);
+	weaver::Term::pushDialect("proto", factoryCogw);
+	weaver::Term::pushDialect("circ", factoryPrs);
+
+	weaver::Project proj;
+	if (proj.hasMod()) {
+		proj.readMod();
+	} else if (term.empty()) {
+		printf("please initialize your module with the following.\n\nlm mod init my_module\n");
+		return 1;
 	}
 
+	proj.pushFiletype("", "wv", "", readWv, loadWv);
+	proj.pushFiletype("func", "cog", "", readCog, loadCog);
+	proj.pushFiletype("proto", "cogw", "", readCog, loadCogw);
+	proj.pushFiletype("circ", "prs", "ckt", readPrs, loadPrs, writePrs);
+	proj.pushFiletype("spice", "spi", "spi", readSpice, loadSpice, writeSpice);
+	proj.pushFiletype("verilog", "v", "rtl", nullptr, nullptr, writeVerilog);
+	proj.pushFiletype("layout", "gds", "gds", nullptr, loadGds, writeGds);
+	proj.pushFiletype("func", "astg", "state", readAstg, loadAstg, writeAstg);
+	proj.pushFiletype("proto", "astgw", "state", readAstg, loadAstgw, writeAstgw);
 
-	if (format == "chp") {
+	weaver::Program prgm;
+	loadGlobalTypes(prgm);
+
+	if (filename.empty()) {
+		filename = "top.wv";
+	}
+
+	if (fs::path(filename).extension().empty()) {
+		filename += ".wv";
+	}
+
+	proj.incl(filename);
+	proj.load(prgm);
+
+	fs::path modName = proj.modName / fs::relative(filename, proj.rootDir);
+
+	int modIdx = prgm.findModule(modName);
+	if (modIdx < 0) {
+		printf("error: could not find module '%s'\n", modName.string().c_str());
+		complete();
+		return 1;
+	}
+
+	int termIdx;
+	for (termIdx = prgm.mods[modIdx].terms.size()-1; termIdx >= 0; termIdx--) {
+		if (prgm.mods[modIdx].terms[termIdx].decl.name == term) {
+			break;
+		}
+	}
+	if (termIdx < 0) {
+		printf("error: could not find term '%s' in module '%s'\n", term.c_str(), modName.string().c_str());
+		complete();
+		return 1;
+	} 
+
+	auto fn = prgm.mods[modIdx].terms.begin()+termIdx;
+
+	if (fn->dialect().name == "func") {
 		vector<chp::term_index> steps;
 		if (sfilename != "") {
 			FILE *seq = fopen(sfilename.c_str(), "r");
 			char command[256];
 			int n, n1;
-			if (seq != NULL)
-			{
-				while (fgets(command, 255, seq) != NULL)
-				{
-					if (sscanf(command, "%d.%d", &n, &n1) == 2)
+			if (seq != nullptr) {
+				while (fgets(command, 255, seq) != nullptr) {
+					if (sscanf(command, "%d.%d", &n, &n1) == 2) {
 						steps.push_back(chp::term_index(n, n1));
+					}
 				}
 				fclose(seq);
-			}
-			else
+			} else {
 				printf("error: file not found '%s'\n", sfilename.c_str());
+			}
 		}
 
-		chp::graph cg;
-
-		parse_chp::register_syntax(tokens);
-		config.load(tokens, filename, "");
-
-		tokens.increment(false);
-		tokens.expect<parse_chp::composition>();
-		while (tokens.decrement(__FILE__, __LINE__))
-		{
-			parse_chp::composition syntax(tokens);
-			chp::import_chp(cg, syntax, &tokens, true);
-
-			tokens.increment(false);
-			tokens.expect<parse_chp::composition>();
-		}
-		cg.post_process(true);
-
-		chpsim(cg, steps);
-	} else if (format == "hse" or format == "astg" or format == "cog") {
+		chp::graph g = fn->as<chp::graph>();
+		chpsim(g, steps);
+	} else if (fn->dialect().name == "proto") {
 		vector<hse::term_index> steps;
 		if (sfilename != "") {
 			FILE *seq = fopen(sfilename.c_str(), "r");
 			char command[256];
 			int n, n1;
-			if (seq != NULL)
-			{
-				while (fgets(command, 255, seq) != NULL)
-				{
-					if (sscanf(command, "%d.%d", &n, &n1) == 2)
+			if (seq != nullptr) {
+				while (fgets(command, 255, seq) != nullptr) {
+					if (sscanf(command, "%d.%d", &n, &n1) == 2) {
 						steps.push_back(hse::term_index(n, n1));
+					}
 				}
 				fclose(seq);
-			}
-			else
+			} else {
 				printf("error: file not found '%s'\n", sfilename.c_str());
-		}
-
-		hse::graph hg;
-
-		if (format == "hse") {
-			parse_chp::register_syntax(tokens);
-			config.load(tokens, filename, "");
-
-			tokens.increment(false);
-			tokens.expect<parse_chp::composition>();
-			while (tokens.decrement(__FILE__, __LINE__))
-			{
-				parse_chp::composition syntax(tokens);
-				hse::import_hse(hg, syntax, &tokens, true);
-
-				tokens.increment(false);
-				tokens.expect<parse_chp::composition>();
-			}
-		} else if (format == "astg") {
-			parse_astg::register_syntax(tokens);
-			config.load(tokens, filename, "");
-			
-			tokens.increment(false);
-			tokens.expect<parse_astg::graph>();
-			while (tokens.decrement(__FILE__, __LINE__))
-			{
-				parse_astg::graph syntax(tokens);
-				hse::import_hse(hg, syntax, &tokens);
-
-				tokens.increment(false);
-				tokens.expect<parse_astg::graph>();
-			}
-		} else if (format == "cog") {
-			parse_cog::register_syntax(tokens);
-			config.load(tokens, filename, "");
-
-			tokens.increment(false);
-			tokens.expect<parse_cog::composition>();
-			while (tokens.decrement(__FILE__, __LINE__))
-			{
-				parse_cog::composition syntax(tokens);
-				hse::import_hse(hg, syntax, &tokens, true);
-
-				tokens.increment(false);
-				tokens.expect<parse_cog::composition>();
 			}
 		}
-		hg.post_process(true);
-		hg.check_variables();
-
-		hsesim(hg, prefix, steps);
-	} else if (format == "prs") {
+		
+		hse::graph g = fn->as<hse::graph>();
+		hsesim(g, steps);
+	} else if (fn->dialect().name == "circ") {
 		/*vector<prs::term_index> steps;
 		if (sfilename != "") {
 			FILE *seq = fopen(sfilename.c_str(), "r");
 			char command[256];
 			int n, n1;
-			if (seq != NULL)
-			{
-				while (fgets(command, 255, seq) != NULL)
-				{
-					if (sscanf(command, "%d.%d", &n, &n1) == 2)
+			if (seq != NULL) {
+				while (fgets(command, 255, seq) != NULL) {
+					if (sscanf(command, "%d.%d", &n, &n1) == 2) {
 						steps.push_back(prs::term_index(n, n1));
+					}
 				}
 				fclose(seq);
-			}
-			else
+			} else {
 				printf("error: file not found '%s'\n", sfilename.c_str());
+			}
 		}*/
 
-		prs::production_rule_set pr;
-
-		parse_prs::register_syntax(tokens);
-		config.load(tokens, filename, "");
-
-		tokens.increment(false);
-		tokens.expect<parse_prs::production_rule_set>();
-		if (tokens.decrement(__FILE__, __LINE__))
-		{
-			parse_prs::production_rule_set syntax(tokens);
-			prs::import_production_rule_set(syntax, pr, -1, -1, prs::attributes(), 0, &tokens, true);
-		}
+		prs::production_rule_set pr = fn->as<prs::production_rule_set>();
 
 		if (debug) {
 			printf("\n\n%s\n\n", export_production_rule_set(pr).to_string().c_str());
@@ -1213,7 +1185,7 @@ int sim_command(configuration &config, string techPath, string cellsDir, int arg
 			printf("\n\n");
 		}
 
-		prsim(pr, prefix, debug);//, steps);
+		prsim(pr, debug);//, steps);
 	}
 
 	complete();

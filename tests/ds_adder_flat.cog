@@ -1,0 +1,27 @@
+WIDTH = 8
+while {
+	await Ac.probe()==0 & Bc.probe()==0 {
+		Sc.send(0) and Sd.send((Ad.probe() + Bd.probe() + ci) % pow(2, WIDTH))
+		ci = (Ad.probe() + Bd.probe() + ci) / pow(2, WIDTH)
+		Ac.recv() and Ad.recv() and Bc.recv() and Bd.recv()
+
+	} or await Ac.probe()==0 & Bc.probe()==1 {
+		Sc.send(0) and Sd.send((Ad.probe() + Bd.probe() + ci) % pow(2, WIDTH))
+		ci = (Ad.probe() + Bd.probe() + ci) / pow(2, WIDTH)
+		Ac.recv() and Ad.recv()
+
+	} or await Ac.probe()==1 & Bc.probe()==0 {
+		Sc.send(0) and Sd.send((Ad.probe() + Bd.probe() + ci) % pow(2, WIDTH))
+		ci = (Ad.probe() + Bd.probe() + ci) / pow(2, WIDTH)
+		Bc.recv() and Bd.recv()
+
+	} or await Ac.probe()==1 & Bc.probe()==1 & co~=ci {
+		Sc.send(0) and Sd.send((Ad.probe() + Bd.probe() + ci) % pow(2, WIDTH))
+		ci = (Ad.probe() + Bd.probe() + ci) / pow(2, WIDTH)
+
+	} or await Ac.probe()==1 & Bc.probe()==1 & co==ci {
+		Sc.send(1) and Sd.send((Ad.probe() + Bd.probe() + ci) % pow(2, WIDTH))
+		ci = 0
+		Ac.recv() and Ad.recv() and Bc.recv() and Bd.recv()
+	}
+}
