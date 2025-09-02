@@ -39,6 +39,9 @@ Build::Build(weaver::Project &proj) : proj(proj) {
 
 	noCells = false;
 	noGhosts = false;
+
+	progress = false;
+	debug = false;
 	
 	targets.resize(ROUTE+1, false);
 }
