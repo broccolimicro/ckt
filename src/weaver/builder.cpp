@@ -166,6 +166,7 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 	// Do the synthesis
 	chp::graph &g = prgm.mods[modIdx].terms[termIdx].as<chp::graph>();
 	g.post_process();	
+	g.flatten(debug);
 
 	//string graph_render_filename = "_" + prefix + "_" + g.name + ".png";
 	//gvdot::render(graph_render_filename, chp::export_graph(g, true).to_string());
