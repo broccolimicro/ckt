@@ -53,6 +53,44 @@ void import_symbols(Program &prgm, int modIdx, const parse_ucs::source &syntax) 
 	}
 }
 
+void import_term(Program &prgm, Module &mod, int modIdx, const parse_ucs::function &syntax) {
+	int kind = Term::findDialect(syntax.lang);
+	TypeId recvType;
+	if (not syntax.recv.empty()) {
+		recvType = prgm.findType(modIdx, {syntax.recv});
+		if (not recvType.defined()) {
+			printf("error: type not defined '%s'\n", syntax.recv.c_str());
+			return;
+		}
+	}
+
+	TypeId retType;
+	if (syntax.ret.valid) {
+		retType = prgm.findType(modIdx, syntax.ret.names);
+		if (not retType.defined()) {
+			printf("error: type not defined '%s'\n", syntax.ret.to_string().c_str());
+			return;
+		}
+	}
+
+	vector<Instance> args;
+	for (auto j = syntax.args.begin(); j != syntax.args.end(); j++) {
+		import_declaration(args, prgm, modIdx, *j);
+	}
+
+	int termIdx = mod.createTerm(Term::procOf(kind, syntax.name, args, retType, recvType));
+	if (kind >= 0) {
+		mod.terms[termIdx].def = Term::dialects[kind].factory(syntax.name, syntax.body, nullptr);
+	}
+
+	for (auto i = syntax.impl.begin(); i != syntax.impl.end(); i++) {
+		vector<TermId> implTerm = prgm.findTerms(modIdx, i->names);
+		if (not implTerm.empty()) {
+			mod.terms[termIdx].impl.push_back(implTerm[0]);
+		}
+	}
+}
+
 void import_module(Program &prgm, int modIdx, const parse_ucs::source &syntax) {
 	for (auto i = syntax.types.begin(); i != syntax.types.end(); i++) {
 		TypeId recvType = prgm.findType(modIdx, {i->name});
@@ -66,35 +104,7 @@ void import_module(Program &prgm, int modIdx, const parse_ucs::source &syntax) {
 	}
 
 	for (auto i = syntax.funcs.begin(); i != syntax.funcs.end(); i++) {
-		int kind = Term::findDialect(i->lang);
-		TypeId recvType;
-		if (not i->recv.empty()) {
-			recvType = prgm.findType(modIdx, {i->recv});
-			if (not recvType.defined()) {
-				printf("error: type not defined '%s'\n", i->recv.c_str());
-				continue;
-			}
-		}
-
-		TypeId retType;
-		if (i->ret.valid) {
-			retType = prgm.findType(modIdx, i->ret.names);
-			if (not retType.defined()) {
-				printf("error: type not defined '%s'\n", i->ret.to_string().c_str());
-				continue;
-			}
-		}
-
-		vector<Instance> args;
-		for (auto j = i->args.begin(); j != i->args.end(); j++) {
-			import_declaration(args, prgm, modIdx, *j);
-		}
-
-		int termIdx = prgm.mods[modIdx].createTerm(Term::procOf(kind, i->name, args, retType, recvType));
-
-		if (kind >= 0) {
-			prgm.mods[modIdx].terms[termIdx].def = Term::dialects[kind].factory(i->body, nullptr);
-		}
+		import_term(prgm, prgm.mods[modIdx], modIdx, *i);
 	}
 }
 

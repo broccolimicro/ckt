@@ -30,13 +30,14 @@ void readSpice(weaver::Project &proj, weaver::Source &source, string buffer) {
 }
 
 void loadSpice(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
+	string name = source.path.stem().string();
 	sch::Netlist net;
 	sch::import_netlist(proj.tech, net, *(parse_spice::netlist*)source.syntax.get(), source.tokens.get());
 
 	int kind = weaver::Term::getDialect("spice");
-	int modIdx = prgm.getModule(source.modName.string());
+	int modIdx = prgm.getModule(source.modName);
 
-	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, source.modName.stem().string(), vector<weaver::Instance>()));
+	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, name, vector<weaver::Instance>()));
 
 	prgm.mods[modIdx].terms[termIdx].def = net;
 }
@@ -48,7 +49,7 @@ void writeSpice(fs::path path, const weaver::Project &proj, const weaver::Progra
 		return;
 	}
 
-	const sch::Netlist &net = std::any_cast<const sch::Netlist&>(prgm.mods[modIdx].terms[termIdx].def);
+	const sch::Netlist &net = prgm.mods[modIdx].terms[termIdx].as<sch::Netlist>();
 	string buffer = sch::export_netlist(proj.tech, net).to_string();
 	fout.write(buffer.c_str(), buffer.size());
 	fout.close();

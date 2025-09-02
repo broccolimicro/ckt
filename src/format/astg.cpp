@@ -28,28 +28,32 @@ void readAstg(weaver::Project &proj, weaver::Source &source, string buffer) {
 }
 
 void loadAstg(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
+	string name = source.path.stem().string();
 	chp::graph g;
+	g.name = name;
 	g = chp::import_chp(*(parse_astg::graph*)source.syntax.get(), source.tokens.get());
 
 	int kind = weaver::Term::getDialect("func");
-	int modIdx = prgm.getModule(source.modName.string());
+	int modIdx = prgm.getModule(source.modName);
 
-	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, source.modName.stem().string(), vector<weaver::Instance>()));
+	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, name, vector<weaver::Instance>()));
 
 	prgm.mods[modIdx].terms[termIdx].def = g;
 }
 
 void loadAstgw(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
+	string name = source.path.stem().string();
 	hse::graph g;
+	g.name = name;
 	hse::import_hse(g, *(parse_astg::graph*)source.syntax.get(), source.tokens.get());
 
 	g.post_process(true);
 	g.check_variables();
 
 	int kind = weaver::Term::getDialect("proto");
-	int modIdx = prgm.getModule(source.modName.string());
+	int modIdx = prgm.getModule(source.modName);
 
-	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, source.modName.stem().string(), vector<weaver::Instance>()));
+	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, name, vector<weaver::Instance>()));
 
 	prgm.mods[modIdx].terms[termIdx].def = g;
 }
@@ -61,7 +65,7 @@ void writeAstg(fs::path path, const weaver::Project &proj, const weaver::Program
 		return;
 	}
 
-	const chp::graph &g = std::any_cast<const chp::graph&>(prgm.mods[modIdx].terms[termIdx].def);
+	const chp::graph &g = prgm.mods[modIdx].terms[termIdx].as<chp::graph>();
 	string buffer = chp::export_astg(g).to_string();
 	fout.write(buffer.c_str(), buffer.size());
 	fout.close();
@@ -74,7 +78,7 @@ void writeAstgw(fs::path path, const weaver::Project &proj, const weaver::Progra
 		return;
 	}
 
-	const hse::graph &g = std::any_cast<const hse::graph&>(prgm.mods[modIdx].terms[termIdx].def);
+	const hse::graph &g = prgm.mods[modIdx].terms[termIdx].as<hse::graph>();
 	string buffer = hse::export_astg(g).to_string();
 	fout.write(buffer.c_str(), buffer.size());
 	fout.close();

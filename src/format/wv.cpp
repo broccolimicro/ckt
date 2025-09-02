@@ -22,7 +22,7 @@ void readWv(weaver::Project &proj, weaver::Source &source, string buffer) {
 	}
 
 	parse_ucs::source &syntax = *(parse_ucs::source*)source.syntax.get();
-	syntax.name = source.modName.string();
+	syntax.name = source.modName;
 
 	for (auto j = syntax.incl.begin(); j != syntax.incl.end(); j++) {
 		for (auto k = j->path.begin(); k != j->path.end(); k++) {

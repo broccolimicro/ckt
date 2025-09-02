@@ -28,34 +28,39 @@ void readCog(weaver::Project &proj, weaver::Source &source, string buffer) {
 }
 
 void loadCog(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
+	string name = source.path.stem().string();
 	chp::graph g;
+	g.name = name;
 	chp::import_chp(g, *(parse_cog::composition*)source.syntax.get(), source.tokens.get(), true);
 
 	int kind = weaver::Term::getDialect("func");
-	int modIdx = prgm.getModule(source.modName.string());
+	int modIdx = prgm.getModule(source.modName);
 
-	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, source.modName.stem().string(), vector<weaver::Instance>()));
+	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, name, vector<weaver::Instance>()));
 
 	prgm.mods[modIdx].terms[termIdx].def = g;
 }
 
 void loadCogw(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
+	string name = source.path.stem().string();
 	hse::graph g;
+	g.name = name;
 	hse::import_hse(g, *(parse_cog::composition*)source.syntax.get(), source.tokens.get(), true);
 
 	g.post_process(true);
 	g.check_variables();
 
 	int kind = weaver::Term::getDialect("proto");
-	int modIdx = prgm.getModule(source.modName.string());
+	int modIdx = prgm.getModule(source.modName);
 
-	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, source.modName.stem().string(), vector<weaver::Instance>()));
+	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, name, vector<weaver::Instance>()));
 
 	prgm.mods[modIdx].terms[termIdx].def = g;
 }
 
-std::any factoryCog(const parse::syntax *syntax, tokenizer *tokens) {
+std::any factoryCog(string name, const parse::syntax *syntax, tokenizer *tokens) {
 	chp::graph g;
+	g.name = name;
 	if (syntax != nullptr) {
 		chp::import_chp(g, *(const parse_cog::composition *)syntax, tokens, true);
 		//g.post_process(true);
@@ -63,8 +68,9 @@ std::any factoryCog(const parse::syntax *syntax, tokenizer *tokens) {
 	return g;
 }
 
-std::any factoryCogw(const parse::syntax *syntax, tokenizer *tokens) {
+std::any factoryCogw(string name, const parse::syntax *syntax, tokenizer *tokens) {
 	hse::graph g;
+	g.name = name;
 	if (syntax != nullptr) {
 		hse::import_hse(g, *(const parse_cog::composition *)syntax, tokens, true);
 		g.post_process(true);

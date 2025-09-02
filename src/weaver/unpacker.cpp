@@ -106,7 +106,7 @@ bool Unpack::gdsToSpi(weaver::Program &prgm, int modIdx, int termIdx) const {
 	vector<weaver::Instance> args = decl.args;
 
 	// Do the synthesis
-	phy::Library &lib = std::any_cast<phy::Library&>(prgm.mods[modIdx].terms[termIdx].def);
+	phy::Library &lib = prgm.mods[modIdx].terms[termIdx].as<phy::Library>();
 
 	for (auto i = args.begin(); i != args.end(); i++) {
 		// TODO(edward.bingham) pass the variable declarations over to spice
@@ -151,7 +151,7 @@ bool Unpack::spiToPrs(weaver::Program &prgm, int modIdx, int termIdx) const {
 	}
 
 	// Do the synthesis
-	sch::Netlist &net = std::any_cast<sch::Netlist&>(prgm.mods[modIdx].terms[termIdx].def);
+	sch::Netlist &net = prgm.mods[modIdx].terms[termIdx].as<sch::Netlist>();
 
 	for (auto i = args.begin(); i != args.end(); i++) {
 		// TODO(edward.bingham) pass the variable declarations over to circ

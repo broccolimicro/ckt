@@ -1095,7 +1095,6 @@ int sim_command(int argc, char **argv) {
 
 	proj.incl(filename);
 	proj.load(prgm);
-	prgm.print();
 
 	fs::path modName = proj.modName / fs::relative(filename, proj.rootDir);
 
@@ -1138,7 +1137,7 @@ int sim_command(int argc, char **argv) {
 			}
 		}
 
-		chp::graph g = std::any_cast<chp::graph>(fn->def);
+		chp::graph g = fn->as<chp::graph>();
 		chpsim(g, steps);
 	} else if (fn->dialect().name == "proto") {
 		vector<hse::term_index> steps;
@@ -1158,7 +1157,7 @@ int sim_command(int argc, char **argv) {
 			}
 		}
 		
-		hse::graph g = std::any_cast<hse::graph>(fn->def);
+		hse::graph g = fn->as<hse::graph>();
 		hsesim(g, steps);
 	} else if (fn->dialect().name == "circ") {
 		/*vector<prs::term_index> steps;
@@ -1178,7 +1177,7 @@ int sim_command(int argc, char **argv) {
 			}
 		}*/
 
-		prs::production_rule_set pr = std::any_cast<prs::production_rule_set>(fn->def);
+		prs::production_rule_set pr = fn->as<prs::production_rule_set>();
 
 		if (debug) {
 			printf("\n\n%s\n\n", export_production_rule_set(pr).to_string().c_str());

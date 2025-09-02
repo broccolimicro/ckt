@@ -161,7 +161,7 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 	vector<weaver::Instance> args = decl.args;
 
 	// Do the synthesis
-	chp::graph &g = std::any_cast<chp::graph&>(prgm.mods[modIdx].terms[termIdx].def);
+	chp::graph &g = prgm.mods[modIdx].terms[termIdx].as<chp::graph>();
 	g.post_process();	
 
 	//string graph_render_filename = "_" + prefix + "_" + g.name + ".png";
@@ -202,7 +202,7 @@ bool Build::flowToVerilog(weaver::Program &prgm, int modIdx, int termIdx) const 
 	vector<weaver::Instance> args = decl.args;
 
 	// Do the synthesis
-	flow::Func &fn = std::any_cast<flow::Func&>(prgm.mods[modIdx].terms[termIdx].def);
+	flow::Func &fn = prgm.mods[modIdx].terms[termIdx].as<flow::Func>();
 
 	for (auto i = args.begin(); i != args.end(); i++) {
 		// TODO(edward.bingham) pass the variable declarations over to verilog
@@ -237,7 +237,7 @@ bool Build::hseToPrs(weaver::Program &prgm, int modIdx, int termIdx) const {
 	string name = decl.name;
 	vector<weaver::Instance> args = decl.args;
 
-	hse::graph &hg = std::any_cast<hse::graph&>(prgm.mods[modIdx].terms[termIdx].def);
+	hse::graph &hg = prgm.mods[modIdx].terms[termIdx].as<hse::graph>();
 	hg.name = decl.name;
 	hg.post_process(true);
 	hg.check_variables();
@@ -329,7 +329,7 @@ bool Build::prsToSpi(weaver::Program &prgm, int modIdx, int termIdx) {
 	string name = decl.name;
 	vector<weaver::Instance> args = decl.args;
 
-	prs::production_rule_set &pr = std::any_cast<prs::production_rule_set&>(prgm.mods[modIdx].terms[termIdx].def);
+	prs::production_rule_set &pr = prgm.mods[modIdx].terms[termIdx].as<prs::production_rule_set>();
 
 	bool inverting = false;
 	if (logic == Build::LOGIC_CMOS) {
@@ -425,7 +425,7 @@ bool Build::spiToGds(weaver::Program &prgm, int modIdx, int termIdx) {
 	string name = decl.name;
 	vector<weaver::Instance> args = decl.args;
 
-	sch::Netlist &net = std::any_cast<sch::Netlist&>(prgm.mods[modIdx].terms[termIdx].def);
+	sch::Netlist &net = prgm.mods[modIdx].terms[termIdx].as<sch::Netlist>();
 
 	if (noCells) {
 		for (int i = 0; i < (int)net.subckts.size(); i++) {

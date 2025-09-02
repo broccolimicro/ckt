@@ -14,7 +14,7 @@ void writeVerilog(fs::path path, const weaver::Project &proj, const weaver::Prog
 		return;
 	}
 
-	const clocked::Module &mod = std::any_cast<const clocked::Module&>(prgm.mods[modIdx].terms[termIdx].def);
+	const clocked::Module &mod = prgm.mods[modIdx].terms[termIdx].as<clocked::Module>();
 	string buffer = flow::export_module(mod).to_string();
 	fout.write(buffer.c_str(), buffer.size());
 	fout.close();

@@ -243,7 +243,6 @@ int build_command(int argc, char **argv) {
 	proj.incl(filename);
 	proj.load(prgm);
 	builder.build(prgm);
-	prgm.print();
 	proj.save(prgm);
 
 	if (!is_clean()) {

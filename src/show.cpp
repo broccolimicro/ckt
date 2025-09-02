@@ -158,9 +158,9 @@ int show_command(int argc, char **argv) {
 				outPath = proj.buildPath("dbg", j->decl.name+".png").string();
 			}
 			if (j->dialect().name == "func") {
-				gvdot::render(outPath, chp::export_graph(std::any_cast<const chp::graph&>(j->def), labels).to_string());
+				gvdot::render(outPath, chp::export_graph(j->as<chp::graph>(), labels).to_string());
 			} else if (j->dialect().name == "proto") {
-				hse::graph &g = std::any_cast<hse::graph&>(j->def);
+				hse::graph &g = j->as<hse::graph>();
 				if (states) {
 					hse::graph sg = hse::to_state_graph(g, true);
 					gvdot::render(outPath, hse::export_graph(sg, horiz, labels, notations, ghost, encodings).to_string());

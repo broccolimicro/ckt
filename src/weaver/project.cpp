@@ -131,7 +131,7 @@ bool Project::read(Program &prgm, fs::path path) {
 
 	sources.push_back(Source());
 	sources.back().path = fs::relative(canon, workDir);
-	sources.back().modName = fs::path(modName) / fs::relative(canon, rootDir);
+	sources.back().modName = pathToModule(canon);
 	sources.back().filetype = filetype;
 	sources.back().tokens = unique_ptr<tokenizer>(new tokenizer());
 
@@ -349,6 +349,25 @@ void Project::vendor() const {
 }
 
 void Project::tidy() {
+}
+
+string Project::pathToModule(fs::path path) const {
+	string result;
+
+	string ext = path.extension().string().substr(1);
+	auto filetype = getExtension(ext);
+
+	fs::path dirInModule = fs::relative(path.parent_path(), rootDir);
+	if (dirInModule.lexically_normal() != ".") {
+		result = (fs::path(modName) / dirInModule / path.stem()).string();
+	} else {
+		result = (fs::path(modName) / path.stem()).string();
+	}
+
+	if (filetype != nullptr and not filetype->dialect.empty()) {
+		result += ">>" + filetype->dialect;
+	}
+	return result;
 }
 
 fs::path Project::buildPath(string dir, string filename) const {

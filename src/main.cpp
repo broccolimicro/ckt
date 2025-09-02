@@ -7,7 +7,7 @@
 #include "sim.h"
 #include "show.h"
 //#include "test.h"
-//#include "compare.h"
+#include "compare.h"
 #include "tech.h"
 #include "mod.h"
 
@@ -26,7 +26,7 @@ void print_help() {
 	printf("  unpack        decompile the structural specification\n");
 	printf("  sim           simulate the described circuit\n");
 	//printf("  test          verify the behavior/structure of the circuit\n");
-	//printf("  compare       ensure that two circuit specifications match\n");
+	printf("  compare       ensure that two circuit specifications match\n");
 	printf("  show          visualize the described circuit\n");
 	printf("\n");
 	printf("  mod           manage this module\n");
@@ -67,7 +67,7 @@ int main(int argc, char **argv) {
 			//return test_command(argc-i, argv+i);
 		} else if (arg == "compare") {
 			++i;
-			//return compare_command(argc-i, argv+i);
+			return compare_command(argc-i, argv+i);
 		} else if (arg == "show") {
 			++i;
 			return show_command(argc-i, argv+i);
@@ -96,7 +96,7 @@ int main(int argc, char **argv) {
 			} else if (arg == "test") {
 				//test_help();
 			} else if (arg == "compare") {
-				//compare_help();
+				compare_help();
 			} else if (arg == "show") {
 				show_help();
 			} else if (arg == "tech") {

@@ -20,7 +20,7 @@ struct Depend {
 
 struct Source {
 	fs::path path;
-	fs::path modName;
+	string modName;
 	unique_ptr<parse::syntax> syntax;
 	unique_ptr<tokenizer> tokens;
 	const Filetype *filetype;
@@ -93,6 +93,8 @@ struct Project {
 
 	void vendor() const;
 	void tidy();
+
+	string pathToModule(fs::path path) const;
 
 	fs::path buildPath(string dialect, string filename) const;
 };
