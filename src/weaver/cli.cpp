@@ -13,7 +13,7 @@ string Proto::to_string() const {
 
 	if (isTerm()) {
 		result += ":";
-		if (not recv.empty()) {
+		if (not unqualified and not recv.empty()) {
 			result += recv[0];
 			for (int i = 1; i < (int)recv.size(); i++) {
 				result += "." + recv[i];
@@ -21,19 +21,22 @@ string Proto::to_string() const {
 			result += "::";
 		}
 
-		result += name[1]+"(";
-		for (int i = 0; i < (int)args.size(); i++) {
-			if (i != 0) {
-				result += ",";
-			}
-			if (not args[i].empty()) {
-				result += args[i][0];
-				for (int j = 1; j < (int)args[i].size(); j++) {
-					result += "." + args[i][j];
+		result += name[1];
+		if (not unqualified) {
+			result += "(";
+			for (int i = 0; i < (int)args.size(); i++) {
+				if (i != 0) {
+					result += ",";
+				}
+				if (not args[i].empty()) {
+					result += args[i][0];
+					for (int j = 1; j < (int)args[i].size(); j++) {
+						result += "." + args[i][j];
+					}
 				}
 			}
+			result += ")";
 		}
-		result += ")";
 	}
 	return result;
 }
@@ -56,9 +59,11 @@ vector<string> parseIdent(string id) {
 
 Proto parseProto(const weaver::Project &proj, string proto) {
 	Proto result;
+	result.unqualified = true;
 	size_t par = proto.rfind("(");
 	if (par != string::npos) {
-		string args = proto.substr(par+1, proto.size()-2);
+		result.unqualified = false;
+		string args = proto.substr(par+1, proto.size()-par-2);
 		proto = proto.substr(0, par);
 		size_t com = args.rfind(",");
 		while (com != string::npos) {
@@ -95,3 +100,20 @@ Proto parseProto(const weaver::Project &proj, string proto) {
 	return result;
 }
 
+vector<weaver::TermId> findProto(const weaver::Program &prgm, Proto proto) {
+	if (proto.isModule()) {
+		return vector<weaver::TermId>(1, weaver::TermId(prgm.findModule(proto.name[0]), -1));
+	} else if (proto.unqualified) {
+		return prgm.findTerms(proto.name);
+	}
+
+	weaver::TypeId recv;
+	if (not proto.recv.empty()) {
+		recv = prgm.findType(proto.recv);
+	}
+	vector<weaver::TypeId> args;
+	for (auto i = proto.args.begin(); i != proto.args.end(); i++) {
+		args.push_back(prgm.findType(*i));
+	}
+	return vector<weaver::TermId>(1, prgm.findTerm(recv, proto.name, args));
+}

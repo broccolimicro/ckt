@@ -4,6 +4,7 @@
 #include <string>
 #include <filesystem>
 #include "project.h"
+#include <weaver/program.h>
 
 using namespace std;
 namespace fs = std::filesystem;
@@ -14,6 +15,8 @@ struct Proto {
 	vector<string> name;
 	vector<vector<string> > args;
 
+	bool unqualified;
+
 	bool isModule() const;
 	bool isTerm() const;
 
@@ -22,3 +25,4 @@ struct Proto {
 
 vector<string> parseIdent(string id);
 Proto parseProto(const weaver::Project &proj, string proto);
+vector<weaver::TermId> findProto(const weaver::Program &prgm, Proto proto);

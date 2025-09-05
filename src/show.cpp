@@ -1,6 +1,7 @@
 #include "show.h"
 
 #include <common/standard.h>
+#include <common/message.h>
 #include <parse/parse.h>
 #include <parse/default/block_comment.h>
 #include <parse/default/line_comment.h>
@@ -19,6 +20,7 @@
 #include <prs/bubble.h>
 
 #include "weaver/project.h"
+#include "weaver/cli.h"
 
 #include "format/dot.h"
 #include "format/cog.h"
@@ -31,6 +33,37 @@
 
 #include <interpret_chp/export.h>
 #include <interpret_hse/export.h>
+
+struct ShowOptions {
+	ShowOptions() {
+		encodings = -1;
+
+		proper = true;
+		aggressive = false;
+		process = true;
+		labels = false;
+		notations = false;
+		horiz = false;
+		states = false;
+		petri = false;
+		ghost = false;
+	}
+
+	~ShowOptions() {
+	}
+
+	int encodings;
+
+	bool proper;
+	bool aggressive;
+	bool process;
+	bool labels;
+	bool notations;
+	bool horiz;
+	bool states;
+	bool petri;
+	bool ghost;
+};
 
 void show_help() {
 	printf("Usage: lm show [options] file...\n");
@@ -47,61 +80,31 @@ void show_help() {
 	printf(" -s,--sync       Render half synchronization actions\n");
 }
 
-int show_command(int argc, char **argv) {
-	string filename = "";
-	string term = "";
-
-	int encodings = -1;
-
-	bool proper = true;
-	bool aggressive = false;
-	bool process = true;
-	bool labels = false;
-	bool notations = false;
-	bool horiz = false;
-	bool states = false;
-	bool petri = false;
-	bool ghost = false;
-	
-	for (int i = 0; i < argc; i++) {
-		string arg = argv[i];
-		if (arg == "--labels" || arg == "-l") {
-			labels = true;
-		} else if (arg == "--notations" || arg == "-nt") {
-			notations = true;
-		} else if (arg == "--leftright" || arg == "-lr") {
-			horiz = true;
-		} else if (arg == "--effective" || arg == "-e") {
-			encodings = 1;
-		} else if (arg == "--predicate" || arg == "-p") {
-			encodings = 0;
-		} else if (arg == "--ghost" || arg == "-g") {
-			ghost = true;
-		} else if (arg == "--raw" || arg == "-r") {
-			process = false;
-		} else if (arg == "--nest" || arg == "-n") {
-			proper = false;
-		} else if (arg == "--aggressive" || arg == "-ag") {
-			aggressive = true;
-		} else if (arg == "-sg" or arg == "--states") {
-			states = true;
-		} else if (arg == "-pn" or arg == "--petri") {
-			petri = true;
+void show(ShowOptions opts, weaver::Term &t, string outPath) {
+	if (t.kind < 0) {
+		internal("", "dialect not defined for term '" + t.decl.name + "'", __FILE__, __LINE__);
+		return;
+	}
+	if (t.dialect().name == "func") {
+		gvdot::render(outPath, chp::export_graph(t.as<chp::graph>(), opts.labels).to_string());
+	} else if (t.dialect().name == "proto") {
+		hse::graph &g = t.as<hse::graph>();
+		if (opts.states) {
+			hse::graph sg = hse::to_state_graph(g, true);
+			gvdot::render(outPath, hse::export_graph(sg, opts.horiz, opts.labels, opts.notations, opts.ghost, opts.encodings).to_string());
+		} else if (opts.petri) {
+			hse::graph pn = hse::to_petri_net(g, true);
+			gvdot::render(outPath, hse::export_graph(pn, opts.horiz, opts.labels, opts.notations, opts.ghost, opts.encodings).to_string());
 		} else {
-			filename = argv[i];
-			size_t pos = filename.find_last_of(':');
-			if (pos != string::npos) {
-				term = filename.substr(pos+1);
-				filename = filename.substr(0, pos);
-			}
+			gvdot::render(outPath, hse::export_graph(g, opts.horiz, opts.labels, opts.notations, opts.ghost, opts.encodings).to_string());
 		}
 	}
+}
 
+int show_command(int argc, char **argv) {
 	parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
-	//parse_ucs::function::registry.insert({"chp", parse_ucs::language(&parse_chp::produce, &parse_chp::expect, &parse_chp::register_syntax)});
 	parse_ucs::function::registry.insert({"proto", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
 	parse_ucs::function::registry.insert({"circ", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
-	//parse_ucs::function::registry.insert({"spice", parse_ucs::language(&parse_spice::produce, &parse_spice::expect, &parse_spice::register_syntax)});
 
 	weaver::Term::pushDialect("func", factoryCog);
 	weaver::Term::pushDialect("proto", factoryCogw);
@@ -110,9 +113,6 @@ int show_command(int argc, char **argv) {
 	weaver::Project proj;
 	if (proj.hasMod()) {
 		proj.readMod();
-	} else if (term.empty()) {
-		printf("please initialize your module with the following.\n\nlm mod init my_module\n");
-		return 1;
 	}
 
 	proj.pushFiletype("", "wv", "", readWv, loadWv);
@@ -121,54 +121,90 @@ int show_command(int argc, char **argv) {
 	proj.pushFiletype("circ", "prs", "ckt", readPrs, loadPrs, writePrs);
 	proj.pushFiletype("spice", "spi", "spi", readSpice, loadSpice, writeSpice);
 	proj.pushFiletype("verilog", "v", "rtl", nullptr, nullptr, writeVerilog);
-	proj.pushFiletype("layout", "gds", "gds", nullptr, nullptr, writeGds);
+	proj.pushFiletype("layout", "gds", "gds", nullptr, loadGds, writeGds);
 	proj.pushFiletype("func", "astg", "state", readAstg, loadAstg, writeAstg);
 	proj.pushFiletype("proto", "astgw", "state", readAstg, loadAstgw, writeAstgw);
+
+	vector<Proto> protos;
+
+	ShowOptions opts;
+	
+	for (int i = 0; i < argc; i++) {
+		string arg = argv[i];
+		if (arg == "--labels" || arg == "-l") {
+			opts.labels = true;
+		} else if (arg == "--notations" || arg == "-nt") {
+			opts.notations = true;
+		} else if (arg == "--leftright" || arg == "-lr") {
+			opts.horiz = true;
+		} else if (arg == "--effective" || arg == "-e") {
+			opts.encodings = 1;
+		} else if (arg == "--predicate" || arg == "-p") {
+			opts.encodings = 0;
+		} else if (arg == "--ghost" || arg == "-g") {
+			opts.ghost = true;
+		} else if (arg == "--raw" || arg == "-r") {
+			opts.process = false;
+		} else if (arg == "--nest" || arg == "-n") {
+			opts.proper = false;
+		} else if (arg == "--aggressive" || arg == "-ag") {
+			opts.aggressive = true;
+		} else if (arg == "-sg" or arg == "--states") {
+			opts.states = true;
+		} else if (arg == "-pn" or arg == "--petri") {
+			opts.petri = true;
+		} else {
+			protos.push_back(parseProto(proj, arg));
+		}
+	}
+
+	if (protos.empty() and not proj.hasMod()) {
+		printf("please initialize your module with the following.\n\nlm mod init my_module\n");
+		return 1;
+	}
 
 	weaver::Program prgm;
 	loadGlobalTypes(prgm);
 
-	if (filename.empty()) {
-		filename = "top.wv";
+	if (protos.empty()) {
+		proj.incl("top.wv");
+	} else {
+		for (auto j = protos.begin(); j != protos.end(); j++) {
+			proj.incl(j->path);
+		}
 	}
 
-	if (fs::path(filename).extension().empty()) {
-		filename += ".wv";
-	}
-
-	proj.incl(filename);
 	proj.load(prgm);
 
-	if (term.empty()) {
-		fs::create_directories(proj.rootDir / proj.BUILD / "dbg");
-	}
-
-	for (auto i = prgm.mods.begin(); i != prgm.mods.end(); i++) {
-		for (auto j = i->terms.begin(); j != i->terms.end(); j++) {
-			if (j->kind < 0) {
-				printf("internal:%s:%d: dialect not defined for term '%s'\n", __FILE__, __LINE__, j->decl.name.c_str());
-				continue;
+	fs::create_directories(proj.rootDir / proj.BUILD / "dbg");
+	if (protos.empty()) {
+		for (auto i = prgm.mods.begin(); i != prgm.mods.end(); i++) {
+			for (auto j = i->terms.begin(); j != i->terms.end(); j++) {
+				show(opts, *j, proj.buildPath("dbg", j->decl.name+".png").string());
 			}
-			if (not term.empty() and j->decl.name != term) {
-				continue;
-			}
-
-			string outPath = proj.workDir / (j->decl.name + ".png");
-			if (term.empty()) {
-				outPath = proj.buildPath("dbg", j->decl.name+".png").string();
-			}
-			if (j->dialect().name == "func") {
-				gvdot::render(outPath, chp::export_graph(j->as<chp::graph>(), labels).to_string());
-			} else if (j->dialect().name == "proto") {
-				hse::graph &g = j->as<hse::graph>();
-				if (states) {
-					hse::graph sg = hse::to_state_graph(g, true);
-					gvdot::render(outPath, hse::export_graph(sg, horiz, labels, notations, ghost, encodings).to_string());
-				} else if (petri) {
-					hse::graph pn = hse::to_petri_net(g, true);
-					gvdot::render(outPath, hse::export_graph(pn, horiz, labels, notations, ghost, encodings).to_string());
+		}
+	} else {
+		for (auto i = protos.begin(); i != protos.end(); i++) {
+			vector<weaver::TermId> idx = findProto(prgm, *i);
+			if (i->isModule()) {
+				if (not idx.empty() and idx[0].mod >= 0) {
+					for (auto j = prgm.mods[idx[0].mod].terms.begin(); j != prgm.mods[idx[0].mod].terms.end(); j++) {
+						show(opts, *j, proj.buildPath("dbg", j->decl.name+".png").string());
+					}
 				} else {
-					gvdot::render(outPath, hse::export_graph(g, horiz, labels, notations, ghost, encodings).to_string());
+					error("", "module not found for '" + i->to_string() + "'", __FILE__, __LINE__);
+				}
+			} else if (i->isTerm()) {
+				if (idx.empty()) {
+					error("", "term not found for '" + i->to_string() + "'", __FILE__, __LINE__);
+				}
+				for (auto j = idx.begin(); j != idx.end(); j++) {
+					if (j->defined()) {
+						weaver::Term &t = prgm.termAt(*j);
+						show(opts, t, proj.workDir / (t.decl.name + ".png"));
+					} else {
+						error("", "term not found for '" + i->to_string() + "'", __FILE__, __LINE__);
+					}
 				}
 			}
 		}

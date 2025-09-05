@@ -108,6 +108,12 @@ void compare(weaver::Program &prgm, weaver::Term &child, weaver::Term &parent) {
 		extract(s0, lib);
 
 		compare(s0, parent.as<sch::Netlist>());
+	} else if (child.dialect().name == "spice" and parent.dialect().name == "child") {
+		phy::Library &lib = parent.as<phy::Library>();
+		sch::Netlist s1;
+		extract(s1, lib);
+
+		compare(child.as<sch::Netlist>(), s1);
 	} else if (child.dialect().name == "spice" and parent.dialect().name == "spice") {
 		compare(child.as<sch::Netlist>(), parent.as<sch::Netlist>());
 	}
@@ -130,82 +136,73 @@ void verifyImpl(weaver::Program &prgm, weaver::TermId idx) {
 	}
 }
 
-weaver::TermId findProto(const weaver::Program &prgm, Proto proto) {
-	if (proto.isModule()) {
-		return weaver::TermId(prgm.findModule(proto.name[0]), -1);
-	}
-
-	weaver::TypeId recv;
-	if (not proto.recv.empty()) {
-		recv = prgm.findType(proto.recv);
-	}
-	vector<weaver::TypeId> args;
-	for (auto i = proto.args.begin(); i != proto.args.end(); i++) {
-		args.push_back(prgm.findType(*i));
-	}
-	return prgm.findTerm(recv, proto.name, args);
-}
-
 void verifyGroup(weaver::Program &prgm, Group group) {
 	if (group.terms.empty()) {
 		return;
 	} else if (group.terms.size() == 1u) {
 		printf("%s:\n", group.terms[0].to_string().c_str());
+		vector<weaver::TermId> idx = findProto(prgm, group.terms[0]);
 		if (group.terms[0].isModule()) {
-			int modIdx = prgm.findModule(group.terms[0].name[0]);
-			if (modIdx >= 0) {
-				for (int termIdx = 0; termIdx < (int)prgm.mods[modIdx].terms.size(); termIdx++) {
-					verifyImpl(prgm, weaver::TermId(modIdx, termIdx));
+			if (idx[0].mod >= 0) {
+				for (idx[0].index = 0; idx[0].index < (int)prgm.mods[idx[0].mod].terms.size(); idx[0].index++) {
+					verifyImpl(prgm, idx[0]);
 				}
-			}
-		} else {
-			weaver::TermId idx = findProto(prgm, group.terms[0]);
-			if (idx.defined()) {
-				verifyImpl(prgm, idx);
 			} else {
-				printf("error: term not found '%s'\n", ::to_string(group.terms[0].name).c_str());
+				printf("error: module not found '%s'\n", group.terms[0].to_string().c_str());
+			}
+		} else if (group.terms[0].isTerm()) {
+			for (auto j = idx.begin(); j != idx.end(); j++) {
+				if (j->defined()) {
+					verifyImpl(prgm, *j);
+				} else {
+					printf("error: term not found '%s'\n", group.terms[0].to_string().c_str());
+				}
 			}
 		}
 		return;
 	}
 	
-	weaver::TermId prev = findProto(prgm, group.terms[0]);
-	if (prev.mod < 0) {
+	vector<weaver::TermId> prev = findProto(prgm, group.terms[0]);
+	if (prev.empty() or prev[0].mod < 0) {
 		printf("error: term not found '%s'\n", group.terms[0].to_string().c_str());
 	}
 	for (int i = 1; i < (int)group.terms.size(); i++) {
-		weaver::TermId curr = findProto(prgm, group.terms[i]);
-		if (curr.mod < 0) {
+		vector<weaver::TermId> curr = findProto(prgm, group.terms[i]);
+		if (curr.empty() or curr[0].mod < 0) {
 			printf("error: term not found '%s'\n", group.terms[i].to_string().c_str());
 		}
 		printf("%s = %s:\n", group.terms[i-1].to_string().c_str(), group.terms[i].to_string().c_str());
-		if (curr.defined() and prev.defined()) {
-			weaver::Term &t0 = prgm.termAt(prev);
-			weaver::Term &t1 = prgm.termAt(curr);
-			compare(prgm, t0, t1);
-		} else if (curr.defined() and prev.mod >= 0) {
-			weaver::Term &t1 = prgm.termAt(curr);
-			for (int t0i = 0; t0i < (int)prgm.mods[prev.mod].terms.size(); t0i++) {
-				weaver::Term &t0 = prgm.termAt(weaver::TermId(prev.mod, t0i));
-				if (t0.decl.name == t1.decl.name) {
+		for (auto j = prev.begin(); j != prev.end(); j++) {
+			for (auto k = curr.begin(); k != curr.end(); k++) {
+				if (k->defined() and j->defined()) {
+					weaver::Term &t0 = prgm.termAt(*j);
+					weaver::Term &t1 = prgm.termAt(*k);
 					compare(prgm, t0, t1);
-				}
-			}
-		} else if (curr.mod >= 0 and prev.defined()) {
-			weaver::Term &t0 = prgm.termAt(prev);
-			for (int t1i = 0; t1i < (int)prgm.mods[curr.mod].terms.size(); t1i++) {
-				weaver::Term &t1 = prgm.termAt(weaver::TermId(curr.mod, t1i));
-				if (t0.decl.name == t1.decl.name) {
-					compare(prgm, t0, t1);
-				}
-			}
-		} else if (curr.mod >= 0 and prev.mod >= 0) {
-			for (int t0i = 0; t0i < (int)prgm.mods[prev.mod].terms.size(); t0i++) {
-				weaver::Term &t0 = prgm.termAt(weaver::TermId(prev.mod, t0i));
-				for (int t1i = 0; t1i < (int)prgm.mods[curr.mod].terms.size(); t1i++) {
-					weaver::Term &t1 = prgm.termAt(weaver::TermId(curr.mod, t1i));
-					if (t0.decl.name == t1.decl.name) {
-						compare(prgm, t0, t1);
+				} else if (k->defined() and j->mod >= 0) {
+					weaver::Term &t1 = prgm.termAt(*k);
+					for (int t0i = 0; t0i < (int)prgm.mods[j->mod].terms.size(); t0i++) {
+						weaver::Term &t0 = prgm.termAt(weaver::TermId(j->mod, t0i));
+						if (t0.decl.name == t1.decl.name) {
+							compare(prgm, t0, t1);
+						}
+					}
+				} else if (k->mod >= 0 and j->defined()) {
+					weaver::Term &t0 = prgm.termAt(*j);
+					for (int t1i = 0; t1i < (int)prgm.mods[k->mod].terms.size(); t1i++) {
+						weaver::Term &t1 = prgm.termAt(weaver::TermId(k->mod, t1i));
+						if (t0.decl.name == t1.decl.name) {
+							compare(prgm, t0, t1);
+						}
+					}
+				} else if (k->mod >= 0 and j->mod >= 0) {
+					for (int t0i = 0; t0i < (int)prgm.mods[j->mod].terms.size(); t0i++) {
+						weaver::Term &t0 = prgm.termAt(weaver::TermId(j->mod, t0i));
+						for (int t1i = 0; t1i < (int)prgm.mods[k->mod].terms.size(); t1i++) {
+							weaver::Term &t1 = prgm.termAt(weaver::TermId(k->mod, t1i));
+							if (t0.decl.name == t1.decl.name) {
+								compare(prgm, t0, t1);
+							}
+						}
 					}
 				}
 			}
