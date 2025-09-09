@@ -14,8 +14,8 @@
 #include <parse/default/block_comment.h>
 #include <parse/default/line_comment.h>
 
-#include <parse_cog/composition.h>
 #include <parse_cog/branch.h>
+#include <parse_cog/composition.h>
 #include <parse_cog/control.h>
 #include <parse_cog/factory.h>
 
@@ -28,7 +28,8 @@
 #include <flow/func.h>
 #include <flow/module.h>
 #include <flow/synthesize.h>
-#include <interpret_flow/export.h>
+#include <interpret_flow/export_dot.h>
+#include <interpret_flow/export_verilog.h>
 
 #include "src/format/dot.h"
 
@@ -63,7 +64,7 @@ string readStringFromFile(const string &absolute_filename, bool strip_newlines=f
 	// Replace all newlines with spaces
 	if (strip_newlines) {
 		 replace(result.begin(), result.end(), '\n', ' ');
-		 replace(result.begin(), result.end(), '\r', ' '); // for Windows files
+		 replace(result.begin(), result.end(), '\r', ' '); // don't forget Windows newlines
 	}
 
 	return result;
@@ -135,12 +136,26 @@ flow::Func testFuncSynthesisFromCog(flow::Func &expected, bool render=true) {
 	g.post_process(true, false);  //TODO: ... true, true) , should be called internally from other transformations
 	g.name = expected.name;
 
-	g.flatten(true);
+	//g.flatten(true);
 	if (render) {
 		string graphvizRaw = chp::export_graph(g, true).to_string();
 		gvdot::render(filenameWithoutExtension + ".png", graphvizRaw);
 	}
 	flow::Func real = chp::synthesizeFuncFromCHP(g);
+	if (render) {
+		string graphvizRaw = flow::export_func(real).to_string();
+
+		string filename = filenameWithoutExtension + "-flow.dot";
+		std::ofstream export_file(filename);
+		if (!export_file) {
+				std::cerr << "ERROR: Failed to open file for dot export: "
+					<< filename << std::endl
+					<< "ERROR: Try again from dir: <project_dir>/lib/flow" << std::endl;
+				//TODO: we want soft failure, but this doesn't break or prevent file writing
+		} 
+		export_file << graphvizRaw;
+		//gvdot::render(filenameWithoutExtension + "-flow.png", graphvizRaw);
+	}
 
 	EXPECT_EQ(real.name, expected.name);
 	EXPECT_TRUE(areEquivalent(real, expected));
@@ -256,10 +271,10 @@ TEST(CogToVerilog, TrafficLight) {
 	func_expected.conds[branch0].mem(s, expr_green);
 
 	int branch1 = func_expected.pushCond(expr_s == expr_green);
-	func_expected.conds[branch0].mem(s, expr_yellow);
+	func_expected.conds[branch1].mem(s, expr_yellow);
 
 	int branch2 = func_expected.pushCond(expr_s == expr_yellow);
-	func_expected.conds[branch0].mem(s, expr_red);
+	func_expected.conds[branch2].mem(s, expr_red);
 
 	flow::Func func_real = testFuncSynthesisFromCog(func_expected);
 	string verilog = synthesizeVerilogFromFunc(func_real).to_string();

@@ -5,7 +5,7 @@
 #include <parse/default/line_comment.h>
 #include <parse/default/new_line.h>
 
-#include <interpret_flow/export.h>
+#include <interpret_flow/export_verilog.h>
 
 void writeVerilog(fs::path path, const weaver::Project &proj, const weaver::Program &prgm, int modIdx, int termIdx) {
 	ofstream fout(path.string().c_str(), ios::out);

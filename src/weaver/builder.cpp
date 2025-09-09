@@ -1,5 +1,7 @@
 #include "builder.h"
 
+#include <filesystem>
+
 #include <common/standard.h>
 #include <common/timer.h>
 #include <common/text.h>
@@ -17,17 +19,18 @@
 #include <sch/Placer.h>
 #include <phy/Script.h>
 
-#include <interpret_flow/export.h>
+#include <interpret_chp/export_dot.h>
+#include <interpret_flow/export_dot.h>
+#include <interpret_flow/export_verilog.h>
 #include <interpret_hse/export_cli.h>
 #include <interpret_hse/export.h>
-#include <interpret_prs/export.h>
-#include <interpret_sch/export.h>
 #include <interpret_phy/import.h>
 #include <interpret_phy/export.h>
-
-#include <filesystem>
+#include <interpret_prs/export.h>
+#include <interpret_sch/export.h>
 
 #include "../format/cell.h"
+#include "../format/dot.h"
 
 Build::Build(weaver::Project &proj) : proj(proj) {
 	logic = LOGIC_CMOS;
@@ -139,7 +142,8 @@ void Build::build(weaver::Program &prgm) {
 }
 
 bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
-	string debugDir = proj.rootDir / proj.BUILD / "dbg";
+	std::filesystem::path debugDirPath = proj.rootDir / proj.BUILD / "dbg";
+	string debugDir = debugDirPath.string();
 
 	// Verify expected format of the term
 	if (prgm.mods[modIdx].terms[termIdx].dialect().name != "func") {
@@ -166,22 +170,50 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 	// Do the synthesis
 	chp::graph &g = prgm.mods[modIdx].terms[termIdx].as<chp::graph>();
 	g.post_process();	
-	g.flatten(debug);
-
-	//string graph_render_filename = "_" + prefix + "_" + g.name + ".png";
-	//gvdot::render(graph_render_filename, chp::export_graph(g, true).to_string());
+	g.flatten(this->debug);
 
 	for (auto i = args.begin(); i != args.end(); i++) {
 		// TODO(edward.bingham) pass the variable declarations over to flow
+		chp::variable var(i->name);
+		g.vars.push_back(var);
+		//TODO: can chp::synthesizeFuncFromCHP() always assume its vars are pre-populated?
 	}
 
 	int dstIdx = prgm.mods[flowIdx].createTerm(weaver::Term::procOf(flowKind, name, args));
-	prgm.mods[flowIdx].terms[dstIdx].def = chp::synthesizeFuncFromCHP(g);
+	const flow::Func &f = chp::synthesizeFuncFromCHP(g);
+	prgm.mods[flowIdx].terms[dstIdx].def = f;
+
+	if (this->debug) {
+		string prefix = ""; //"_" + this->proj.modName + "_";
+		string flatchp_filename = (debugDirPath / (prefix + g.name + "_flatchp.png")).string();
+		string flatchp_dot = chp::export_graph(g, true).to_string();
+		gvdot::render(flatchp_filename, flatchp_dot);
+
+		string flow_filename = (debugDirPath / (prefix + g.name + "_flow.dot")).string();
+		string flow_dot = flow::export_func(f).to_string();
+		//gvdot::render(flow_filename, flow_dot);
+		//TODO: a well-structured flow::export_func in interpret_flow/export_dot,h will play nice with gvdot::render for png export
+
+		std::ofstream export_file(flow_filename);
+		if (!export_file) {
+				std::cerr << "ERROR: Failed to open file for dot export: "
+					<< flow_filename << std::endl;
+					//<< "ERROR: Try again from dir: <project_dir>/lib/flow" << std::endl;
+
+				//TODO: we want soft failure, but this doesn't break or prevent file writing
+				return false;
+
+		}  else {
+			export_file << flow_dot;
+		}
+	}
+
 	return true;
 }
 
 bool Build::flowToVerilog(weaver::Program &prgm, int modIdx, int termIdx) const {
-	string debugDir = proj.rootDir / proj.BUILD / "dbg";
+	std::filesystem::path debugDirPath = proj.rootDir / proj.BUILD / "dbg";
+	string debugDir = debugDirPath.string();
 
 	// Verify expected format of the term
 	if (prgm.mods[modIdx].terms[termIdx].dialect().name != "flow") {
@@ -213,12 +245,40 @@ bool Build::flowToVerilog(weaver::Program &prgm, int modIdx, int termIdx) const 
 	}
 
 	int dstIdx = prgm.mods[verilogIdx].createTerm(weaver::Term::procOf(verilogKind, name, args));
-	prgm.mods[verilogIdx].terms[dstIdx].def = flow::synthesizeModuleFromFunc(fn);
+	clocked::Module mod = flow::synthesizeModuleFromFunc(fn);
+	parse_verilog::module_def mod_v = flow::export_module(mod);
+	string verilog = mod_v.to_string();
+
+	prgm.mods[verilogIdx].terms[dstIdx].def = mod;
+	//TODO: Why stop at clocked::Module? This is flowToVerilog!
+	//prgm.mods[verilogIdx].terms[dstIdx].def = mod_v; ??
+	//prgm.mods[verilogIdx].terms[dstIdx].def = verilog; ??
+
+
+	if (this->debug) {
+		string prefix = ""; //"_" + this->proj.modName + "_";
+		string verilog_filename = (debugDirPath / (prefix + fn.name + ".v")).string();
+
+		std::ofstream export_file(verilog_filename);
+		if (!export_file) {
+				std::cerr << "ERROR: Failed to open file for verilog export: "
+					<< verilog_filename << std::endl;
+					//<< "ERROR: Try again from dir: <project_dir>/lib/flow" << std::endl;
+
+				//TODO: we want soft failure, but this doesn't break or prevent file writing
+				return false;
+
+		}  else {
+			export_file << verilog;
+		}
+	}
+
 	return true;
 }
 
 bool Build::hseToPrs(weaver::Program &prgm, int modIdx, int termIdx) const {
-	string debugDir = proj.rootDir / proj.BUILD / "dbg";
+	std::filesystem::path debugDirPath = proj.rootDir / proj.BUILD / "dbg";
+	string debugDir = debugDirPath.string();
 
 	// Verify expected format of the term
 	if (prgm.mods[modIdx].terms[termIdx].dialect().name != "proto") {
@@ -406,7 +466,8 @@ bool Build::prsToSpi(weaver::Program &prgm, int modIdx, int termIdx) {
 }
 
 bool Build::spiToGds(weaver::Program &prgm, int modIdx, int termIdx) {
-	string debugDir = proj.rootDir / proj.BUILD / "dbg";
+	std::filesystem::path debugDirPath = proj.rootDir / proj.BUILD / "dbg";
+	string debugDir = debugDirPath.string();
 
 	// Verify expected format of the term
 	if (prgm.mods[modIdx].terms[termIdx].dialect().name != "spice") {

@@ -128,7 +128,7 @@ int show_command(int argc, char **argv) {
 	vector<Proto> protos;
 
 	ShowOptions opts;
-	
+
 	for (int i = 0; i < argc; i++) {
 		string arg = argv[i];
 		if (arg == "--labels" || arg == "-l") {
