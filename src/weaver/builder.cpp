@@ -45,6 +45,7 @@ Build::Build(weaver::Project &proj) : proj(proj) {
 
 	progress = false;
 	debug = false;
+	format_expressions_as_html_table = false;
 	
 	targets.resize(ROUTE+1, false);
 }
@@ -170,6 +171,13 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 	// Do the synthesis
 	chp::graph &g = prgm.mods[modIdx].terms[termIdx].as<chp::graph>();
 	g.post_process();	
+	if (this->debug) {
+		string prefix = ""; //"_" + this->proj.modName + "_";
+		string chp_filename = (debugDirPath / (prefix + g.name + "_chp.png")).string();
+		string chp_dot = chp::export_graph(g, true).to_string();
+		gvdot::render(chp_filename, chp_dot);
+	}
+
 	g.flatten(this->debug);
 
 	for (auto i = args.begin(); i != args.end(); i++) {
@@ -190,7 +198,7 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 		gvdot::render(flatchp_filename, flatchp_dot);
 
 		string flow_filename = (debugDirPath / (prefix + g.name + "_flow.dot")).string();
-		string flow_dot = flow::export_func(f).to_string();
+		string flow_dot = flow::export_func(f, this->format_expressions_as_html_table).to_string();
 		//gvdot::render(flow_filename, flow_dot);
 		//TODO: a well-structured flow::export_func in interpret_flow/export_dot,h will play nice with gvdot::render for png export
 

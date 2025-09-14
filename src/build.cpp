@@ -35,6 +35,8 @@ void build_help() {
 	printf("\nOptions:\n");
 	printf(" -v,--verbose     display verbose messages\n");
 	printf(" -d,--debug       display internal debugging messages\n");
+	printf("    --flow_html   enable HTML table output in debug mode (requires --debug)\n");
+	printf(" -h,--help        display this help text\n");
 	printf(" -p,--progress    display progress information\n");
 	printf("\n");
 	printf(" -t,--tech <techfile>    manually specify the technology file and arguments\n");
@@ -94,6 +96,26 @@ int build_command(int argc, char **argv) {
 		} else if (arg == "--debug" or arg == "-d") {
 			set_debug(true);
 			builder.debug = true;
+			
+			// Create debug dir if it does not already exist
+			std::filesystem::path debugDirPath = proj.rootDir / proj.BUILD / "dbg";
+			if (!std::filesystem::exists(debugDirPath)) {
+				if (!fs::create_directories(debugDirPath)) {
+					printf("error: %s does not exist & cannot be created\n", debugDirPath.c_str());
+					return 1;
+				}
+			}
+
+		} else if (arg == "--flow_html") {
+			if (!builder.debug) {
+				printf("warning: --flow_html flag requires --debug to be enabled, ignoring\n");
+			} else {
+				builder.format_expressions_as_html_table = true;
+			}
+		} else if (arg == "-h" or arg == "--help") {
+			build_help();
+			return 0;
+
 		} else if (arg == "--progress" or arg == "-p") {
 			builder.progress = true;
 		} else if (arg == "--tech" or arg == "-t") {

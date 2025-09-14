@@ -53,6 +53,7 @@ struct Build {
 
 	bool progress;
 	bool debug;
+	bool format_expressions_as_html_table;
 	
 	vector<bool> targets;
 
