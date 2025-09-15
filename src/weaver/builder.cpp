@@ -111,6 +111,7 @@ void doPlacement(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=
 			if (stream != nullptr and cells != nullptr) {
 				export_layout(*stream, lib, i, *cells);
 			}
+			lst.mapToLayout(i, lib.macros[i]);
 		}
 	}
 
