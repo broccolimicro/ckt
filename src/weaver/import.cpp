@@ -49,7 +49,8 @@ Decl import_prototype(const Program &prgm, int modIdx, const parse_ucs::prototyp
 
 void import_symbols(Program &prgm, int modIdx, const parse_ucs::source &syntax) {
 	for (auto i = syntax.types.begin(); i != syntax.types.end(); i++) {
-		int recvType = prgm.mods[modIdx].createType(Type::typeOf(i->name));
+		//int recvType = prgm.mods[modIdx].createType(Type::typeOf(i->name));
+		prgm.mods[modIdx].createType(Type::typeOf(i->name));
 	}
 }
 

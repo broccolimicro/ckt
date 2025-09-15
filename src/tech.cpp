@@ -56,7 +56,7 @@
 #define KBLU  "\x1B[34m"
 using namespace std::chrono;
 
-const bool debug = false;
+//const bool debug = false;
 
 void tech_help() {
 	printf("Usage: lm tech <command> [arguments]\n");

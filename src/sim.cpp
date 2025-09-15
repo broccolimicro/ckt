@@ -801,7 +801,7 @@ void prsim(prs::production_rule_set &pr, bool debug) {//, vector<prs::term_index
 
 	int seed = 0;
 	srand(seed);
-	int step = 0;
+	//int step = 0;
 	int n = 0;
 	char command[256];
 	bool done = false;
@@ -880,7 +880,7 @@ void prsim(prs::production_rule_set &pr, bool debug) {//, vector<prs::term_index
 			sim.run();
 		} else if (strncmp(command, "reset", 5) == 0 || strncmp(command, "r", 1) == 0) {
 			sim.reset();
-			step = 0;
+			//step = 0;
 			srand(seed);
 		} else if (strncmp(command, "wait", 4) == 0 || strncmp(command, "w", 1) == 0) {
 			sim.wait();
@@ -977,7 +977,7 @@ void prsim(prs::production_rule_set &pr, bool debug) {//, vector<prs::term_index
 				//sim.interference_errors.clear();
 				//sim.instability_errors.clear();
 				//sim.mutex_errors.clear();
-				step++;
+				//step++;
 			}
 		} else if (strncmp(command, "fire", 4) == 0 || strncmp(command, "f", 1) == 0) {
 			if (sscanf(command, "fire %d", &n) == 1 || sscanf(command, "f%d", &n) == 1) {
@@ -999,7 +999,7 @@ void prsim(prs::production_rule_set &pr, bool debug) {//, vector<prs::term_index
 						//sim.interference_errors.clear();
 						//sim.instability_errors.clear();
 						//sim.mutex_errors.clear();
-						step++;
+						//step++;
 					//}
 				} else {
 					printf("error: must be in the range [0,%llu)\n", sim.enabled.size());

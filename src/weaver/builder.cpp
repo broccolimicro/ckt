@@ -418,17 +418,19 @@ bool Build::prsToSpi(weaver::Program &prgm, int modIdx, int termIdx) {
 		prs::bubble bub;
 		bub.load_prs(pr);
 
-		int step = 0;
+		//int step = 0;
 		//if (has(Build::BUBBLE) and debug) {
 		//	gvdot::render(pr.name+"_bubble0.png", export_bubble(bub, pr).to_string());
 		//}
 		for (auto i = bub.net.begin(); i != bub.net.end(); i++) {
-			auto result = bub.step(i);
+			bub.step(i);
+			//auto result = bub.step(i);
 			//if (has(Build::BUBBLE) and debug and result.second) {
 			//	gvdot::render(pr.name+"_bubble" + to_string(++step) + ".png", export_bubble(bub, pr).to_string());
 			//}
 		}
-		auto result = bub.complete();
+		bub.complete();
+		//auto result = bub.complete();
 		//if (has(Build::BUBBLE) and debug and result) {
 		//	gvdot::render(pr.name+"_bubble" + to_string(++step) + ".png", export_bubble(bub, pr).to_string());
 		//}
