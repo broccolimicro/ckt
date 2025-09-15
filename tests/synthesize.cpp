@@ -133,17 +133,17 @@ flow::Func testFuncSynthesisFromCog(flow::Func &expected, bool render=true) {
 	cout << "```cog" << endl << cogRaw << endl << "```" << endl;
 
 	chp::graph g = importCHPFromCogString(cogRaw);
-	g.post_process(true, false);  //TODO: ... true, true) , should be called internally from other transformations
 	g.name = expected.name;
+	g.post_process(true, false);  //TODO: ... true, true) , should be called internally from other transformations
+	g.flatten(true);
 
-	//g.flatten(true);
 	if (render) {
 		string graphvizRaw = chp::export_graph(g, true).to_string();
 		gvdot::render(filenameWithoutExtension + ".png", graphvizRaw);
 	}
 	flow::Func real = chp::synthesizeFuncFromCHP(g);
 	if (render) {
-		string graphvizRaw = flow::export_func(real).to_string();
+		string graphvizRaw = flow::export_func(real, true).to_string();
 
 		string filename = filenameWithoutExtension + "-flow.dot";
 		std::ofstream export_file(filename);
