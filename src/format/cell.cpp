@@ -57,6 +57,7 @@ bool import_cell(phy::Library &lib, sch::Netlist &lst, int idx, bool progress, b
 		bool imported = import_layout(lib.macros[idx], cellPath, lib.macros[idx].name);
 		if (progress) {
 			if (imported) {
+				lib.macros[idx].trace();
 				sch::Subckt gdsNet(true);
 				extract(gdsNet, lib.macros[idx], true);
 				gdsNet.cleanDangling(true);
