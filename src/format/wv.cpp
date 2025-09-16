@@ -18,7 +18,7 @@ void readWv(weaver::Project &proj, weaver::Source &source, string buffer) {
 	source.tokens->increment(true);
 	source.tokens->expect<parse_ucs::source>();
 	if (source.tokens->decrement(__FILE__, __LINE__)) {
-		source.syntax = unique_ptr<parse::syntax>(new parse_ucs::source(*source.tokens));
+		source.syntax = shared_ptr<parse::syntax>(new parse_ucs::source(*source.tokens));
 	}
 
 	parse_ucs::source &syntax = *(parse_ucs::source*)source.syntax.get();
@@ -35,7 +35,7 @@ void readWv(weaver::Project &proj, weaver::Source &source, string buffer) {
 void loadWv(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
 	int index = prgm.getModule(source.modName);
 	// load symbols to break dependency chains
-	import_symbols(prgm, index, *(parse_ucs::source*)source.syntax.get());
+	import_symbols(prgm, index, *(parse_ucs::source*)source.syntax.get(), source.tokens.get());
 	// link up all of the dependencies
-	import_module(prgm, index, *(parse_ucs::source*)source.syntax.get());
+	import_module(prgm, index, *(parse_ucs::source*)source.syntax.get(), source.tokens.get());
 }

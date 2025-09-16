@@ -133,7 +133,7 @@ bool Project::read(Program &prgm, fs::path path) {
 	sources.back().path = fs::relative(canon, workDir);
 	sources.back().modName = pathToModule(canon);
 	sources.back().filetype = filetype;
-	sources.back().tokens = unique_ptr<tokenizer>(new tokenizer());
+	sources.back().tokens = shared_ptr<tokenizer>(new tokenizer());
 
 	if (filetype->read != nullptr) {
 		ifstream fin;

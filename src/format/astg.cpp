@@ -23,7 +23,7 @@ void readAstg(weaver::Project &proj, weaver::Source &source, string buffer) {
 	source.tokens->increment(false);
 	source.tokens->expect<parse_astg::graph>();
 	if (source.tokens->decrement(__FILE__, __LINE__)) {
-		source.syntax = unique_ptr<parse::syntax>(new parse_astg::graph(*source.tokens));
+		source.syntax = shared_ptr<parse::syntax>(new parse_astg::graph(*source.tokens));
 	}
 }
 

@@ -23,7 +23,7 @@ void Binder::popScope() {
 	prgm.mods[currModule].terms[currTerm].symb.popScope();
 }*/
 
-bool import_declaration(vector<Instance> &result, const Program &prgm, int modIdx, const parse_ucs::declaration &syntax) {
+bool import_declaration(vector<Instance> &result, const Program &prgm, int modIdx, const parse_ucs::declaration &syntax, tokenizer *tokens) {
 	TypeId type = prgm.findType(modIdx, syntax.type.names);
 	if (not type.defined()) {
 		printf("error: type not defined '%s'\n", syntax.type.to_string().c_str());
@@ -37,24 +37,24 @@ bool import_declaration(vector<Instance> &result, const Program &prgm, int modId
 	return true;
 }
 
-Decl import_prototype(const Program &prgm, int modIdx, const parse_ucs::prototype &syntax, TypeId recvType) {
+Decl import_prototype(const Program &prgm, int modIdx, const parse_ucs::prototype &syntax, TypeId recvType, tokenizer *tokens) {
 	TypeId retType = prgm.findType(modIdx, syntax.ret.names);
 	vector<Instance> args;
 	for (auto i = syntax.args.begin(); i != syntax.args.end(); i++) {
-		import_declaration(args, prgm, modIdx, *i);
+		import_declaration(args, prgm, modIdx, *i, tokens);
 	}
 
 	return Decl(syntax.name, args, retType, recvType);
 }
 
-void import_symbols(Program &prgm, int modIdx, const parse_ucs::source &syntax) {
+void import_symbols(Program &prgm, int modIdx, const parse_ucs::source &syntax, tokenizer *tokens) {
 	for (auto i = syntax.types.begin(); i != syntax.types.end(); i++) {
 		//int recvType = prgm.mods[modIdx].createType(Type::typeOf(i->name));
 		prgm.mods[modIdx].createType(Type::typeOf(i->name));
 	}
 }
 
-void import_term(Program &prgm, Module &mod, int modIdx, const parse_ucs::function &syntax) {
+void import_term(Program &prgm, Module &mod, int modIdx, const parse_ucs::function &syntax, tokenizer *tokens) {
 	int kind = Term::findDialect(syntax.lang);
 	TypeId recvType;
 	if (not syntax.recv.empty()) {
@@ -76,12 +76,12 @@ void import_term(Program &prgm, Module &mod, int modIdx, const parse_ucs::functi
 
 	vector<Instance> args;
 	for (auto j = syntax.args.begin(); j != syntax.args.end(); j++) {
-		import_declaration(args, prgm, modIdx, *j);
+		import_declaration(args, prgm, modIdx, *j, tokens);
 	}
 
 	int termIdx = mod.createTerm(Term::procOf(kind, syntax.name, args, retType, recvType));
 	if (kind >= 0) {
-		mod.terms[termIdx].def = Term::dialects[kind].factory(syntax.name, syntax.body, nullptr);
+		mod.terms[termIdx].def = Term::dialects[kind].factory(syntax.name, syntax.body, tokens);
 	}
 
 	for (auto i = syntax.impl.begin(); i != syntax.impl.end(); i++) {
@@ -92,20 +92,20 @@ void import_term(Program &prgm, Module &mod, int modIdx, const parse_ucs::functi
 	}
 }
 
-void import_module(Program &prgm, int modIdx, const parse_ucs::source &syntax) {
+void import_module(Program &prgm, int modIdx, const parse_ucs::source &syntax, tokenizer *tokens) {
 	for (auto i = syntax.types.begin(); i != syntax.types.end(); i++) {
 		TypeId recvType = prgm.findType(modIdx, {i->name});
 		for (auto j = i->members.begin(); j != i->members.end(); j++) {
-			import_declaration(prgm.typeAt(recvType).members, prgm, modIdx, *j);
+			import_declaration(prgm.typeAt(recvType).members, prgm, modIdx, *j, tokens);
 		}
 
 		for (auto j = i->protocols.begin(); j != i->protocols.end(); j++) {
-			prgm.typeAt(recvType).methods.push_back(import_prototype(prgm, modIdx, *j, recvType));
+			prgm.typeAt(recvType).methods.push_back(import_prototype(prgm, modIdx, *j, recvType, tokens));
 		}
 	}
 
 	for (auto i = syntax.funcs.begin(); i != syntax.funcs.end(); i++) {
-		import_term(prgm, prgm.mods[modIdx], modIdx, *i);
+		import_term(prgm, prgm.mods[modIdx], modIdx, *i, tokens);
 	}
 }
 

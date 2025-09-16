@@ -21,8 +21,8 @@ struct Depend {
 struct Source {
 	fs::path path;
 	string modName;
-	unique_ptr<parse::syntax> syntax;
-	unique_ptr<tokenizer> tokens;
+	shared_ptr<parse::syntax> syntax;
+	shared_ptr<tokenizer> tokens;
 	const Filetype *filetype;
 };
 

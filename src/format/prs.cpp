@@ -20,7 +20,7 @@ void readPrs(weaver::Project &proj, weaver::Source &source, string buffer) {
 	source.tokens->increment(false);
 	parse_prs::expect(*source.tokens);
 	if (source.tokens->decrement(__FILE__, __LINE__)) {
-		source.syntax = unique_ptr<parse::syntax>(new parse_prs::production_rule_set(*source.tokens));
+		source.syntax = shared_ptr<parse::syntax>(new parse_prs::production_rule_set(*source.tokens));
 	}
 }
 
