@@ -101,6 +101,21 @@ void show(ShowOptions opts, weaver::Term &t, string outPath) {
 	}
 }
 
+void show(ShowOptions opts, fs::path outPath, weaver::Program &prgm, weaver::TermId term=weaver::TermId()) {
+	if (term.mod < 0) {
+		for (term.mod = 0; term.mod < (int)prgm.mods.size(); term.mod++) {
+			show(opts, outPath, prgm, term);
+		}
+	} else if (term.index < 0) {
+		for (term.index = 0; term.index < (int)prgm.mods[term.mod].terms.size(); term.index++) {
+			show(opts, outPath, prgm, term);
+		}
+	} else {
+		weaver::Term &t = prgm.termAt(term);
+		show(opts, t, outPath / (t.decl.name + ".png"));
+	}
+}
+
 int show_command(int argc, char **argv) {
 	parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
 	parse_ucs::function::registry.insert({"proto", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
@@ -185,27 +200,12 @@ int show_command(int argc, char **argv) {
 		}
 	} else {
 		for (auto i = protos.begin(); i != protos.end(); i++) {
-			vector<weaver::TermId> idx = findProto(prgm, *i);
-			if (i->isModule()) {
-				if (not idx.empty() and idx[0].mod >= 0) {
-					for (auto j = prgm.mods[idx[0].mod].terms.begin(); j != prgm.mods[idx[0].mod].terms.end(); j++) {
-						show(opts, *j, proj.buildPath("dbg", j->decl.name+".png").string());
-					}
-				} else {
-					error("", "module not found for '" + i->to_string() + "'", __FILE__, __LINE__);
-				}
-			} else if (i->isTerm()) {
-				if (idx.empty()) {
-					error("", "term not found for '" + i->to_string() + "'", __FILE__, __LINE__);
-				}
-				for (auto j = idx.begin(); j != idx.end(); j++) {
-					if (j->defined()) {
-						weaver::Term &t = prgm.termAt(*j);
-						show(opts, t, proj.workDir / (t.decl.name + ".png"));
-					} else {
-						error("", "term not found for '" + i->to_string() + "'", __FILE__, __LINE__);
-					}
-				}
+			vector<weaver::TermId> curr = findProto(prgm, *i);
+			if (curr.empty()) {
+				error("", "module not found for term '" + i->to_string() + "'", __FILE__, __LINE__);
+			}
+			for (auto j = curr.begin(); j != curr.end(); j++) {
+				show(opts, proj.workDir, prgm, *j);
 			}
 		}
 	}
