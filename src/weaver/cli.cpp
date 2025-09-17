@@ -41,6 +41,10 @@ string Proto::to_string() const {
 	return result;
 }
 
+bool Proto::empty() const {
+	return name.empty();
+}
+
 vector<string> parseIdent(string id) {
 	vector<string> result;
 	string term = "";
@@ -85,17 +89,30 @@ Proto parseProto(const weaver::Project &proj, string proto) {
 
 	result.name = parseIdent(proto);
 
+	size_t syn = result.name[0].rfind(">>");
+	if (syn != string::npos) {
+		auto filetype = proj.getDialect(result.name[0].substr(syn+2));
+		result.name[0] = result.name[0].substr(0, syn);
+		if (filetype != nullptr) {
+			result.name[0] += "." + filetype->ext;
+		}
+	}
+
 	fs::path canon = result.name[0];
 	if (canon.extension().empty()) {
 		canon = result.name[0] + ".wv";
 	}
 	if (not canon.is_absolute()) {
-		canon = proj.workDir / canon;
+		if (result.name[0].rfind(fs::relative(proj.workDir, proj.rootDir).string(), 0) == 0) {
+			canon = proj.rootDir / canon;
+		} else {
+			canon = proj.workDir / canon;
+		}
 	}
 
 	result.path = fs::relative(canon, proj.workDir);
 
-	result.name[0] = proj.pathToModule(result.path);
+	result.name[0] = proj.pathToModule(canon);
 
 	return result;
 }

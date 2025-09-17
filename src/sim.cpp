@@ -20,6 +20,7 @@
 #include <prs/simulator.h>
 
 #include "weaver/project.h"
+#include "weaver/cli.h"
 
 #include "format/dot.h"
 #include "format/cog.h"
@@ -182,7 +183,7 @@ void chpsim(chp::graph &g, vector<chp::term_index> steps = vector<chp::term_inde
 			script = fopen(&command[7], "r");
 			if (script == NULL)
 			{
-				printf("error: file not found '%s'", &command[7]);
+				printf("error: file not found '%s'\n", &command[7]);
 				script = stdin;
 			}
 		}
@@ -517,7 +518,7 @@ void hsesim(hse::graph &g, vector<hse::term_index> steps = vector<hse::term_inde
 			script = fopen(&command[7], "r");
 			if (script == NULL)
 			{
-				printf("error: file not found '%s'", &command[7]);
+				printf("error: file not found '%s'\n", &command[7]);
 				script = stdin;
 			}
 		}
@@ -847,7 +848,7 @@ void prsim(prs::production_rule_set &pr, bool debug) {//, vector<prs::term_index
 			script = fopen(&command[7], "r");
 			if (script == NULL)
 			{
-				printf("error: file not found '%s'", &command[7]);
+				printf("error: file not found '%s'\n", &command[7]);
 				script = stdin;
 			}
 		}
@@ -1016,33 +1017,49 @@ void prsim(prs::production_rule_set &pr, bool debug) {//, vector<prs::term_index
 }
 
 int sim_command(int argc, char **argv) {
-	string filename = "";
-	string term = "";
+	parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
+	parse_ucs::function::registry.insert({"proto", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
+	parse_ucs::function::registry.insert({"circ", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
+
+	weaver::Term::pushDialect("func", factoryCog);
+	weaver::Term::pushDialect("proto", factoryCogw);
+	weaver::Term::pushDialect("circ", factoryPrs);
+
+	weaver::Project proj;
+	if (proj.hasMod()) {
+		proj.readMod();
+	}
+
+	proj.pushFiletype("", "wv", "", readWv, loadWv);
+	proj.pushFiletype("func", "cog", "", readCog, loadCog);
+	proj.pushFiletype("proto", "cogw", "", readCog, loadCogw);
+	proj.pushFiletype("circ", "prs", "ckt", readPrs, loadPrs, writePrs);
+	proj.pushFiletype("spice", "spi", "spi", readSpice, loadSpice, writeSpice);
+	proj.pushFiletype("verilog", "v", "rtl", nullptr, nullptr, writeVerilog);
+	proj.pushFiletype("layout", "gds", "gds", nullptr, loadGds, writeGds);
+	proj.pushFiletype("func", "astg", "state", readAstg, loadAstg, writeAstg);
+	proj.pushFiletype("proto", "astgw", "state", readAstg, loadAstgw, writeAstgw);
+
+	Proto proto;
 
 	string sfilename = "";
-	bool debug;
+	bool list = false;
+	bool debug = false;
 
 	for (int i = 0; i < argc; i++) {
 		string arg = argv[i];
 
-		if (arg[0] == '-') {
-			if (arg == "--verbose" or arg == "-v") {
-				set_verbose(true);
-			} else if (arg == "--debug" or arg == "-d") {
-				set_debug(true);
-				debug = true;
-			} else {
-				printf("unrecognized flag '%s'\n", argv[i]);
-			}
-		} else if (filename == "") {
-			filename = argv[i];
-			size_t pos = filename.find_last_of(':');
-			if (pos != string::npos) {
-				term = filename.substr(pos+1);
-				filename = filename.substr(0, pos);
-			}
+		if (arg == "--verbose" or arg == "-v") {
+			set_verbose(true);
+		} else if (arg == "--debug" or arg == "-d") {
+			set_debug(true);
+			debug = true;
+		} else if (arg == "--list" or arg == "-l") {
+			list = true;
+		} else if (proto.empty()) {
+			proto = parseProto(proj, arg);
 		} else {
-			sfilename = argv[i];
+			sfilename = arg;
 			size_t dot = sfilename.find_last_of(".");
 			if (dot == string::npos) {
 				printf("unrecognized file format\n");
@@ -1056,70 +1073,66 @@ int sim_command(int argc, char **argv) {
 		}
 	}
 
-	parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
-	parse_ucs::function::registry.insert({"proto", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
-	parse_ucs::function::registry.insert({"circ", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
-
-	weaver::Term::pushDialect("func", factoryCog);
-	weaver::Term::pushDialect("proto", factoryCogw);
-	weaver::Term::pushDialect("circ", factoryPrs);
-
-	weaver::Project proj;
-	if (proj.hasMod()) {
-		proj.readMod();
-	} else if (term.empty()) {
-		printf("please initialize your module with the following.\n\nlm mod init my_module\n");
-		return 1;
-	}
-
-	proj.pushFiletype("", "wv", "", readWv, loadWv);
-	proj.pushFiletype("func", "cog", "", readCog, loadCog);
-	proj.pushFiletype("proto", "cogw", "", readCog, loadCogw);
-	proj.pushFiletype("circ", "prs", "ckt", readPrs, loadPrs, writePrs);
-	proj.pushFiletype("spice", "spi", "spi", readSpice, loadSpice, writeSpice);
-	proj.pushFiletype("verilog", "v", "rtl", nullptr, nullptr, writeVerilog);
-	proj.pushFiletype("layout", "gds", "gds", nullptr, loadGds, writeGds);
-	proj.pushFiletype("func", "astg", "state", readAstg, loadAstg, writeAstg);
-	proj.pushFiletype("proto", "astgw", "state", readAstg, loadAstgw, writeAstgw);
-
 	weaver::Program prgm;
 	loadGlobalTypes(prgm);
 
-	if (filename.empty()) {
-		filename = "top.wv";
+	if (proto.empty()) {
+		proj.incl("top.wv");
+		proto.name = vector<string>({"top", "top"});
+	} else {
+		proj.incl(proto.path);
 	}
 
-	if (fs::path(filename).extension().empty()) {
-		filename += ".wv";
-	}
-
-	proj.incl(filename);
 	proj.load(prgm);
 
-	fs::path modName = proj.modName / fs::relative(filename, proj.rootDir);
-
-	int modIdx = prgm.findModule(modName);
-	if (modIdx < 0) {
-		printf("error: could not find module '%s'\n", modName.string().c_str());
-		complete();
-		return 1;
-	}
-
-	int termIdx;
-	for (termIdx = prgm.mods[modIdx].terms.size()-1; termIdx >= 0; termIdx--) {
-		if (prgm.mods[modIdx].terms[termIdx].decl.name == term) {
-			break;
+	if (list) {
+		for (auto i = prgm.mods.begin(); i != prgm.mods.end(); i++) {
+			for (auto j = i->terms.begin(); j != i->terms.end(); j++) {
+				string name = i->name;
+				if (name.rfind(proj.modName+"/", 0) == 0) {
+					name = name.substr(proj.modName.size()+1);
+				}
+				printf("%s:", name.c_str());
+				if (j->decl.recv.defined()) {
+					printf("%s::", prgm.typeAt(j->decl.recv).name.c_str());
+				}
+				printf("%s(", j->decl.name.c_str());
+				for (int k = 0; k < (int)j->decl.args.size(); k++) {
+					if (k != 0) {
+						printf(",");
+					}
+					if (j->decl.args[k].type.defined()) {
+						printf("%s", prgm.typeAt(j->decl.args[k].type).name.c_str());
+					}
+				}
+				printf(")\n");
+			}
 		}
+
+		complete();
+		return is_clean();
 	}
-	if (termIdx < 0) {
-		printf("error: could not find term '%s' in module '%s'\n", term.c_str(), modName.string().c_str());
+
+	vector<weaver::TermId> curr = findProto(prgm, proto);
+	if (curr.empty() or curr[0].mod < 0) {
+		error("", "module not found for term '" + proto.to_string() + "'", __FILE__, __LINE__);
 		complete();
 		return 1;
-	} 
+	}
 
-	auto fn = prgm.mods[modIdx].terms.begin()+termIdx;
+	if (curr[0].index < 0 and prgm.mods[curr[0].mod].terms.size() == 1u) {
+		curr[0].index = 0;
+	}
 
-	if (fn->dialect().name == "func") {
+	if (curr[0].index < 0) {
+		error("", "term not found '" + proto.to_string() + "'", __FILE__, __LINE__);
+		complete();
+		return 1;
+	}
+
+	const weaver::Term &fn = prgm.termAt(curr[0]);
+
+	if (fn.dialect().name == "func") {
 		vector<chp::term_index> steps;
 		if (sfilename != "") {
 			FILE *seq = fopen(sfilename.c_str(), "r");
@@ -1137,9 +1150,9 @@ int sim_command(int argc, char **argv) {
 			}
 		}
 
-		chp::graph g = fn->as<chp::graph>();
+		chp::graph g = fn.as<chp::graph>();
 		chpsim(g, steps);
-	} else if (fn->dialect().name == "proto") {
+	} else if (fn.dialect().name == "proto") {
 		vector<hse::term_index> steps;
 		if (sfilename != "") {
 			FILE *seq = fopen(sfilename.c_str(), "r");
@@ -1157,9 +1170,9 @@ int sim_command(int argc, char **argv) {
 			}
 		}
 		
-		hse::graph g = fn->as<hse::graph>();
+		hse::graph g = fn.as<hse::graph>();
 		hsesim(g, steps);
-	} else if (fn->dialect().name == "circ") {
+	} else if (fn.dialect().name == "circ") {
 		/*vector<prs::term_index> steps;
 		if (sfilename != "") {
 			FILE *seq = fopen(sfilename.c_str(), "r");
@@ -1177,7 +1190,7 @@ int sim_command(int argc, char **argv) {
 			}
 		}*/
 
-		prs::production_rule_set pr = fn->as<prs::production_rule_set>();
+		prs::production_rule_set pr = fn.as<prs::production_rule_set>();
 
 		if (debug) {
 			printf("\n\n%s\n\n", export_production_rule_set(pr).to_string().c_str());
@@ -1186,6 +1199,8 @@ int sim_command(int argc, char **argv) {
 		}
 
 		prsim(pr, debug);//, steps);
+	} else {
+		error("", "unrecognized dialect '" + fn.dialect().name + "'", __FILE__, __LINE__);
 	}
 
 	complete();

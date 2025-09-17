@@ -30,7 +30,7 @@ void loadPrs(weaver::Project &proj, weaver::Program &prgm, const weaver::Source 
 	pr.name = name;
 	prs::import_production_rule_set(*(parse_prs::production_rule_set*)source.syntax.get(), pr, -1, -1, prs::attributes(), 0, source.tokens.get(), true);
 
-	int kind = weaver::Term::getDialect("ckt");
+	int kind = weaver::Term::getDialect("circ");
 	int modIdx = prgm.getModule(source.modName);
 
 	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, name, vector<weaver::Instance>()));

@@ -21,6 +21,8 @@ struct Proto {
 	bool isTerm() const;
 
 	string to_string() const;
+
+	bool empty() const;
 };
 
 vector<string> parseIdent(string id);

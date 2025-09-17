@@ -100,7 +100,7 @@ bool Project::incl(fs::path path, fs::path from) {
 		}
 	}
 	if (filename.empty()) {
-		printf("error: file not found '%s'", path.string().c_str());
+		printf("error: file not found '%s'\n", path.string().c_str());
 		return false;
 	}
 	
@@ -139,7 +139,7 @@ bool Project::read(Program &prgm, fs::path path) {
 		ifstream fin;
 		fin.open(path.string().c_str(), ios::binary | ios::in);
 		if (not fin.is_open()) {
-			printf("error: file not found '%s'", path.string().c_str());
+			printf("error: file not found '%s'\n", path.string().c_str());
 			return false;
 		}
 
