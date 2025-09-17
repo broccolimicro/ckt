@@ -1043,7 +1043,6 @@ int sim_command(int argc, char **argv) {
 	Proto proto;
 
 	string sfilename = "";
-	bool list = false;
 	bool debug = false;
 
 	for (int i = 0; i < argc; i++) {
@@ -1054,8 +1053,6 @@ int sim_command(int argc, char **argv) {
 		} else if (arg == "--debug" or arg == "-d") {
 			set_debug(true);
 			debug = true;
-		} else if (arg == "--list" or arg == "-l") {
-			list = true;
 		} else if (proto.empty()) {
 			proto = parseProto(proj, arg);
 		} else {
@@ -1084,34 +1081,6 @@ int sim_command(int argc, char **argv) {
 	}
 
 	proj.load(prgm);
-
-	if (list) {
-		for (auto i = prgm.mods.begin(); i != prgm.mods.end(); i++) {
-			for (auto j = i->terms.begin(); j != i->terms.end(); j++) {
-				string name = i->name;
-				if (name.rfind(proj.modName+"/", 0) == 0) {
-					name = name.substr(proj.modName.size()+1);
-				}
-				printf("%s:", name.c_str());
-				if (j->decl.recv.defined()) {
-					printf("%s::", prgm.typeAt(j->decl.recv).name.c_str());
-				}
-				printf("%s(", j->decl.name.c_str());
-				for (int k = 0; k < (int)j->decl.args.size(); k++) {
-					if (k != 0) {
-						printf(",");
-					}
-					if (j->decl.args[k].type.defined()) {
-						printf("%s", prgm.typeAt(j->decl.args[k].type).name.c_str());
-					}
-				}
-				printf(")\n");
-			}
-		}
-
-		complete();
-		return is_clean();
-	}
 
 	vector<weaver::TermId> curr = findProto(prgm, proto);
 	if (curr.empty() or curr[0].mod < 0) {

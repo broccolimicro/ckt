@@ -18,6 +18,7 @@
 
 #include "weaver/unpacker.h"
 #include "weaver/project.h"
+#include "weaver/cli.h"
 
 #include "format/cog.h"
 #include "format/spice.h"
@@ -41,18 +42,32 @@ void unpack_help() {
 }
 
 int unpack_command(int argc, char **argv) {
+	parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
+	parse_ucs::function::registry.insert({"proto", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
+	parse_ucs::function::registry.insert({"circ", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
+
+	weaver::Term::pushDialect("func", factoryCog);
+	weaver::Term::pushDialect("proto", factoryCogw);
+	weaver::Term::pushDialect("circ", factoryPrs);
+
 	weaver::Project proj;
 	if (proj.hasMod()) {
 		proj.readMod();
-	} else {
-		printf("please initialize your module with the following.\n\nlm mod init my_module\n");
-		return 1;
 	}
 
-	Unpack unpacker(proj);
+	proj.pushFiletype("", "wv", "", readWv, loadWv);
+	proj.pushFiletype("func", "cog", "", readCog, loadCog);
+	proj.pushFiletype("proto", "cogw", "", readCog, loadCogw);
+	proj.pushFiletype("circ", "prs", "ckt", readPrs, loadPrs, writePrs);
+	proj.pushFiletype("spice", "spi", "spi", readSpice, loadSpice, writeSpice);
+	proj.pushFiletype("verilog", "v", "rtl", nullptr, nullptr, writeVerilog);
+	proj.pushFiletype("layout", "gds", "gds", nullptr, loadGds, writeGds);
+	proj.pushFiletype("func", "astg", "state", readAstg, loadAstg, writeAstg);
+	proj.pushFiletype("proto", "astgw", "state", readAstg, loadAstgw, writeAstgw);
 
-	string filename = "";
-	string term = "";
+	vector<Proto> protos;
+
+	Unpack unpacker(proj);
 
 	for (int i = 0; i < argc; i++) {
 		string arg = argv[i];
@@ -72,51 +87,38 @@ int unpack_command(int argc, char **argv) {
 		} else if (arg == "-s" or arg == "--size") {
 			unpacker.set(Unpack::SIZED);
 		} else {
-			filename = arg;
-			size_t pos = filename.find_last_of(':');
-			if (pos != string::npos) {
-				term = filename.substr(pos+1);
-				filename = filename.substr(0, pos);
-			}
+			protos.push_back(parseProto(proj, arg));
 		}
 	}
-
-	parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
-	parse_ucs::function::registry.insert({"proto", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
-	parse_ucs::function::registry.insert({"circ", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
-
-	weaver::Term::pushDialect("func", factoryCog);
-	weaver::Term::pushDialect("proto", factoryCogw);
-	weaver::Term::pushDialect("circ", factoryPrs);
-
-	proj.pushFiletype("", "wv", "", readWv, loadWv);
-	proj.pushFiletype("func", "cog", "", readCog, loadCog);
-	proj.pushFiletype("proto", "cogw", "", readCog, loadCogw);
-	proj.pushFiletype("circ", "prs", "ckt", readPrs, loadPrs, writePrs);
-	proj.pushFiletype("spice", "spi", "spi", readSpice, loadSpice, writeSpice);
-	proj.pushFiletype("verilog", "v", "rtl", nullptr, nullptr, writeVerilog);
-	proj.pushFiletype("layout", "gds", "gds", nullptr, loadGds, writeGds);
-	proj.pushFiletype("func", "astg", "state", readAstg, loadAstg, writeAstg);
-	proj.pushFiletype("proto", "astgw", "state", readAstg, loadAstgw, writeAstgw);
 
 	weaver::Program prgm;
 	loadGlobalTypes(prgm);
 
-	if (filename.empty()) {
-		filename = "top.wv";
+	if (protos.empty()) {
+		proj.incl("top.wv");
+		proj.load(prgm);
+		unpacker.unpack(prgm);
+	} else {
+		for (auto i = protos.begin(); i != protos.end(); i++) {
+			proj.incl(i->path);
+		}
+		proj.load(prgm);
+		for (auto i = protos.begin(); i != protos.end(); i++) {
+			vector<weaver::TermId> curr = findProto(prgm, *i);
+			if (curr.empty()) {
+				error("", "module not found for term '" + i->to_string() + "'", __FILE__, __LINE__);
+			}
+			for (auto j = curr.begin(); j != curr.end(); j++) {
+				unpacker.unpack(prgm, *j);
+			}
+		}
 	}
 
-	if (fs::path(filename).extension().empty()) {
-		filename += ".wv";
+	if (unpacker.debug) {
+		prgm.print();
 	}
 
-	proj.incl(filename);
-	proj.load(prgm);
-	unpacker.unpack(prgm);
-	prgm.print();
 	proj.save(prgm);
-
-	fs::path modName = proj.modName / fs::relative(filename, proj.rootDir);
 
 	if (!is_clean()) {
 		complete();

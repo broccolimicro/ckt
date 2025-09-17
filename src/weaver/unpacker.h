@@ -35,7 +35,7 @@ struct Unpack {
 	void excl(int target);
 	bool has(int target) const;
 
-	void unpack(weaver::Program &prgm);
+	void unpack(weaver::Program &prgm, weaver::TermId term=weaver::TermId());
 
 	// TODO(edward.bingham) generalize this into lowering and analysis stages, create a DAG to generalize the compilation algorithm
 	bool gdsToSpi(weaver::Program &prgm, int modIdx, int termIdx) const;

@@ -31,6 +31,8 @@
 
 Unpack::Unpack(weaver::Project &proj) : proj(proj) {
 	stage = -1;
+	progress = false;
+	debug = false;
 
 	targets.resize(SIZED+1, false);
 }
@@ -63,19 +65,27 @@ bool Unpack::has(int target) const {
 	return targets[target];
 }
 
-void Unpack::unpack(weaver::Program &prgm) {
-	for (int i = 0; i < (int)prgm.mods.size(); i++) {
-		for (int j = 0; j < (int)prgm.mods[i].terms.size(); j++) {
-			if (prgm.mods[i].terms[j].kind < 0) {
-				printf("internal:%s:%d: dialect not defined for term '%s'\n", __FILE__, __LINE__, prgm.mods[i].terms[j].decl.name.c_str());
-				continue;
-			}
-			string dialectName = prgm.mods[i].terms[j].dialect().name;
-			if (dialectName == "layout") {
-				gdsToSpi(prgm, i, j);
-			} else if (dialectName == "spice") {
-				spiToPrs(prgm, i, j);
-			}
+void Unpack::unpack(weaver::Program &prgm, weaver::TermId term) {
+	if (term.mod < 0) {
+		for (term.mod = 0; term.mod < (int)prgm.mods.size(); term.mod++) {
+			unpack(prgm, term);
+		}
+	} else if (term.index < 0) {
+		for (term.index = 0; term.index < (int)prgm.mods[term.mod].terms.size(); term.index++) {
+			unpack(prgm, term);
+		}
+	} else {
+		if (prgm.mods[term.mod].terms[term.index].kind < 0) {
+			internal("", "dialect not defined for term '" + prgm.mods[term.mod].terms[term.index].decl.name + "'", __FILE__, __LINE__);
+			return;
+		}
+		string dialectName = prgm.mods[term.mod].terms[term.index].dialect().name;
+		if (dialectName == "layout") {
+			gdsToSpi(prgm, term.mod, term.index);
+		} else if (dialectName == "spice") {
+			spiToPrs(prgm, term.mod, term.index);
+		} else {
+			error("", "dialect not supported for unpack '" + dialectName + "'", __FILE__, __LINE__);
 		}
 	}
 }
