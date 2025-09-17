@@ -120,25 +120,31 @@ void doPlacement(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=
 	}
 }
 
-void Build::build(weaver::Program &prgm) {
-	for (int i = 0; i < (int)prgm.mods.size(); i++) {
-		for (int j = 0; j < (int)prgm.mods[i].terms.size(); j++) {
-			if (prgm.mods[i].terms[j].kind < 0) {
-				printf("internal:%s:%d: dialect not defined for term '%s'\n", __FILE__, __LINE__, prgm.mods[i].terms[j].decl.name.c_str());
-				continue;
-			}
-			string dialectName = prgm.mods[i].terms[j].dialect().name;
-			if (dialectName == "func") {
-				chpToFlow(prgm, i, j);
-			} else if (dialectName == "flow") {
-				flowToVerilog(prgm, i, j);
-			} else if (dialectName == "proto") {
-				hseToPrs(prgm, i, j);
-			} else if (dialectName == "circ") {
-				prsToSpi(prgm, i, j);
-			} else if (dialectName == "spice") {
-				spiToGds(prgm, i, j);
-			}
+void Build::build(weaver::Program &prgm, weaver::TermId term) {
+	if (term.mod < 0) {
+		for (term.mod = 0; term.mod < (int)prgm.mods.size(); term.mod++) {
+			build(prgm, term);
+		}
+	} else if (term.index < 0) {
+		for (term.index = 0; term.index < (int)prgm.mods[term.mod].terms.size(); term.index++) {
+			build(prgm, term);
+		}
+	} else {
+		if (prgm.mods[term.mod].terms[term.index].kind < 0) {
+			printf("internal:%s:%d: dialect not defined for term '%s'\n", __FILE__, __LINE__, prgm.mods[term.mod].terms[term.index].decl.name.c_str());
+			return;
+		}
+		string dialectName = prgm.mods[term.mod].terms[term.index].dialect().name;
+		if (dialectName == "func") {
+			chpToFlow(prgm, term.mod, term.index);
+		} else if (dialectName == "flow") {
+			flowToVerilog(prgm, term.mod, term.index);
+		} else if (dialectName == "proto") {
+			hseToPrs(prgm, term.mod, term.index);
+		} else if (dialectName == "circ") {
+			prsToSpi(prgm, term.mod, term.index);
+		} else if (dialectName == "spice") {
+			spiToGds(prgm, term.mod, term.index);
 		}
 	}
 }

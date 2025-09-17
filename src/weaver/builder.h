@@ -65,7 +65,7 @@ struct Build {
 	void excl(int target);
 	bool has(int target) const;
 
-	void build(weaver::Program &prgm);
+	void build(weaver::Program &prgm, weaver::TermId term=weaver::TermId());
 
 	// TODO(edward.bingham) generalize this into lowering and analysis stages, create a DAG to generalize the compilation algorithm
 	bool chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const;
