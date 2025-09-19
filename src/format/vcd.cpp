@@ -2,6 +2,7 @@
 
 #include <interpret_boolean/export.h>
 #include <unistd.h>
+#include <cinttypes>
 
 vcd::vcd() {
 	fvcd = nullptr;
@@ -85,7 +86,7 @@ void vcd::create(string prefix, ucs::ConstNetlist v) {
 void vcd::append(uint64_t t, boolean::cube encoding, string error) {
 	static const char values[4] = {'x','0','1','z'};
 	if (t > this->t) {
-		fprintf(fvcd, "#%llu\n", t);
+		fprintf(fvcd, "#%" PRIu64 "\n", t);
 		this->t = t;
 	}
 
@@ -105,7 +106,7 @@ void vcd::append(uint64_t t, boolean::cube encoding, string error) {
 void vcd::append(uint64_t t, boolean::cube encoding, boolean::cube strength, string error) {
 	static const char values[4] = {'x','0','1','z'};
 	if (t > this->t) {
-		fprintf(fvcd, "#%llu\n", t);
+		fprintf(fvcd, "#%" PRIu64 "\n", t);
 		this->t = t;
 	}
 
@@ -135,7 +136,7 @@ void vcd::close() {
 	if (fgtk != nullptr) {
 		fprintf(fgtk, "*1.0 0");
 		for (auto marker = markers.begin(); marker != markers.end(); marker++) {
-			fprintf(fgtk, " %llu", marker->first);
+			fprintf(fgtk, " %" PRIu64, marker->first);
 		}
 		fprintf(fgtk, "\n");
 		char id = 'A';

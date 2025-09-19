@@ -118,7 +118,8 @@ int build_command(int argc, char **argv) {
 			std::filesystem::path debugDirPath = proj.rootDir / proj.BUILD / "dbg";
 			if (!std::filesystem::exists(debugDirPath)) {
 				if (!fs::create_directories(debugDirPath)) {
-					printf("error: %s does not exist & cannot be created\n", debugDirPath.c_str());
+					string debugDirPathStr = debugDirPath.string();
+					printf("error: %s does not exist & cannot be created\n", debugDirPathStr.c_str());
 					return 1;
 				}
 			}

@@ -100,7 +100,8 @@ bool Project::incl(fs::path path, fs::path from) {
 		}
 	}
 	if (filename.empty()) {
-		printf("error: file not found '%s'\n", path.string().c_str());
+		string pathstr = path.string();
+		printf("error: file not found '%s'\n", pathstr.c_str());
 		return false;
 	}
 	
@@ -137,9 +138,10 @@ bool Project::read(Program &prgm, fs::path path) {
 
 	if (filetype->read != nullptr) {
 		ifstream fin;
-		fin.open(path.string().c_str(), ios::binary | ios::in);
+		string pathstr = path.string();
+		fin.open(pathstr.c_str(), ios::binary | ios::in);
 		if (not fin.is_open()) {
-			printf("error: file not found '%s'\n", path.string().c_str());
+			printf("error: file not found '%s'\n", pathstr.c_str());
 			return false;
 		}
 
@@ -246,7 +248,8 @@ void Project::setTech(string techName) {
 	}
 
 	if (not fs::exists(path)) {
-		printf("tech directory '%s' not found\n", path.string().c_str());
+		string pathstr = path.string();
+		printf("tech directory '%s' not found\n", pathstr.c_str());
 		printf("the tech directory may be specified using the $LOOM_TECH variable\n");
 	} else {
 		this->techName = techName;
@@ -280,7 +283,8 @@ void Project::readMod() {
 	parse_ucs::modfile::register_syntax(tokens);
 
 	ifstream fin;
-	fin.open((rootDir / "lm.mod").string().c_str(), ios::binary | ios::in);
+	string pathstr = (rootDir / "lm.mod").string();
+	fin.open(pathstr.c_str(), ios::binary | ios::in);
 	if (!fin.is_open()) {
 		tokens.error("file not found '" + (rootDir / "lm.mod").string() + "'", __FILE__, __LINE__);
 	} else {
@@ -339,7 +343,8 @@ void Project::writeMod() {
 	result.attrs.push_back(techAttr);
 
 	ofstream fout;
-	fout.open((rootDir / "lm.mod").string().c_str(), ios::out);
+	string pathstr = (rootDir / "lm.mod").string();
+	fout.open(pathstr.c_str(), ios::out);
 	string buf = result.to_string("");
 	fout.write(buf.c_str(), buf.size());
 	fout.close();

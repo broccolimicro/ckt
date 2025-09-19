@@ -1,5 +1,7 @@
 #include "sim.h"
 
+#include <cinttypes>
+
 #include <common/standard.h>
 #include <parse/parse.h>
 #include <parse/default/block_comment.h>
@@ -723,7 +725,7 @@ void hsesim(hse::graph &g, vector<hse::term_index> steps = vector<hse::term_inde
 					boolean::cube action = g.transitions[sim.loaded[sim.ready[firing].first].index].local_action[sim.ready[firing].second];
 					boolean::cube remote_action = g.transitions[sim.loaded[sim.ready[firing].first].index].remote_action[sim.ready[firing].second];
 
-					printf("%llu\tT%d.%d\t%s -> %s%s\n", sim.now, sim.loaded[sim.ready[firing].first].index, sim.ready[firing].second, export_expression(guard, g).to_string().c_str(), export_composition(action, g).to_string().c_str(), flags.c_str());
+					printf("%" PRIu64 "\tT%d.%d\t%s -> %s%s\n", sim.now, sim.loaded[sim.ready[firing].first].index, sim.ready[firing].second, export_expression(guard, g).to_string().c_str(), export_composition(action, g).to_string().c_str(), flags.c_str());
 					
 					sim.fire(firing);
 
@@ -764,7 +766,7 @@ void hsesim(hse::graph &g, vector<hse::term_index> steps = vector<hse::term_inde
 						boolean::cube action = g.transitions[sim.loaded[sim.ready[n].first].index].local_action[sim.ready[n].second];
 						boolean::cube remote_action = g.transitions[sim.loaded[sim.ready[n].first].index].remote_action[sim.ready[n].second];
 
-						printf("%llu\tT%d.%d\t%s -> %s%s\n", sim.now, sim.loaded[sim.ready[n].first].index, sim.ready[n].second, export_expression(guard, g).to_string().c_str(), export_composition(action, g).to_string().c_str(), flags.c_str());
+						printf("%" PRIu64 "\tT%d.%d\t%s -> %s%s\n", sim.now, sim.loaded[sim.ready[n].first].index, sim.ready[n].second, export_expression(guard, g).to_string().c_str(), export_composition(action, g).to_string().c_str(), flags.c_str());
 					
 						sim.fire(n);
 
@@ -969,7 +971,7 @@ void prsim(prs::production_rule_set &pr, bool debug) {//, vector<prs::term_index
 
 				//boolean::cube old = sim.encoding;
 				auto e = sim.fire();
-				printf("%llu\t%s\n", e.fire_at, e.to_string(&pr).c_str());
+				printf("%" PRIu64 "\t%s\n", e.fire_at, e.to_string(&pr).c_str());
 
 				dump.append(e.fire_at, sim.encoding, sim.strength);
 
@@ -991,7 +993,7 @@ void prsim(prs::production_rule_set &pr, bool debug) {//, vector<prs::term_index
 
 						//boolean::cube old = sim.encoding;
 						auto e = sim.fire(n);
-						printf("%llu\t%s\n", e.fire_at, e.to_string(&pr).c_str());
+						printf("%" PRIu64 "\t%s\n", e.fire_at, e.to_string(&pr).c_str());
 			
 						dump.append(e.fire_at, sim.encoding, sim.strength);
 
@@ -1003,10 +1005,10 @@ void prsim(prs::production_rule_set &pr, bool debug) {//, vector<prs::term_index
 						//step++;
 					//}
 				} else {
-					printf("error: must be in the range [0,%llu)\n", sim.enabled.size());
+					printf("error: must be in the range [0,%zu)\n", sim.enabled.size());
 				}
 			} else {
-				printf("error: expected ID in the range [0,%llu)\n", sim.enabled.size());
+				printf("error: expected ID in the range [0,%zu)\n", sim.enabled.size());
 			}
 		} else if (length > 0) {
 			printf("error: unrecognized command '%s'\n", command);
