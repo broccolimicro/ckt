@@ -39,9 +39,10 @@ void loadPrs(weaver::Project &proj, weaver::Program &prgm, const weaver::Source 
 }
 
 void writePrs(fs::path path, const weaver::Project &proj, const weaver::Program &prgm, int modIdx, int termIdx) {
-	ofstream fout(path.c_str(), ios::out);
+	string pathstr = path.string();
+	ofstream fout(pathstr.c_str(), ios::out);
 	if (not fout.is_open()) {
-		printf("error: unable to write to file '%s'\n", path.c_str());
+		printf("error: unable to write to file '%s'\n", pathstr.c_str());
 		return;
 	}
 
