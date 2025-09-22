@@ -17,7 +17,7 @@
 #include <interpret_hse/export.h>
 
 void readAstg(weaver::Project &proj, weaver::Source &source, string buffer) {
-	parse_astg::graph::register_syntax(*source.tokens);
+	parse_astg::register_syntax(*source.tokens);
 	source.tokens->insert(source.path.string(), buffer, nullptr);
 
 	source.tokens->increment(false);
@@ -47,7 +47,7 @@ void loadAstgw(weaver::Project &proj, weaver::Program &prgm, const weaver::Sourc
 	g.name = name;
 	hse::import_hse(g, *(parse_astg::graph*)source.syntax.get(), source.tokens.get());
 
-	g.post_process(true);
+	g.post_process(true, false, false, false);
 	g.check_variables();
 
 	int kind = weaver::Term::getDialect("proto");

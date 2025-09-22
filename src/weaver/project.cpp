@@ -186,7 +186,16 @@ bool Project::save(Program &prgm, int modIdx, int termIdx) const {
 	fs::path emitDir = (rootDir / BUILD / filetype->build).string();
 	std::filesystem::create_directories(emitDir.string());
 	
-	string filename = prgm.mods[modIdx].terms[termIdx].decl.name + "." + filetype->ext;
+	string mod = prgm.mods[modIdx].name;
+	if (mod.rfind(modName+"/", 0) != string::npos) {
+		mod = mod.substr(modName.size()+1);
+	}
+	size_t pos = mod.find(">>");
+	if (pos != string::npos) {
+		mod = mod.substr(0, pos);
+	}
+
+	string filename = mod + "_" + prgm.mods[modIdx].terms[termIdx].decl.name + "." + filetype->ext;
 	filetype->write((emitDir / filename).string(), *this, prgm, modIdx, termIdx);
 	return true;
 }

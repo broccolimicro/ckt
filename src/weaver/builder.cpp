@@ -329,7 +329,7 @@ bool Build::hseToPrs(weaver::Program &prgm, int modIdx, int termIdx) const {
 		if (has(Build::ELAB)) {
 			std::filesystem::create_directories(debugDir);
 			string suffix = stage == Build::ELAB ? "" : "_predicate";
-			string filename = debugDir+"/"+prgm.mods[modIdx].terms[termIdx].decl.name+suffix+".astg";
+			string filename = debugDir+"/"+prgm.mods[modIdx].terms[termIdx].decl.name+suffix+".astgw";
 			hse::export_astg(filename, hg);
 		}
 
@@ -364,7 +364,7 @@ bool Build::hseToPrs(weaver::Program &prgm, int modIdx, int termIdx) const {
 
 		if (has(Build::ENCODE)) {
 			string suffix = stage == Build::ENCODE ? "" : "_complete";
-			hse::export_astg(debugDir+"/"+hg.name+suffix+".astg", hg);
+			hse::export_astg(debugDir+"/"+hg.name+suffix+".astgw", hg);
 		}
 
 		if (enc.conflicts.size() > 0) {

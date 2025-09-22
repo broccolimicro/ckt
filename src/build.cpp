@@ -113,17 +113,6 @@ int build_command(int argc, char **argv) {
 		} else if (arg == "--debug" or arg == "-d") {
 			set_debug(true);
 			builder.debug = true;
-			
-			// Create debug dir if it does not already exist
-			std::filesystem::path debugDirPath = proj.rootDir / proj.BUILD / "dbg";
-			if (!std::filesystem::exists(debugDirPath)) {
-				if (!fs::create_directories(debugDirPath)) {
-					string debugDirPathStr = debugDirPath.string();
-					printf("error: %s does not exist & cannot be created\n", debugDirPathStr.c_str());
-					return 1;
-				}
-			}
-
 		} else if (arg == "--flow_html") {
 			if (!builder.debug) {
 				printf("warning: --flow_html flag requires --debug to be enabled, ignoring\n");
@@ -252,6 +241,16 @@ int build_command(int argc, char **argv) {
 
 	weaver::Program prgm;
 	loadGlobalTypes(prgm);
+
+	// Create debug dir if it does not already exist
+	std::filesystem::path debugDirPath = proj.rootDir / proj.BUILD / "dbg";
+	if (!std::filesystem::exists(debugDirPath)) {
+		if (!fs::create_directories(debugDirPath)) {
+			string debugDirPathStr = debugDirPath.string();
+			printf("error: %s does not exist & cannot be created\n", debugDirPathStr.c_str());
+			return 1;
+		}
+	}
 
 	if (protos.empty()) {
 		proj.incl("top.wv");
