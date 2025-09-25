@@ -86,9 +86,16 @@ void show(ShowOptions opts, weaver::Term &t, string outPath) {
 		return;
 	}
 	if (t.dialect().name == "func") {
-		gvdot::render(outPath, chp::export_graph(t.as<chp::graph>(), opts.labels).to_string());
+		chp::graph g = t.as<chp::graph>();
+		if (opts.process) {
+			g.post_process(opts.proper, opts.aggressive);
+		}
+		gvdot::render(outPath, chp::export_graph(g, opts.labels).to_string());
 	} else if (t.dialect().name == "proto") {
-		hse::graph &g = t.as<hse::graph>();
+		hse::graph g = t.as<hse::graph>();
+		if (opts.process) {
+			g.post_process(opts.proper, opts.aggressive);
+		}
 		if (opts.states) {
 			hse::graph sg = hse::to_state_graph(g, true);
 			gvdot::render(outPath, hse::export_graph(sg, opts.horiz, opts.labels, opts.notations, opts.ghost, opts.encodings).to_string());

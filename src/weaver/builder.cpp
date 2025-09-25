@@ -177,7 +177,7 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 
 	// Do the synthesis
 	chp::graph &g = prgm.mods[modIdx].terms[termIdx].as<chp::graph>();
-	g.post_process();	
+	g.post_process(true);	
 	if (this->debug) {
 		string prefix = ""; //"_" + this->proj.modName + "_";
 		string chp_filename = (debugDirPath / (prefix + g.name + "_chp.png")).string();

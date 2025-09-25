@@ -273,7 +273,12 @@ void chpsim(chp::graph &g, vector<chp::term_index> steps = vector<chp::term_inde
 
 			for (int i = 0; i < enabled; i++)
 			{
-				printf("(%d) T%d.%d:%s->%s\n", i, sim.loaded[sim.ready[i].first].index, sim.ready[i].second, export_expression(sim.loaded[sim.ready[i].first].guard_action, g).to_string().c_str(), export_composition(sim.loaded[sim.ready[i].first].local_action.states[sim.ready[i].second], g).to_string().c_str());
+				printf("(%d) T%d.%d:%s->%s : %s\n", i,
+					sim.loaded[sim.ready[i].first].index,
+					sim.ready[i].second,
+					export_expression(sim.loaded[sim.ready[i].first].guard, g).to_string().c_str(), 
+					export_composition(sim.loaded[sim.ready[i].first].local_action.states[sim.ready[i].second], g).to_string().c_str(),
+					export_expression(sim.loaded[sim.ready[i].first].guard_action, g).to_string().c_str());
 				if (sim.loaded[sim.ready[i].first].vacuous) {
 					printf("\tvacuous");
 				}
@@ -397,7 +402,13 @@ void chpsim(chp::graph &g, vector<chp::term_index> steps = vector<chp::term_inde
 					if (vacuous) {
 						flags = " [vacuous]";
 					}
-					printf("%d\tT%d.%d\t%s -> %s%s\n", step, sim.loaded[sim.ready[firing].first].index, sim.ready[firing].second, export_expression(sim.loaded[sim.ready[firing].first].guard_action, g).to_string().c_str(), export_composition(sim.loaded[sim.ready[firing].first].local_action[sim.ready[firing].second], g).to_string().c_str(), flags.c_str());
+					printf("%d\tT%d.%d\t%s -> %s : %s%s\n", step,
+						sim.loaded[sim.ready[firing].first].index,
+						sim.ready[firing].second,
+						export_expression(sim.loaded[sim.ready[firing].first].guard, g).to_string().c_str(),
+						export_composition(sim.loaded[sim.ready[firing].first].local_action[sim.ready[firing].second], g).to_string().c_str(),
+						export_expression(sim.loaded[sim.ready[firing].first].guard_action, g).to_string().c_str(),
+						flags.c_str());
 
 					sim.fire(firing);
 
@@ -433,7 +444,13 @@ void chpsim(chp::graph &g, vector<chp::term_index> steps = vector<chp::term_inde
 							flags = " [vacuous]";
 						}
 
-						printf("%d\tT%d.%d\t%s -> %s%s\n", step, sim.loaded[sim.ready[n].first].index, sim.ready[n].second, export_expression(sim.loaded[sim.ready[n].first].guard_action, g).to_string().c_str(), export_composition(sim.loaded[sim.ready[n].first].local_action[sim.ready[n].second], g).to_string().c_str(), flags.c_str());
+						printf("%d\tT%d.%d\t%s -> %s : %s%s\n", step,
+							sim.loaded[sim.ready[n].first].index,
+							sim.ready[n].second,
+							export_expression(sim.loaded[sim.ready[n].first].guard, g).to_string().c_str(),
+							export_composition(sim.loaded[sim.ready[n].first].local_action[sim.ready[n].second], g).to_string().c_str(),
+							export_expression(sim.loaded[sim.ready[n].first].guard_action, g).to_string().c_str(),
+							flags.c_str());
 						
 						sim.fire(n);
 
@@ -1122,6 +1139,7 @@ int sim_command(int argc, char **argv) {
 		}
 
 		chp::graph g = fn.as<chp::graph>();
+		g.post_process(true);
 		chpsim(g, steps);
 	} else if (fn.dialect().name == "proto") {
 		vector<hse::term_index> steps;

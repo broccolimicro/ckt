@@ -63,7 +63,6 @@ std::any factoryCog(string name, const parse::syntax *syntax, tokenizer *tokens)
 	g.name = name;
 	if (syntax != nullptr) {
 		chp::import_chp(g, *(const parse_cog::composition *)syntax, tokens, true);
-		g.post_process(true);
 	}
 	return g;
 }
