@@ -127,6 +127,27 @@ void vcd::append(uint64_t t, boolean::cube encoding, boolean::cube strength, str
 	}
 }
 
+void vcd::append(uint64_t t, arithmetic::State encoding, string error) {
+	static const char values[4] = {'x','0','1','z'};
+	if (t > this->t) {
+		fprintf(fvcd, "#%" PRIu64 "\n", t);
+		this->t = t;
+	}
+
+	for (size_t i = 0; i < encoding.values.size(); i++) {
+		if (encoding.values[i].isValid()) {
+			fprintf(fvcd, "%c%s\n", values[1], nets[i].c_str());
+		} else if (encoding.values[i].isNeutral()) {
+			fprintf(fvcd, "%c%s\n", values[3], nets[i].c_str());
+		} else if (encoding.values[i].isUnstable()) {
+			fprintf(fvcd, "%c%s\n", values[0], nets[i].c_str());
+		}
+	}
+
+	if (not error.empty()) {
+		markers.push_back(pair<uint64_t, string>(t, error));
+	}
+}
 
 void vcd::close() {
 	if (fvcd != nullptr) {

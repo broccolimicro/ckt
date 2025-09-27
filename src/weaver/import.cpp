@@ -23,7 +23,7 @@ void Binder::popScope() {
 	prgm.mods[currModule].terms[currTerm].symb.popScope();
 }*/
 
-bool import_declaration(vector<Instance> &result, const Program &prgm, int modIdx, const parse_ucs::declaration &syntax, tokenizer *tokens) {
+bool import_declaration(vector<Instance> &result, const Program &prgm, int modIdx, const parse_ucs::function::declaration &syntax, tokenizer *tokens) {
 	TypeId type = prgm.findType(modIdx, syntax.type.names);
 	if (not type.defined()) {
 		printf("error: type not defined '%s'\n", syntax.type.to_string().c_str());
