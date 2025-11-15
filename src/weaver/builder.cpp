@@ -183,9 +183,21 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 		string chp_filename = (debugDirPath / (prefix + g.name + "_chp.png")).string();
 		string chp_dot = chp::export_graph(g, true).to_string();
 		gvdot::render(chp_filename, chp_dot);
-	}
 
-	g.flatten(this->debug);
+		string chp_dot_filename = (debugDirPath / (prefix + g.name + "_chp.dot")).string();
+		std::ofstream export_chp_file(chp_dot_filename);
+		if (!export_chp_file) {
+				std::cerr << "ERROR: Failed to open file for dot export: "
+					<< chp_dot_filename << std::endl;
+					//<< "ERROR: Try again from dir: <project_dir>/lib/flow" << std::endl;
+
+				//TODO: we want soft failure, but this doesn't break or prevent file writing
+				return false;
+
+		}  else {
+			export_chp_file << chp_dot;
+		}
+	}
 
 	for (auto i = args.begin(); i != args.end(); i++) {
 		// TODO(edward.bingham) pass the variable declarations over to flow
@@ -194,33 +206,42 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 		//TODO: can chp::synthesizeFuncFromCHP() always assume its vars are pre-populated?
 	}
 
-	int dstIdx = prgm.mods[flowIdx].createTerm(weaver::Term::procOf(flowKind, name, args));
-	const flow::Func &f = chp::synthesizeFuncFromCHP(g);
-	prgm.mods[flowIdx].terms[dstIdx].def = f;
+	//int dstIdx = prgm.mods[flowIdx].createTerm(weaver::Term::procOf(flowKind, name, args));
+	vector<chp::graph> procs = g.decompose();
+	//g.flatten(this->debug);
+	//const flow::Func &f = chp::synthesizeFuncFromCHP(g);
+	//prgm.mods[flowIdx].terms[dstIdx].def = f;
 
 	if (this->debug) {
-		string prefix = ""; //"_" + this->proj.modName + "_";
-		string flatchp_filename = (debugDirPath / (prefix + g.name + "_flatchp.png")).string();
-		string flatchp_dot = chp::export_graph(g, true).to_string();
-		gvdot::render(flatchp_filename, flatchp_dot);
-
-		string flow_filename = (debugDirPath / (prefix + g.name + "_flow.dot")).string();
-		string flow_dot = flow::export_func(f, this->format_expressions_as_html_table).to_string();
-		//gvdot::render(flow_filename, flow_dot);
-		//TODO: a well-structured flow::export_func in interpret_flow/export_dot,h will play nice with gvdot::render for png export
-
-		std::ofstream export_file(flow_filename);
-		if (!export_file) {
-				std::cerr << "ERROR: Failed to open file for dot export: "
-					<< flow_filename << std::endl;
-					//<< "ERROR: Try again from dir: <project_dir>/lib/flow" << std::endl;
-
-				//TODO: we want soft failure, but this doesn't break or prevent file writing
-				return false;
-
-		}  else {
-			export_file << flow_dot;
+		for (size_t pid = 0; pid < procs.size(); pid++) {
+			chp::graph proc = procs[pid];
+			cout << "rendering proc" + std::to_string(pid) + ": " + proc.name << endl;
+			if (proc.places.size() > 100) { cout << "YIKES! P+" + std::to_string(proc.places.size()) << endl; continue; }
+			if (proc.transitions.size() > 100) { cout << "YIKES! T+" + std::to_string(proc.transitions.size()) << endl; continue; }
+			
+			string prefix = ""; //"_" + this->proj.modName + "_";
+			string proc_filename = (debugDirPath / (prefix + proc.name + ".png")).string();  // formerly, "_flatchp.png"
+			string proc_dot = chp::export_graph(proc, true).to_string();
+			gvdot::render(proc_filename, proc_dot);
 		}
+
+		//string flow_filename = (debugDirPath / (prefix + g.name + "_flow.dot")).string();
+		//string flow_dot = flow::export_func(f, this->format_expressions_as_html_table).to_string();
+		////gvdot::render(flow_filename, flow_dot);
+		////TODO: a well-structured flow::export_func in interpret_flow/export_dot,h will play nice with gvdot::render for png export
+
+		//std::ofstream export_file(flow_filename);
+		//if (!export_file) {
+		//		std::cerr << "ERROR: Failed to open file for dot export: "
+		//			<< flow_filename << std::endl;
+		//			//<< "ERROR: Try again from dir: <project_dir>/lib/flow" << std::endl;
+
+		//		//TODO: we want soft failure, but this doesn't break or prevent file writing
+		//		return false;
+
+		//}  else {
+		//	export_file << flow_dot;
+		//}
 	}
 
 	return true;
@@ -271,7 +292,13 @@ bool Build::flowToVerilog(weaver::Program &prgm, int modIdx, int termIdx) const 
 
 
 	if (this->debug) {
-		string prefix = ""; //"_" + this->proj.modName + "_";
+		string prefix = "";
+		//if (modIdx < prgm.mods.size() && prgm.modes[modIdx].name != fm.name) {
+			//prefix += prgm.mods[modIdx].name + "_";
+		//}
+		//if (this->proj.modName != fn.name) {
+		//	prefix += this->proj.modName + "_";
+		//}
 		string verilog_filename = (debugDirPath / (prefix + fn.name + ".v")).string();
 
 		std::ofstream export_file(verilog_filename);
