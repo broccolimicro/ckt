@@ -32,6 +32,8 @@
 #include "../format/cell.h"
 #include "../format/dot.h"
 
+#define MAX_PROCESS_SIZE 64
+
 Build::Build(weaver::Project &proj) : proj(proj) {
 	logic = LOGIC_CMOS;
 	timing = TIMING_MIXED;
@@ -131,7 +133,7 @@ void Build::build(weaver::Program &prgm, weaver::TermId term) {
 		}
 	} else {
 		if (prgm.mods[term.mod].terms[term.index].kind < 0) {
-			printf("internal:%s:%d: dialect not defined for term '%s'\n", __FILE__, __LINE__, prgm.mods[term.mod].terms[term.index].decl.name.c_str());
+			fprintf(stderr, "internal:%s:%d: dialect not defined for term '%s'\n", __FILE__, __LINE__, prgm.mods[term.mod].terms[term.index].decl.name.c_str());
 			return;
 		}
 		string dialectName = prgm.mods[term.mod].terms[term.index].dialect().name;
@@ -155,7 +157,7 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 
 	// Verify expected format of the term
 	if (prgm.mods[modIdx].terms[termIdx].dialect().name != "func") {
-		printf("error: dialect '%s' not supported for translation from chp to flow.\n",
+		fprintf(stderr, "error: dialect '%s' not supported for translation from chp to flow.\n",
 			prgm.mods[modIdx].terms[termIdx].dialect().name.c_str());
 		return false;
 	}
@@ -166,7 +168,7 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 
 	const weaver::Decl &decl = prgm.mods[modIdx].terms[termIdx].decl;
 	if (decl.ret.defined() or decl.recv.defined()) {
-		printf("error: function must be a full process for synthesis\n");
+		fprintf(stderr, "error: function must be a full process for synthesis\n");
 		return false;
 	}
 
@@ -175,11 +177,11 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 	// TODO(edward.bingham) merge weaver type system and flow types?
 	vector<weaver::Instance> args = decl.args;
 
-	// Do the synthesis
 	chp::graph &g = prgm.mods[modIdx].terms[termIdx].as<chp::graph>();
 	g.post_process(true);	
+
+	string prefix = ""; //"_" + this->proj.modName + "_";
 	if (this->debug) {
-		string prefix = ""; //"_" + this->proj.modName + "_";
 		string chp_filename = (debugDirPath / (prefix + g.name + "_chp.png")).string();
 		string chp_dot = chp::export_graph(g, true).to_string();
 		gvdot::render(chp_filename, chp_dot);
@@ -191,8 +193,7 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 					<< chp_dot_filename << std::endl;
 					//<< "ERROR: Try again from dir: <project_dir>/lib/flow" << std::endl;
 
-				//TODO: we want soft failure, but this doesn't break or prevent file writing
-				return false;
+				//return false;  // fail gracefully
 
 		}  else {
 			export_chp_file << chp_dot;
@@ -206,42 +207,114 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 		//TODO: can chp::synthesizeFuncFromCHP() always assume its vars are pre-populated?
 	}
 
-	//int dstIdx = prgm.mods[flowIdx].createTerm(weaver::Term::procOf(flowKind, name, args));
-	vector<chp::graph> procs = g.decompose();
-	//g.flatten(this->debug);
-	//const flow::Func &f = chp::synthesizeFuncFromCHP(g);
-	//prgm.mods[flowIdx].terms[dstIdx].def = f;
-
+	// Attempt templated synthesis on the original source program
 	if (this->debug) {
-		for (size_t pid = 0; pid < procs.size(); pid++) {
-			chp::graph proc = procs[pid];
-			cout << "rendering proc" + std::to_string(pid) + ": " + proc.name << endl;
-			if (proc.places.size() > 100) { cout << "YIKES! P+" + std::to_string(proc.places.size()) << endl; continue; }
-			if (proc.transitions.size() > 100) { cout << "YIKES! T+" + std::to_string(proc.transitions.size()) << endl; continue; }
-			
-			string prefix = ""; //"_" + this->proj.modName + "_";
-			string proc_filename = (debugDirPath / (prefix + proc.name + ".png")).string();  // formerly, "_flatchp.png"
+		clog.rdbuf(cout.rdbuf());
+
+	} else {
+		string logFilename = (debugDirPath / (prefix + g.name + ".log")).string();
+		ofstream logFile(logFilename);
+		if (not logFile) {
+			cerr << "ERROR: Failed to open file for debug logs: " << logFilename << endl
+				<< "ERROR: Since no logfile available, redirecting debug info to stdout" << endl;
+			//return false;  // fail gracefully, it's just a log file
+
+			clog.rdbuf(cout.rdbuf());
+			cout << "Since logfile cannot be opened at " << logFilename << endl
+				<< "all debug info will be dumped into stdout." << endl;
+
+		} else {
+			clog.rdbuf(logFile.rdbuf());
+			//TODO: perhaps tee'ing a stream to route not just clog but cerr & cout to this file as well as stdout
+		}
+	}
+
+	chp::graph sourceGraphCopy(g);
+	int dstIdx = prgm.mods[flowIdx].createTerm(weaver::Term::procOf(flowKind, name, args));
+	g.flatten(this->debug);  //TODO: clean up debugFlag prop-drilling in favor of std::clog
+	const flow::Func &f = chp::synthesizeFuncFromCHP(g, this->debug);  //TODO: clean up debugFlag prop-drilling in favor of std::clog
+	prgm.mods[flowIdx].terms[dstIdx].def = f;
+
+	string flow_filename = (debugDirPath / (prefix + g.name + "_flow.dot")).string();
+	string flow_dot = flow::export_func(f, this->debug).to_string();
+	gvdot::render(flow_filename, flow_dot);
+	//TODO: a well-structured flow::export_func in interpret_flow/export_dot.h will play nice with gvdot::render for png export
+
+	std::ofstream export_file(flow_filename);
+	if (!export_file) {
+			std::cerr << "ERROR: Failed to open file for dot export: "
+				<< flow_filename << std::endl;
+				//<< "ERROR: Try again from dir: <project_dir>/lib/flow" << std::endl;
+
+			//TODO: we want soft failure, but this doesn't break or prevent file writing
+			return false;
+
+	}  else {
+		export_file << flow_dot;
+	}
+
+
+	//
+	// Attempt Process Decomposition
+	//
+	vector<chp::graph> procs = sourceGraphCopy.decompose();
+
+	// Render modified source right before decomposition
+	if (this->debug) {
+		string projection_filename = (debugDirPath / (prefix + sourceGraphCopy.name + "_projection.png")).string();
+		string projection_dot = chp::export_graph(sourceGraphCopy, true).to_string();
+		gvdot::render(projection_filename, projection_dot);
+	}
+
+	// Attempt templated synthesis on decomposed subprocesses
+	for (size_t pid = 0; pid < procs.size(); pid++) {
+		chp::graph proc = procs[pid];
+		cout << "rendering proc" + std::to_string(pid) + ": " + proc.name << endl;
+		if (proc.places.size() > MAX_PROCESS_SIZE) { cout << "YIKES! P+" + std::to_string(proc.places.size()) << endl; continue; }
+		if (proc.transitions.size() > MAX_PROCESS_SIZE) { cout << "YIKES! T+" + std::to_string(proc.transitions.size()) << endl; continue; }
+
+		if (this->debug) {
+			string proc_filename = (debugDirPath / (prefix + proc.name + "_" + std::to_string(pid) + ".png")).string();  // formerly, "_flatchp.png"
 			string proc_dot = chp::export_graph(proc, true).to_string();
 			gvdot::render(proc_filename, proc_dot);
 		}
 
-		//string flow_filename = (debugDirPath / (prefix + g.name + "_flow.dot")).string();
-		//string flow_dot = flow::export_func(f, this->format_expressions_as_html_table).to_string();
-		////gvdot::render(flow_filename, flow_dot);
-		////TODO: a well-structured flow::export_func in interpret_flow/export_dot,h will play nice with gvdot::render for png export
+		try {
+			bool isFlat = proc.isFlat();
+			cout << proc.name << (isFlat ? " is flat" : " is not flat") << endl;  //clog
+			if (not isFlat) { proc.flatten(this->debug); }
 
-		//std::ofstream export_file(flow_filename);
-		//if (!export_file) {
-		//		std::cerr << "ERROR: Failed to open file for dot export: "
-		//			<< flow_filename << std::endl;
-		//			//<< "ERROR: Try again from dir: <project_dir>/lib/flow" << std::endl;
+			if (not proc.isFlat()) {
+				cout << proc.name << " is still not flat" << endl;  //clog
+				continue;
+			}
+			cout << proc.name << " is now flat" << endl;
 
-		//		//TODO: we want soft failure, but this doesn't break or prevent file writing
-		//		return false;
+			//int dstIdx = prgm.mods[flowIdx].createTerm(weaver::Term::procOf(flowKind, name, args));
+			const flow::Func &procFunc = chp::synthesizeFuncFromCHP(proc, this->debug);  //TODO: clean up debugFlag prop-drilling in favor of std::clog
+			//prgm.mods[flowIdx].terms[dstIdx].def = procFunc;
 
-		//}  else {
-		//	export_file << flow_dot;
-		//}
+			string procFlowFilename = (debugDirPath / (prefix + proc.name + "_flow.dot")).string();
+			string procFlowDot = flow::export_func(procFunc, this->debug).to_string();
+			gvdot::render(procFlowFilename, procFlowDot);
+			//TODO: a well-structured flow::export_func in interpret_flow/export_dot.h will play nice with gvdot::render for png export
+
+			std::ofstream procFlowFile(procFlowFilename);
+			if (!procFlowFile) {
+					std::cerr << "ERROR: Failed to open file for dot export: "
+						<< procFlowFilename << std::endl;
+						//<< "ERROR: Try again from dir: <project_dir>/lib/flow" << std::endl;
+					//return false;  // fail gracefully
+
+			}  else {
+				procFlowFile << procFlowDot;
+			}
+
+		} catch (...) {
+			cerr << "ERROR: Skipping to next subprocess. Exception caught when synthesizing " << proc.name << endl;
+		}
+
+		//TODO: define target for auto-generation: prgm.mods[...].terms[...].def = procFunc;
 	}
 
 	return true;
@@ -253,7 +326,7 @@ bool Build::flowToVerilog(weaver::Program &prgm, int modIdx, int termIdx) const 
 
 	// Verify expected format of the term
 	if (prgm.mods[modIdx].terms[termIdx].dialect().name != "flow") {
-		printf("error: dialect '%s' not supported for translation from flow to val-rdy.\n",
+		fprintf(stderr, "error: dialect '%s' not supported for translation from flow to val-rdy.\n",
 			prgm.mods[modIdx].terms[termIdx].dialect().name.c_str());
 		return false;
 	}
@@ -264,7 +337,7 @@ bool Build::flowToVerilog(weaver::Program &prgm, int modIdx, int termIdx) const 
 
 	const weaver::Decl &decl = prgm.mods[modIdx].terms[termIdx].decl;
 	if (decl.ret.defined() or decl.recv.defined()) {
-		printf("error: flow must be a full process for synthesis\n");
+		fprintf(stderr, "error: flow must be a full process for synthesis\n");
 		return false;
 	}
 
@@ -324,7 +397,7 @@ bool Build::hseToPrs(weaver::Program &prgm, int modIdx, int termIdx) const {
 
 	// Verify expected format of the term
 	if (prgm.mods[modIdx].terms[termIdx].dialect().name != "proto") {
-		printf("error: dialect '%s' not supported for translation from hse to prs.\n",
+		fprintf(stderr, "error: dialect '%s' not supported for translation from hse to prs.\n",
 			prgm.mods[modIdx].terms[termIdx].dialect().name.c_str());
 		return false;
 	}
@@ -335,7 +408,7 @@ bool Build::hseToPrs(weaver::Program &prgm, int modIdx, int termIdx) const {
 
 	const weaver::Decl &decl = prgm.mods[modIdx].terms[termIdx].decl;
 	if (decl.ret.defined() or decl.recv.defined()) {
-		printf("error: protocol must be a full process for synthesis\n");
+		fprintf(stderr, "error: protocol must be a full process for synthesis\n");
 		return false;
 	}
 
@@ -416,7 +489,7 @@ bool Build::hseToPrs(weaver::Program &prgm, int modIdx, int termIdx) const {
 bool Build::prsToSpi(weaver::Program &prgm, int modIdx, int termIdx) {
 	// Verify expected format of the term
 	if (prgm.mods[modIdx].terms[termIdx].dialect().name != "circ") {
-		printf("error: dialect '%s' not supported for translation from prs to spi.\n",
+		fprintf(stderr, "error: dialect '%s' not supported for translation from prs to spi.\n",
 			prgm.mods[modIdx].terms[termIdx].dialect().name.c_str());
 		return false;
 	}
@@ -427,7 +500,7 @@ bool Build::prsToSpi(weaver::Program &prgm, int modIdx, int termIdx) {
 
 	const weaver::Decl &decl = prgm.mods[modIdx].terms[termIdx].decl;
 	if (decl.ret.defined() or decl.recv.defined()) {
-		printf("error: circuit must be a full process for synthesis\n");
+		fprintf(stderr, "error: circuit must be a full process for synthesis\n");
 		return false;
 	}
 
@@ -515,7 +588,7 @@ bool Build::spiToGds(weaver::Program &prgm, int modIdx, int termIdx) {
 
 	// Verify expected format of the term
 	if (prgm.mods[modIdx].terms[termIdx].dialect().name != "spice") {
-		printf("error: dialect '%s' not supported for translation from spice to gds.\n",
+		fprintf(stderr, "error: dialect '%s' not supported for translation from spice to gds.\n",
 			prgm.mods[modIdx].terms[termIdx].dialect().name.c_str());
 		return false;
 	}
@@ -526,7 +599,7 @@ bool Build::spiToGds(weaver::Program &prgm, int modIdx, int termIdx) {
 
 	const weaver::Decl &decl = prgm.mods[modIdx].terms[termIdx].decl;
 	if (decl.ret.defined() or decl.recv.defined()) {
-		printf("error: spice must be a full process for synthesis\n");
+		fprintf(stderr, "error: spice must be a full process for synthesis\n");
 		return false;
 	}
 
