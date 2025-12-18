@@ -180,6 +180,8 @@ int build_command(int argc, char **argv) {
 			builder.doPreprocess = true;
 		} else if (arg == "--post") {
 			builder.doPostprocess = true;
+		} else if (arg == "--decompose") {
+			builder.testDecompose = true;
 		} else if (arg == "-g" or arg == "--graph") {
 			builder.set(Build::ELAB);
 		} else if (arg == "-c" or arg == "--conflict") {

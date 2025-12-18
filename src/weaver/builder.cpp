@@ -32,7 +32,7 @@
 #include "../format/cell.h"
 #include "../format/dot.h"
 
-#define MAX_PROCESS_SIZE 64
+#define MAX_PROCESS_SIZE 256
 
 Build::Build(weaver::Project &proj) : proj(proj) {
 	logic = LOGIC_CMOS;
@@ -41,6 +41,8 @@ Build::Build(weaver::Project &proj) : proj(proj) {
 
 	doPreprocess = false;
 	doPostprocess = false;
+
+	testDecompose = false;
 
 	noCells = false;
 	noGhosts = false;
@@ -178,9 +180,29 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 	vector<weaver::Instance> args = decl.args;
 
 	chp::graph &g = prgm.mods[modIdx].terms[termIdx].as<chp::graph>();
-	g.post_process(true);	
 
 	string prefix = ""; //"_" + this->proj.modName + "_";
+	if (this->debug) {
+		string chp_filename = (debugDirPath / (prefix + g.name + "_chp_raw.png")).string();
+		string chp_dot = chp::export_graph(g, true).to_string();
+		gvdot::render(chp_filename, chp_dot);
+
+		string chp_dot_filename = (debugDirPath / (prefix + g.name + "_chp_raw.dot")).string();
+		std::ofstream export_chp_file(chp_dot_filename);
+		if (!export_chp_file) {
+				std::cerr << "ERROR: Failed to open file for dot export: "
+					<< chp_dot_filename << std::endl;
+					//<< "ERROR: Try again from dir: <project_dir>/lib/flow" << std::endl;
+
+				//return false;  // fail gracefully
+
+		}  else {
+			export_chp_file << chp_dot;
+		}
+	}
+
+	g.post_process(true);
+
 	if (this->debug) {
 		string chp_filename = (debugDirPath / (prefix + g.name + "_chp.png")).string();
 		string chp_dot = chp::export_graph(g, true).to_string();
@@ -199,7 +221,7 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 			export_chp_file << chp_dot;
 		}
 	}
-
+	
 	for (auto i = args.begin(); i != args.end(); i++) {
 		// TODO(edward.bingham) pass the variable declarations over to flow
 		chp::variable var(i->name);
@@ -229,41 +251,21 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 		}
 	}
 
-	chp::graph sourceGraphCopy(g);
-	int dstIdx = prgm.mods[flowIdx].createTerm(weaver::Term::procOf(flowKind, name, args));
-	g.flatten(this->debug);  //TODO: clean up debugFlag prop-drilling in favor of std::clog
-	const flow::Func &f = chp::synthesizeFuncFromCHP(g, this->debug);  //TODO: clean up debugFlag prop-drilling in favor of std::clog
-	prgm.mods[flowIdx].terms[dstIdx].def = f;
-
-	string flow_filename = (debugDirPath / (prefix + g.name + "_flow.dot")).string();
-	string flow_dot = flow::export_func(f, this->debug).to_string();
-	gvdot::render(flow_filename, flow_dot);
-	//TODO: a well-structured flow::export_func in interpret_flow/export_dot.h will play nice with gvdot::render for png export
-
-	std::ofstream export_file(flow_filename);
-	if (!export_file) {
-			std::cerr << "ERROR: Failed to open file for dot export: "
-				<< flow_filename << std::endl;
-				//<< "ERROR: Try again from dir: <project_dir>/lib/flow" << std::endl;
-
-			//TODO: we want soft failure, but this doesn't break or prevent file writing
-			return false;
-
-	}  else {
-		export_file << flow_dot;
+	// Render modified source right before decomposition
+	if (this->debug) {
+		string projection_filename = (debugDirPath / (prefix + g.name + "_chp.png")).string();
+		string projection_dot = chp::export_graph(g, true).to_string();
+		gvdot::render(projection_filename, projection_dot);
 	}
-
 
 	//
 	// Attempt Process Decomposition
 	//
-	vector<chp::graph> procs = sourceGraphCopy.decompose();
-
-	// Render modified source right before decomposition
-	if (this->debug) {
-		string projection_filename = (debugDirPath / (prefix + sourceGraphCopy.name + "_projection.png")).string();
-		string projection_dot = chp::export_graph(sourceGraphCopy, true).to_string();
-		gvdot::render(projection_filename, projection_dot);
+	vector<chp::graph> procs;
+	if (testDecompose) {
+		procs = g.decompose();
+	} else {
+		procs.push_back(g);
 	}
 
 	// Attempt templated synthesis on decomposed subprocesses
@@ -290,9 +292,9 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 			}
 			cout << proc.name << " is now flat" << endl;
 
-			//int dstIdx = prgm.mods[flowIdx].createTerm(weaver::Term::procOf(flowKind, name, args));
+			int dstIdx = prgm.mods[flowIdx].createTerm(weaver::Term::procOf(flowKind, name + "_" + std::to_string(pid), args));
 			const flow::Func &procFunc = chp::synthesizeFuncFromCHP(proc, this->debug);  //TODO: clean up debugFlag prop-drilling in favor of std::clog
-			//prgm.mods[flowIdx].terms[dstIdx].def = procFunc;
+			prgm.mods[flowIdx].terms[dstIdx].def = procFunc;
 
 			string procFlowFilename = (debugDirPath / (prefix + proc.name + "_flow.dot")).string();
 			string procFlowDot = flow::export_func(procFunc, this->debug).to_string();

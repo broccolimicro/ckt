@@ -51,6 +51,8 @@ struct Build {
 	bool noCells;
 	bool noGhosts;
 
+	bool testDecompose;
+
 	bool progress;
 	bool debug;
 	bool format_expressions_as_html_table;
