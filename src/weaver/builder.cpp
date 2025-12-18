@@ -230,7 +230,7 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 	}
 
 	// Attempt templated synthesis on the original source program
-	if (this->debug) {
+	/*if (this->debug) {
 		clog.rdbuf(cout.rdbuf());
 
 	} else {
@@ -249,7 +249,7 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 			clog.rdbuf(logFile.rdbuf());
 			//TODO: perhaps tee'ing a stream to route not just clog but cerr & cout to this file as well as stdout
 		}
-	}
+	}*/
 
 	// Render modified source right before decomposition
 	if (this->debug) {
