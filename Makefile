@@ -109,6 +109,13 @@ build/$(SRCDIR)/%.o: $(SRCDIR)/%.cpp
 $(TEST_TARGET): setgv $(TEST_OBJECTS) $(filter-out build/$(SRCDIR)/main.o, $(OBJECTS))
 	$(CXX) $(LIBRARY_PATHS) $(CXXFLAGS) $(GTEST_L) $(INCLUDE_PATHS) $(filter-out $(firstword $^), $^) -o $(TEST_TARGET) -pthread -lgtest $(LIBRARIES)
 
+coverage: clean
+	$(MAKE) COVERAGE=1 test
+	./$(TEST_TARGET) || true  # Continue even if tests fail
+	lcov --capture --directory build/$(SRCDIR) --output-file coverage.info
+	lcov --ignore-errors unused --remove coverage.info '/usr/include/*' '*/googletest/*' '*/tests/*' --output-file coverage_filtered.info
+	genhtml coverage_filtered.info --output-directory coverage_report
+
 build/$(TESTDIR)/%.o: $(TESTDIR)/%.cpp
 	@mkdir -p $(dir $@)
 	@$(CXX) $(CXXFLAGS) $(GTEST_I) $(INCLUDE_PATHS) -MM -MF $(patsubst %.o,%.d,$@) -MT $@ -c $<
