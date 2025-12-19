@@ -3,6 +3,8 @@
 *.svg
 *.hse
 *.prs
+*.v
+*.dot
 *.o
 tmp*
 ckt
