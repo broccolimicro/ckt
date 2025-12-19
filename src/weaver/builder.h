@@ -70,11 +70,11 @@ struct Build {
 	void build(weaver::Program &prgm, weaver::TermId term=weaver::TermId());
 
 	// TODO(edward.bingham) generalize this into lowering and analysis stages, create a DAG to generalize the compilation algorithm
-	bool chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const;
-	bool flowToVerilog(weaver::Program &prgm, int modIdx, int termIdx) const;
+	bool chpToFlow(weaver::Program &prgm, int modIdx, int termIdx, vector<weaver::TermId> *result = nullptr) const;
+	bool flowToVerilog(weaver::Program &prgm, int modIdx, int termIdx, vector<weaver::TermId> *result = nullptr) const;
 
-	bool hseToPrs(weaver::Program &prgm, int modIdx, int termIdx) const;
-	bool prsToSpi(weaver::Program &prgm, int modIdx, int termIdx);
-	bool spiToGds(weaver::Program &prgm, int modIdx, int termIdx);
+	bool hseToPrs(weaver::Program &prgm, int modIdx, int termIdx, vector<weaver::TermId> *result = nullptr) const;
+	bool prsToSpi(weaver::Program &prgm, int modIdx, int termIdx, vector<weaver::TermId> *result = nullptr);
+	bool spiToGds(weaver::Program &prgm, int modIdx, int termIdx, vector<weaver::TermId> *result = nullptr);
 };
 

@@ -48,7 +48,7 @@ struct Filetype {
 };
 
 struct Project {
-	Project();
+	Project(fs::path root="");
 	~Project();
 
 	static constexpr string BUILD = "build";

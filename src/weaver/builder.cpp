@@ -153,7 +153,7 @@ void Build::build(weaver::Program &prgm, weaver::TermId term) {
 	}
 }
 
-bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
+bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx, vector<weaver::TermId> *result) const {
 	std::filesystem::path debugDirPath = proj.rootDir / proj.BUILD / "dbg";
 	string debugDir = debugDirPath.string();
 
@@ -268,6 +268,7 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 		procs.push_back(g);
 	}
 
+	bool success = not procs.empty();
 	// Attempt templated synthesis on decomposed subprocesses
 	for (size_t pid = 0; pid < procs.size(); pid++) {
 		chp::graph proc = procs[pid];
@@ -288,11 +289,15 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 
 			if (not proc.isFlat()) {
 				cout << proc.name << " is still not flat" << endl;  //clog
+				success = false;
 				continue;
 			}
 			cout << proc.name << " is now flat" << endl;
 
 			int dstIdx = prgm.mods[flowIdx].createTerm(weaver::Term::procOf(flowKind, name + "_" + std::to_string(pid), args));
+			if (result != nullptr) {
+				result->push_back(weaver::TermId(flowIdx, dstIdx));
+			}
 			const flow::Func &procFunc = chp::synthesizeFuncFromCHP(proc, this->debug);  //TODO: clean up debugFlag prop-drilling in favor of std::clog
 			prgm.mods[flowIdx].terms[dstIdx].def = procFunc;
 
@@ -319,10 +324,10 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx) const {
 		//TODO: define target for auto-generation: prgm.mods[...].terms[...].def = procFunc;
 	}
 
-	return true;
+	return success;
 }
 
-bool Build::flowToVerilog(weaver::Program &prgm, int modIdx, int termIdx) const {
+bool Build::flowToVerilog(weaver::Program &prgm, int modIdx, int termIdx, vector<weaver::TermId> *result) const {
 	std::filesystem::path debugDirPath = proj.rootDir / proj.BUILD / "dbg";
 	string debugDir = debugDirPath.string();
 
@@ -356,6 +361,9 @@ bool Build::flowToVerilog(weaver::Program &prgm, int modIdx, int termIdx) const 
 	}
 
 	int dstIdx = prgm.mods[verilogIdx].createTerm(weaver::Term::procOf(verilogKind, name, args));
+	if (result != nullptr) {
+		result->push_back(weaver::TermId(verilogIdx, dstIdx));
+	}
 	clocked::Module mod = flow::synthesizeModuleFromFunc(fn);
 	parse_verilog::module_def mod_v = flow::export_module(mod);
 	string verilog = mod_v.to_string();
@@ -393,7 +401,7 @@ bool Build::flowToVerilog(weaver::Program &prgm, int modIdx, int termIdx) const 
 	return true;
 }
 
-bool Build::hseToPrs(weaver::Program &prgm, int modIdx, int termIdx) const {
+bool Build::hseToPrs(weaver::Program &prgm, int modIdx, int termIdx, vector<weaver::TermId> *result) const {
 	std::filesystem::path debugDirPath = proj.rootDir / proj.BUILD / "dbg";
 	string debugDir = debugDirPath.string();
 
@@ -483,12 +491,15 @@ bool Build::hseToPrs(weaver::Program &prgm, int modIdx, int termIdx) const {
 		if (progress) printf("done\n\n");
 
 		int dstIdx = prgm.mods[cktIdx].createTerm(weaver::Term::procOf(cktKind, name, args));
+		if (result != nullptr) {
+			result->push_back(weaver::TermId(cktIdx, dstIdx));
+		}
 		prgm.mods[cktIdx].terms[dstIdx].def = pr;
 	}
 	return true;
 }
 
-bool Build::prsToSpi(weaver::Program &prgm, int modIdx, int termIdx) {
+bool Build::prsToSpi(weaver::Program &prgm, int modIdx, int termIdx, vector<weaver::TermId> *result) {
 	// Verify expected format of the term
 	if (prgm.mods[modIdx].terms[termIdx].dialect().name != "circ") {
 		fprintf(stderr, "error: dialect '%s' not supported for translation from prs to spi.\n",
@@ -579,12 +590,15 @@ bool Build::prsToSpi(weaver::Program &prgm, int modIdx, int termIdx) {
 		}
 
 		int dstIdx = prgm.mods[spiIdx].createTerm(weaver::Term::procOf(spiKind, name, args));
+		if (result != nullptr) {
+			result->push_back(weaver::TermId(spiIdx, dstIdx));
+		}
 		prgm.mods[spiIdx].terms[dstIdx].def = net;
 	}
 	return true;
 }
 
-bool Build::spiToGds(weaver::Program &prgm, int modIdx, int termIdx) {
+bool Build::spiToGds(weaver::Program &prgm, int modIdx, int termIdx, vector<weaver::TermId> *result) {
 	std::filesystem::path debugDirPath = proj.rootDir / proj.BUILD / "dbg";
 	string debugDir = debugDirPath.string();
 
@@ -640,6 +654,9 @@ bool Build::spiToGds(weaver::Program &prgm, int modIdx, int termIdx) {
 	}
 
 	int dstIdx = prgm.mods[gdsIdx].createTerm(weaver::Term::procOf(gdsKind, name, args));
+	if (result != nullptr) {
+		result->push_back(weaver::TermId(gdsIdx, dstIdx));
+	}
 	prgm.mods[gdsIdx].terms[dstIdx].def = lib;
 	return true;
 }

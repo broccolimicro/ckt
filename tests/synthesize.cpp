@@ -47,7 +47,7 @@ using std::filesystem::current_path;
 using arithmetic::Expression;
 using arithmetic::Operand;
 
-const std::filesystem::path TEST_DIR = absolute(current_path() / "tests");
+const std::filesystem::path TEST_DIR = absolute(current_path() / "tests" / "cog");
 const int WIDTH = 8;
 
 

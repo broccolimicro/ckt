@@ -27,8 +27,12 @@ Filetype::Filetype(string dialect, string ext, string build, Filetype::Parser re
 Filetype::~Filetype() {
 }
 
-Project::Project() {
-	workDir = fs::current_path();
+Project::Project(fs::path root) {
+	if (root.empty()) {
+		workDir = fs::current_path();
+	} else {
+		workDir = root;
+	}
 	rootDir = workDir;
 	while (not rootDir.empty()
 		and rootDir.parent_path() != rootDir

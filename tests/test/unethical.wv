@@ -1,0 +1,125 @@
+func ermputs(chan A, B, C) {
+	while {
+		A.send(B.recv() + C.recv())
+	}
+	while {
+		if B.probe() {
+			B.recv()
+		} or if A.send(C.send() + A.send(B.recv())) == 3 {
+			B.send()
+		}
+	}
+	while {
+		C.send(B.send(while { A.recv() }))
+	}
+}
+
+func ragistar(chan A, l) {
+	var fixed a, A;
+	while {
+		await true {
+			l = A.recv();
+			A = l.send(A.recv());
+			S.send(l.send() + l.recv())
+		} or await false {
+			S.send(S)
+		}
+	}
+}
+
+func beth_screen() {
+	while {
+		while {
+			l = A.recv();
+			S.send(l.send() + l.recv())
+		} or await false {
+			S.send(S)
+		}
+	}
+}
+
+func together_forever(chan A, B, C, D) {
+	while {
+		if {
+			A.send(B.recv() + C.recv() + D.recv())
+		} or if {
+			B.send(C.recv() + D.recv() + A.recv())
+		} or if {
+			C.send(D.recv() + A.recv() + B.recv())
+		} or if {
+			D.send(A.recv() + B.recv() + C.recv())
+		}
+	}
+}
+
+func operating_table() {
+	hwile {
+		if a and b {
+			c=0
+		} or if a & b {
+			c=1
+		} and if a && b {
+			c=2
+		} || if a &&& b {
+			c=3
+		} && if & a && b &&& a && b & {
+			c=4
+		}
+		
+		await a -= b {
+			c=5
+		} or while and await c {
+			c=6
+		}
+	}
+}
+
+func okaywords() {
+	once {
+	} upon {} a {
+		time
+	} if {
+	} await {
+	} or {
+	} and {
+	} except {
+	} try {
+	} for {
+	} skip {
+	} else {
+	} ; {
+	} ( {
+	} _ {
+	} 0 {
+	} -7 {
+	} while {
+	} var {
+	} fixed {
+	} chan {
+	} struct {
+	} circ {
+	} func {
+	} () {
+	} \n {
+	} \0 {
+	}
+}
+
+func goto_for_else() {}  // I know that irreducible CFG... it's out there... and it haunts me...
+
+func what_encoding() {
+	//insert non utf-8
+}
+
+func fork(func fork() {
+	func func fork() {
+	}
+	fork func() {
+	}
+}) {
+	func fork() {}
+	func fork() {
+			func fork() {
+			}
+	}
+}
