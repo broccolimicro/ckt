@@ -49,7 +49,7 @@ void build_help() {
 	printf("\n");
 
 	printf(" --timing <family>     select the timing family for synthesis:\n");
-	printf("         mixed         do not constrain the timing family (default\n");
+	printf("         mixed         do not constrain the timing family (default)\n");
 	printf("         qdi           strictly use quasi-delay insensitive handshakes\n");
 	printf("         clocked       strictly use clocked val-rdy logic\n");
 	printf("\n");
