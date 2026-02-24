@@ -201,7 +201,7 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx, vector<wea
 		}
 	}
 
-	g.post_process(true);
+	g.post_process(true);  //.reduce(true, false, true);
 
 	if (this->debug) {
 		string chp_filename = (debugDirPath / (prefix + g.name + "_chp.png")).string();
@@ -251,19 +251,25 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx, vector<wea
 		}
 	}*/
 
-	// Render modified source right before decomposition
-	if (this->debug) {
-		string projection_filename = (debugDirPath / (prefix + g.name + "_chp.png")).string();
-		string projection_dot = chp::export_graph(g, true).to_string();
-		gvdot::render(projection_filename, projection_dot);
-	}
-
 	//
 	// Attempt Process Decomposition
 	//
 	vector<chp::graph> procs;
 	if (testDecompose) {
-		procs = g.decompose();
+
+		try {
+			procs = g.decompose();
+
+			// Render modified source right before decomposition
+			if (this->debug) {
+				string projection_filename = (debugDirPath / (prefix + g.name + "_projection.png")).string();
+				string projection_dot = chp::export_graph(g, true).to_string();
+				gvdot::render(projection_filename, projection_dot);
+			}
+		} catch (...) {
+			cerr << "ERROR: Skipping to next subprocess. Exception caught when decomposing CHP graph `" << g.name << "`" << endl;
+		}
+
 	} else {
 		procs.push_back(g);
 	}
@@ -276,16 +282,26 @@ bool Build::chpToFlow(weaver::Program &prgm, int modIdx, int termIdx, vector<wea
 		if (proc.places.size() > MAX_PROCESS_SIZE) { cout << "YIKES! P+" + std::to_string(proc.places.size()) << endl; continue; }
 		if (proc.transitions.size() > MAX_PROCESS_SIZE) { cout << "YIKES! T+" + std::to_string(proc.transitions.size()) << endl; continue; }
 
-		if (this->debug) {
-			string proc_filename = (debugDirPath / (prefix + proc.name + "_" + std::to_string(pid) + ".png")).string();  // formerly, "_flatchp.png"
-			string proc_dot = chp::export_graph(proc, true).to_string();
-			gvdot::render(proc_filename, proc_dot);
+		try {
+			if (this->debug) {
+				string proc_filename = (debugDirPath / (prefix + proc.name + "_" + std::to_string(pid) + ".png")).string();  // formerly, "_flatchp.png"
+				string proc_dot = chp::export_graph(proc, true).to_string();
+				gvdot::render(proc_filename, proc_dot);
+			}
+		} catch (...) {
+			cerr << "ERROR: Skipping to next subprocess. Exception caught when rendering CHP graph for " << proc.name << endl;
 		}
 
 		try {
 			bool isFlat = proc.isFlat();
 			cout << proc.name << (isFlat ? " is flat" : " is not flat") << endl;  //clog
-			if (not isFlat) { proc.flatten(this->debug); }
+			if (not isFlat) {
+				proc.flatten(this->debug);
+
+				string proc_flat_filename = (debugDirPath / (prefix + proc.name + "_" + std::to_string(pid) + "_flat.png")).string();  // formerly, "_flatchp.png"
+				string proc_flat_dot = chp::export_graph(proc, true).to_string();
+				gvdot::render(proc_flat_filename, proc_flat_dot);
+			}
 
 			if (not proc.isFlat()) {
 				cout << proc.name << " is still not flat" << endl;  //clog
