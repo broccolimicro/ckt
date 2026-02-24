@@ -30,19 +30,23 @@
 #include "format/astg.h"
 
 void build_help() {
-	printf("\nUsage: lm build [options] <file>\n");
+	printf("\n");
+	printf("Usage: lm build [options] <file>\n");
 	printf("Synthesize the production rules that implement the behavioral description.\n");
+	printf("\n");
 
-	printf("\nOptions:\n");
+	printf("Options:\n");
 	printf(" -v,--verbose     display verbose messages\n");
 	printf(" -d,--debug       display internal debugging messages\n");
 	printf("    --flow_html   enable HTML table output in debug mode (requires --debug)\n");
 	printf(" -h,--help        display this help text\n");
 	printf(" -p,--progress    display progress information\n");
 	printf("\n");
+
 	printf(" -t,--tech <techfile>    manually specify the technology file and arguments\n");
 	printf(" -c,--cells <celldir>    manually specify the cell directory\n");
 	printf("\n");
+
 	printf(" --logic <family>      select the logic family for synthesis:\n");
 	printf("         raw           do not require inverting logic\n");
 	printf("         cmos          require inverting logic (default)\n");
@@ -54,8 +58,11 @@ void build_help() {
 	printf("         clocked       strictly use clocked val-rdy logic\n");
 	printf("\n");
 
+	printf(" --decompose    decompose into multiple processes (experimental)\n");
 	printf(" --all          save all intermediate stages\n");
-	printf(" -o,--out       set the filename prefix for the saved intermediate stages\n\n");
+	printf(" -o,--out       set the filename prefix for the saved intermediate stages\n");
+	printf("\n");
+
 	printf(" -g,--graph     save the elaborated astg\n");
 	printf(" -c,--conflicts print the conflicts to stdout\n");
 	printf(" -e,--encode    save the complete state encoded astg\n");
@@ -67,9 +74,10 @@ void build_help() {
 	printf(" -m,--map       save the netlist split into cells\n");
 	printf(" -l,--cells     save the cell layouts\n");
 	printf(" -p,--place     save the cell placements\n");
+	printf("\n");
 
-	printf("\nSupported file formats:\n");
-	printf(" *.cog          a wire-level programming language\n");
+	printf("Supported file formats:\n");
+	printf(" *.wv           a Go-like programming language called Weaver\n");
 	printf(" *.chp          a data-level process calculi called Communicating Hardware Processes\n");
 	printf(" *.hse          a wire-level process calculi called Hand-Shaking Expansions\n");
 	printf(" *.prs          production rules\n");
