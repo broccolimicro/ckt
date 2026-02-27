@@ -1033,10 +1033,10 @@ void prsim(prs::production_rule_set &pr, bool debug) {//, vector<prs::term_index
 						//step++;
 					//}
 				} else {
-					printf("error: must be in the range [0,%zu)\n", sim.enabled.size());
+					printf("error: must be in the range [0,%u)\n", (uint32_t)sim.enabled.size());
 				}
 			} else {
-				printf("error: expected ID in the range [0,%zu)\n", sim.enabled.size());
+				printf("error: expected ID in the range [0,%u)\n", (uint32_t)sim.enabled.size());
 			}
 		} else if (length > 0) {
 			printf("error: unrecognized command '%s'\n", command);
