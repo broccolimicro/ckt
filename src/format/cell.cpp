@@ -9,9 +9,9 @@ using namespace std::filesystem;
 
 namespace cell {
 
-void export_cell(int index, const phy::Library &lib, const sch::Netlist &net) {
+void export_cell(std::string path, const phy::Library &lib, const sch::Netlist &net, int index) {
 	if (lib.macros[index].name.rfind("cell_", 0) == 0) {
-		string cellPath = lib.tech->lib + "/" + lib.macros[index].name;
+		string cellPath = path + "/" + lib.macros[index].name;
 		if (not filesystem::exists(cellPath+".gds")) {
 			export_layout(cellPath+".gds", lib.macros[index]);
 			export_lef(cellPath+".lef", lib.macros[index]);
@@ -22,22 +22,22 @@ void export_cell(int index, const phy::Library &lib, const sch::Netlist &net) {
 	}
 }
 
-void export_cells(const phy::Library &lib, const sch::Netlist &net) {
-	if (not filesystem::exists(lib.tech->lib)) {
-		filesystem::create_directory(lib.tech->lib);
+void export_cells(std::string path, const phy::Library &lib, const sch::Netlist &net) {
+	if (not filesystem::exists(path)) {
+		filesystem::create_directory(path);
 	}
 	for (int i = 0; i < (int)lib.macros.size(); i++) {
-		export_cell(i, lib, net);
+		export_cell(path, lib, net, i);
 	}
 }
 
 // returns whether the cell was imported
-bool import_cell(phy::Library &lib, sch::Netlist &lst, int idx, bool progress, bool debug) {
+bool import_cell(std::string path, phy::Library &lib, sch::Netlist &lst, int idx, bool progress, bool debug) {
 	if (idx >= (int)lib.macros.size()) {
 		lib.macros.resize(idx+1, Layout(*lib.tech));
 	}
 	lib.macros[idx].name = lst.subckts[idx].name;
-	string cellPath = lib.tech->lib + "/" + lib.macros[idx].name+".gds";
+	string cellPath = path + "/" + lib.macros[idx].name+".gds";
 	if (progress) {
 		printf("  %s...", lib.macros[idx].name.c_str());
 		fflush(stdout);
@@ -114,8 +114,8 @@ bool import_cell(phy::Library &lib, sch::Netlist &lst, int idx, bool progress, b
 	return false;
 }
 
-void update_library(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream, map<int, gdstk::Cell*> *cells, bool progress, bool debug) {
-	bool libFound = filesystem::exists(lib.tech->lib);
+void update_library(std::string path, phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream, map<int, gdstk::Cell*> *cells, bool progress, bool debug) {
+	bool libFound = filesystem::exists(path);
 	if (progress) {
 		printf("Load cell layouts:\n");
 	}
@@ -124,13 +124,13 @@ void update_library(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stre
 	lib.macros.reserve(lst.subckts.size()+lib.macros.size());
 	for (int i = 0; i < (int)lst.subckts.size(); i++) {
 		if (lst.subckts[i].isCell) {
-			if (not import_cell(lib, lst, i, progress, debug)) {
+			if (not import_cell(path, lib, lst, i, progress, debug)) {
 				// We generated a new cell, save this to the cell library
 				if (not libFound) {
-					filesystem::create_directory(lib.tech->lib);
+					filesystem::create_directory(path);
 					libFound = true;
 				}
-				string cellPath = lib.tech->lib + "/" + lib.macros[i].name;
+				string cellPath = path + "/" + lib.macros[i].name;
 				export_layout(cellPath+".gds", lib.macros[i]);
 				export_lef(cellPath+".lef", lib.macros[i]);
 				export_spi(cellPath+".spi", *lib.tech, lst, lst.subckts[i]);

@@ -7,7 +7,7 @@
 
 #include <interpret_flow/export_verilog.h>
 
-void writeVerilog(fs::path path, const weaver::Project &proj, const weaver::Program &prgm, int modIdx, int termIdx) {
+void writeVerilog(fs::path path, weaver::Project &proj, const weaver::Program &prgm, int modIdx, int termIdx, int varIdx) {
 	string pathstr = path.string();
 	ofstream fout(pathstr.c_str(), ios::out);
 	if (not fout.is_open()) {
@@ -15,7 +15,7 @@ void writeVerilog(fs::path path, const weaver::Project &proj, const weaver::Prog
 		return;
 	}
 
-	const clocked::Module &mod = prgm.mods[modIdx].terms[termIdx].as<clocked::Module>();
+	const clocked::Module &mod = prgm.mods[modIdx].terms[termIdx].variants[varIdx].as<clocked::Module>();
 	string buffer = flow::export_module(mod).to_string();
 	fout.write(buffer.c_str(), buffer.size());
 	fout.close();

@@ -7,7 +7,7 @@
 
 #include <parse_ucs/source.h>
 
-#include "../weaver/import.h"
+#include <interpret_wv/import.h>
 
 void readWv(weaver::Project &proj, weaver::Source &source, string buffer) {
 	source.tokens->register_token<parse::block_comment>(false);

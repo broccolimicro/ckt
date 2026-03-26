@@ -1,5 +1,4 @@
 #include "unpack.h"
-#include "cli.h"
 
 #include <common/standard.h>
 #include <common/timer.h>
@@ -16,10 +15,11 @@
 #include <parse_prs/factory.h>
 #include <parse_spice/factory.h>
 
-#include "weaver/unpacker.h"
-#include "weaver/project.h"
-#include "weaver/cli.h"
+#include <weaver/project.h>
 
+#include "weaver/unpacker.h"
+
+#include "format/mod.h"
 #include "format/cog.h"
 #include "format/spice.h"
 #include "format/gds.h"
@@ -52,7 +52,7 @@ int unpack_command(int argc, char **argv) {
 
 	weaver::Project proj;
 	if (proj.hasMod()) {
-		proj.readMod();
+		readMod(proj);
 	}
 
 	proj.pushFiletype("", "wv", "", readWv, loadWv);
@@ -65,7 +65,7 @@ int unpack_command(int argc, char **argv) {
 	proj.pushFiletype("func", "astg", "state", readAstg, loadAstg, writeAstg);
 	proj.pushFiletype("proto", "astgw", "state", readAstg, loadAstgw, writeAstgw);
 
-	vector<Proto> protos;
+	vector<weaver::Prototype> protos;
 
 	Unpack unpacker(proj);
 
@@ -87,24 +87,24 @@ int unpack_command(int argc, char **argv) {
 		} else if (arg == "-s" or arg == "--size") {
 			unpacker.set(Unpack::SIZED);
 		} else {
-			protos.push_back(parseProto(proj, arg));
+			protos.push_back(weaver::Prototype(arg));
 		}
 	}
 
 	weaver::Program prgm;
 	loadGlobalTypes(prgm);
 
-	if (protos.empty()) {
+	/*if (protos.empty()) {
 		proj.incl("top.wv");
 		proj.load(prgm);
 		unpacker.unpack(prgm);
 	} else {
 		for (auto i = protos.begin(); i != protos.end(); i++) {
-			proj.incl(i->path);
+			proj.incl(proj.relpathFromModule(i->mod));
 		}
 		proj.load(prgm);
 		for (auto i = protos.begin(); i != protos.end(); i++) {
-			vector<weaver::TermId> curr = findProto(prgm, *i);
+			vector<weaver::TermId> curr = prgm.findTerms(*i);
 			if (curr.empty()) {
 				error("", "module not found for term '" + i->to_string() + "'", __FILE__, __LINE__);
 			}
@@ -112,7 +112,7 @@ int unpack_command(int argc, char **argv) {
 				unpacker.unpack(prgm, *j);
 			}
 		}
-	}
+	}*/
 
 	if (unpacker.debug) {
 		prgm.print();

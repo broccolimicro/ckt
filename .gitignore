@@ -1,3 +1,6 @@
+coverage.info
+coverage_filtered.info
+coverage_report
 *.astg
 *.png
 *.svg

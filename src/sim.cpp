@@ -26,9 +26,9 @@
 #include <prs/simulator.h>
 #include <prs/expression.h>
 
-#include "weaver/project.h"
-#include "weaver/cli.h"
+#include <weaver/project.h>
 
+#include "format/mod.h"
 #include "format/dot.h"
 #include "format/cog.h"
 #include "format/spice.h"
@@ -1057,7 +1057,7 @@ int sim_command(int argc, char **argv) {
 
 	weaver::Project proj;
 	if (proj.hasMod()) {
-		proj.readMod();
+		readMod(proj);
 	}
 
 	proj.pushFiletype("", "wv", "", readWv, loadWv);
@@ -1070,7 +1070,7 @@ int sim_command(int argc, char **argv) {
 	proj.pushFiletype("func", "astg", "state", readAstg, loadAstg, writeAstg);
 	proj.pushFiletype("proto", "astgw", "state", readAstg, loadAstgw, writeAstgw);
 
-	Proto proto;
+	weaver::Prototype proto;
 
 	string sfilename = "";
 	bool debug = false;
@@ -1084,7 +1084,7 @@ int sim_command(int argc, char **argv) {
 			set_debug(true);
 			debug = true;
 		} else if (proto.empty()) {
-			proto = parseProto(proj, arg);
+			proto = weaver::Prototype(arg);
 		} else {
 			sfilename = arg;
 			size_t dot = sfilename.find_last_of(".");
@@ -1105,14 +1105,14 @@ int sim_command(int argc, char **argv) {
 
 	if (proto.empty()) {
 		proj.incl("top.wv");
-		proto.name = vector<string>({"top", "top"});
+		proto = weaver::Prototype("top.top");
 	} else {
 		proj.incl(proto.path);
 	}
 
 	proj.load(prgm);
 
-	vector<weaver::TermId> curr = findProto(prgm, proto);
+	vector<weaver::TermId> curr = prgm.findTerms(proto);
 	if (curr.empty() or curr[0].mod < 0) {
 		error("", "module not found for term '" + proto.to_string() + "'", __FILE__, __LINE__);
 		complete();
@@ -1129,9 +1129,20 @@ int sim_command(int argc, char **argv) {
 		return 1;
 	}
 
-	const weaver::Term &fn = prgm.termAt(curr[0]);
+	if (proto.variant < 0) {
+		proto.variant = 0;
+	}
 
-	if (fn.dialect().name == "func") {
+	const weaver::Term &fn = prgm.termAt(curr[0]);
+	if (proto.variant >= (int)fn.variants.size()) {
+		error("", "variant '" + std::to_string(proto.variant) + "' not defined for term '" + proto.to_string() + "'", __FILE__, __LINE__);
+		complete();
+		return 1;
+	}
+
+	const weaver::Variant &var = fn.variants[proto.variant];
+
+	if (var.meta.dialect() == "func") {
 		vector<chp::term_index> steps;
 		if (sfilename != "") {
 			FILE *seq = fopen(sfilename.c_str(), "r");
@@ -1149,10 +1160,10 @@ int sim_command(int argc, char **argv) {
 			}
 		}
 
-		chp::graph g = fn.as<chp::graph>();
+		chp::graph g = var.as<chp::graph>();
 		g.post_process(true);
 		chpsim(g, steps);
-	} else if (fn.dialect().name == "proto") {
+	} else if (var.meta.dialect() == "proto") {
 		vector<hse::term_index> steps;
 		if (sfilename != "") {
 			FILE *seq = fopen(sfilename.c_str(), "r");
@@ -1170,9 +1181,9 @@ int sim_command(int argc, char **argv) {
 			}
 		}
 		
-		hse::graph g = fn.as<hse::graph>();
+		hse::graph g = var.as<hse::graph>();
 		hsesim(g, steps);
-	} else if (fn.dialect().name == "circ") {
+	} else if (var.meta.dialect() == "circ") {
 		/*vector<prs::term_index> steps;
 		if (sfilename != "") {
 			FILE *seq = fopen(sfilename.c_str(), "r");
@@ -1190,7 +1201,7 @@ int sim_command(int argc, char **argv) {
 			}
 		}*/
 
-		prs::production_rule_set pr = fn.as<prs::production_rule_set>();
+		prs::production_rule_set pr = var.as<prs::production_rule_set>();
 
 		if (debug) {
 			printf("\n\n%s\n\n", export_production_rule_set(pr).to_string().c_str());
@@ -1200,7 +1211,7 @@ int sim_command(int argc, char **argv) {
 
 		prsim(pr, debug);//, steps);
 	} else {
-		error("", "unrecognized dialect '" + fn.dialect().name + "'", __FILE__, __LINE__);
+		error("", "unrecognized dialect '" + var.meta.dialect() + "'", __FILE__, __LINE__);
 	}
 
 	complete();

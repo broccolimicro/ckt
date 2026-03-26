@@ -45,7 +45,8 @@
 #include <interpret_arithmetic/export.h>
 #include <interpret_arithmetic/import.h>
 
-#include "weaver/project.h"
+#include <weaver/project.h>
+#include "format/mod.h"
 
 #include <filesystem>
 #include <chrono>
@@ -71,7 +72,7 @@ void tech_help() {
 	//printf("  drop [cell name...]     delete these cells from your cell library\n");
 }
 
-int tech_cells_command(string workingDir, string techDir, string techPath, string cellsDir, int argc, char **argv) {
+int tech_cells_command(weaver::Project &proj, int argc, char **argv) {
 	vector<string> files;
 
 	for (int i = 0; i < argc; i++) {
@@ -91,24 +92,27 @@ int tech_cells_command(string workingDir, string techDir, string techPath, strin
 
 			if (ext != "gds") {
 				printf("unsupported file format '%s'\n", ext.c_str());
-				return 0;
+				return 1;
 			}
 			files.push_back(arg);
 		}
 	}
 
-	if (techPath.empty()) {
+	if (proj.tech.path.empty()) {
 		printf("please provide a python techfile.\n");
-		return 0;
-	}
-
-	phy::Tech tech(techPath, cellsDir);
-	if (not phy::loadTech(tech)) {
-		cout << "techfile does not exist \'" + techPath + "\'." << endl;
 		return 1;
 	}
 
-	bool libFound = filesystem::exists(tech.lib);
+	if (not proj.tech.def.has_value()) {
+		proj.tech.def = make_any<phy::Tech>();
+	}
+	phy::Tech &tech = proj.tech.as<phy::Tech>();
+	if (not tech.isLoaded() and not phy::loadTech(&tech, proj.tech.path, proj.tech.args)) {
+		cout << "Unable to load techfile \'" + proj.tech.path + "\'." << endl;
+		return 1;
+	}
+
+	bool libFound = filesystem::exists(proj.tech.lib);
 	printf("Importing cells...\n");
 	for (auto path = files.begin(); path != files.end(); path++) {
 		printf("\t%s\n", path->c_str());
@@ -133,18 +137,18 @@ int tech_cells_command(string workingDir, string techDir, string techPath, strin
 			printf("%s\n", spi->name.c_str());	
 
 			if (not libFound) {
-				filesystem::create_directory(tech.lib);
+				filesystem::create_directory(proj.tech.lib);
 				libFound = true;
 			}
 		
-			string cellPath = tech.lib + "/" + spi->name;
+			string cellPath = proj.tech.lib + "/" + spi->name;
 			export_layout(cellPath+".gds", *gds);
 			export_lef(cellPath+".lef", *gds);
 			export_spi(cellPath+".spi", tech, net, *spi);
 		}
 	}
 
-	return 1;
+	return 0;
 }
 
 /*int tech_import_command(string workingDir, string techDir, string techPath, string cellsDir, int argc, char **argv) {
@@ -190,7 +194,7 @@ int tech_command(int argc, char **argv) {
 
 	weaver::Project proj;
 	if (proj.hasMod()) {
-		proj.readMod();
+		readMod(proj);
 	} else {
 		printf("please initialize your module with the following.\n\nlm mod init my_module\n");
 		return 1;
@@ -213,15 +217,15 @@ int tech_command(int argc, char **argv) {
 			if (i < argc) {
 				proj.setTech(argv[i]);
 			}
-			proj.writeMod();
+			writeMod(proj);
 			return 0;
 		} else if (arg == "get") {
 			++i;
-			printf("%s\n", proj.techName.c_str());
+			printf("%s\n", proj.tech.path.c_str());
 			return 0;
 		} else if (arg == "cells") {
 			++i;
-			return tech_cells_command(proj.workDir, proj.techDir, proj.tech.path, proj.tech.lib, argc-i, argv+i);
+			return tech_cells_command(proj, argc-i, argv+i);
 		/*} else if (arg == "import") {
 			++i;
 			return tech_import_command(workingDir, techDir, techPath, cellsDir, argc-i, argv+i);*/

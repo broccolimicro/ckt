@@ -15,10 +15,11 @@
 #include <parse_prs/factory.h>
 #include <parse_spice/factory.h>
 
-#include "weaver/builder.h"
-#include "weaver/project.h"
-#include "weaver/cli.h"
+#include <weaver/project.h>
 
+#include "weaver/builder.h"
+
+#include "format/mod.h"
 #include "format/dot.h"
 #include "format/cog.h"
 #include "format/spice.h"
@@ -52,7 +53,7 @@ void compare_help() {
 }
 
 struct Group {
-	vector<Proto> terms;
+	vector<weaver::Prototype> terms;
 };
 
 void compare(sch::Subckt &s0, sch::Subckt &s1) {
@@ -101,20 +102,20 @@ void compare(sch::Netlist &n0, sch::Netlist &n1) {
 	}
 }
 
-void compare(weaver::Program &prgm, weaver::Term &child, weaver::Term &parent) {
-	if (child.dialect().name == "layout" and parent.dialect().name == "spice") {
+void compare(weaver::Program &prgm, weaver::Variant &child, weaver::Variant &parent) {
+	if (child.meta.dialect() == "layout" and parent.meta.dialect() == "spice") {
 		phy::Library &lib = child.as<phy::Library>();
 		sch::Netlist s0;
 		extract(s0, lib);
 
 		compare(s0, parent.as<sch::Netlist>());
-	} else if (child.dialect().name == "spice" and parent.dialect().name == "child") {
+	} else if (child.meta.dialect() == "spice" and parent.meta.dialect() == "child") {
 		phy::Library &lib = parent.as<phy::Library>();
 		sch::Netlist s1;
 		extract(s1, lib);
 
 		compare(child.as<sch::Netlist>(), s1);
-	} else if (child.dialect().name == "spice" and parent.dialect().name == "spice") {
+	} else if (child.meta.dialect() == "spice" and parent.meta.dialect() == "spice") {
 		compare(child.as<sch::Netlist>(), parent.as<sch::Netlist>());
 	}
 	printf("done\n\n");
@@ -122,17 +123,25 @@ void compare(weaver::Program &prgm, weaver::Term &child, weaver::Term &parent) {
 
 void verifyImpl(weaver::Program &prgm, weaver::TermId idx) {
 	weaver::Term &t0 = prgm.termAt(idx);
-	if (t0.impl.empty()) {
-		return;
-	}
+	for (int i = (int)t0.variants.size()-1; i >= 0; i--) {
+		int super = t0.variants[i].super;
+		if (super < 0) {
+			for (auto j = t0.impl.begin(); j != t0.impl.end(); j++) {
+				if (not j->defined()) {
+					printf("error: undefined implements relationship\n");
+					continue;
+				}
 
-	for (auto j = t0.impl.begin(); j != t0.impl.end(); j++) {
-		if (not j->defined()) {
-			printf("error: undefined implements relationship\n");
-			continue;
+				weaver::Term &t1 = prgm.termAt(*j);
+				if (t1.variants.empty()) {
+					continue;
+				}
+
+				compare(prgm, t0.variants[i], t1.variants[0]);
+			}
+		} else {
+			compare(prgm, t0.variants[i], t0.variants[super]);
 		}
-
-		compare(prgm, t0, prgm.termAt(*j));
 	}
 }
 
@@ -141,8 +150,8 @@ void verifyGroup(weaver::Program &prgm, Group group) {
 		return;
 	} else if (group.terms.size() == 1u) {
 		printf("%s:\n", group.terms[0].to_string().c_str());
-		vector<weaver::TermId> idx = findProto(prgm, group.terms[0]);
-		if (group.terms[0].isModule()) {
+		vector<weaver::TermId> idx = prgm.findTerms(group.terms[0]);
+		if (group.terms[0].name.empty()) {
 			if (idx[0].mod >= 0) {
 				for (idx[0].index = 0; idx[0].index < (int)prgm.mods[idx[0].mod].terms.size(); idx[0].index++) {
 					verifyImpl(prgm, idx[0]);
@@ -150,7 +159,7 @@ void verifyGroup(weaver::Program &prgm, Group group) {
 			} else {
 				printf("error: module not found '%s'\n", group.terms[0].to_string().c_str());
 			}
-		} else if (group.terms[0].isTerm()) {
+		} else {
 			for (auto j = idx.begin(); j != idx.end(); j++) {
 				if (j->defined()) {
 					verifyImpl(prgm, *j);
@@ -162,12 +171,21 @@ void verifyGroup(weaver::Program &prgm, Group group) {
 		return;
 	}
 	
-	vector<weaver::TermId> prev = findProto(prgm, group.terms[0]);
+	vector<weaver::TermId> prev = prgm.findTerms(group.terms[0]);
+	int prevVariant = group.terms[0].variant;
+	if (prevVariant < 0) {
+		prevVariant = 0;
+	}
+
 	if (prev.empty() or prev[0].mod < 0) {
 		printf("error: term not found '%s'\n", group.terms[0].to_string().c_str());
 	}
 	for (int i = 1; i < (int)group.terms.size(); i++) {
-		vector<weaver::TermId> curr = findProto(prgm, group.terms[i]);
+		vector<weaver::TermId> curr = prgm.findTerms(group.terms[i]);
+		int currVariant = group.terms[i].variant;
+		if (currVariant < 0) {
+			currVariant = 0;
+		}
 		if (curr.empty() or curr[0].mod < 0) {
 			printf("error: term not found '%s'\n", group.terms[i].to_string().c_str());
 		}
@@ -177,30 +195,63 @@ void verifyGroup(weaver::Program &prgm, Group group) {
 				if (k->defined() and j->defined()) {
 					weaver::Term &t0 = prgm.termAt(*j);
 					weaver::Term &t1 = prgm.termAt(*k);
-					compare(prgm, t0, t1);
+					if (prevVariant >= (int)t0.variants.size()) {
+						printf("error: variant not found '%s'\n", group.terms[i-1].to_string().c_str());
+						break;
+					}
+					if (currVariant >= (int)t1.variants.size()) {
+						printf("error: variant not found '%s'\n", group.terms[i].to_string().c_str());
+						continue;
+					}	
+					compare(prgm, t0.variants[prevVariant], t1.variants[currVariant]);
 				} else if (k->defined() and j->mod >= 0) {
 					weaver::Term &t1 = prgm.termAt(*k);
+					if (currVariant >= (int)t1.variants.size()) {
+						printf("error: variant not found '%s'\n", group.terms[i].to_string().c_str());
+						continue;
+					}
+
 					for (int t0i = 0; t0i < (int)prgm.mods[j->mod].terms.size(); t0i++) {
 						weaver::Term &t0 = prgm.termAt(weaver::TermId(j->mod, t0i));
+						if (prevVariant >= (int)t0.variants.size()) {
+							printf("error: variant not found '%s'\n", group.terms[i-1].to_string().c_str());
+							continue;
+						}
 						if (t0.decl.name == t1.decl.name) {
-							compare(prgm, t0, t1);
+							compare(prgm, t0.variants[prevVariant], t1.variants[currVariant]);
 						}
 					}
 				} else if (k->mod >= 0 and j->defined()) {
 					weaver::Term &t0 = prgm.termAt(*j);
+					if (prevVariant >= (int)t0.variants.size()) {
+						printf("error: variant not found '%s'\n", group.terms[i-1].to_string().c_str());
+						continue;
+					}
 					for (int t1i = 0; t1i < (int)prgm.mods[k->mod].terms.size(); t1i++) {
 						weaver::Term &t1 = prgm.termAt(weaver::TermId(k->mod, t1i));
+						if (currVariant >= (int)t1.variants.size()) {
+							printf("error: variant not found '%s'\n", group.terms[i].to_string().c_str());
+							continue;
+						}
 						if (t0.decl.name == t1.decl.name) {
-							compare(prgm, t0, t1);
+							compare(prgm, t0.variants[prevVariant], t1.variants[currVariant]);
 						}
 					}
 				} else if (k->mod >= 0 and j->mod >= 0) {
 					for (int t0i = 0; t0i < (int)prgm.mods[j->mod].terms.size(); t0i++) {
 						weaver::Term &t0 = prgm.termAt(weaver::TermId(j->mod, t0i));
+						if (prevVariant >= (int)t0.variants.size()) {
+							printf("error: variant not found '%s'\n", group.terms[i-1].to_string().c_str());
+							continue;
+						}
 						for (int t1i = 0; t1i < (int)prgm.mods[k->mod].terms.size(); t1i++) {
 							weaver::Term &t1 = prgm.termAt(weaver::TermId(k->mod, t1i));
+							if (currVariant >= (int)t1.variants.size()) {
+								printf("error: variant not found '%s'\n", group.terms[i].to_string().c_str());
+								continue;
+							}
 							if (t0.decl.name == t1.decl.name) {
-								compare(prgm, t0, t1);
+								compare(prgm, t0.variants[prevVariant], t1.variants[currVariant]);
 							}
 						}
 					}
@@ -209,6 +260,7 @@ void verifyGroup(weaver::Program &prgm, Group group) {
 		}
 
 		prev = curr;
+		prevVariant = currVariant;
 	}
 }
 
@@ -223,7 +275,7 @@ int compare_command(int argc, char **argv) {
 
 	weaver::Project proj;
 	if (proj.hasMod()) {
-		proj.readMod();
+		readMod(proj);
 	}
 
 	proj.pushFiletype("", "wv", "", readWv, loadWv);
@@ -244,12 +296,12 @@ int compare_command(int argc, char **argv) {
 
 		size_t eq = arg.rfind("=");
 		while (eq != string::npos) {
-			groups.back().terms.push_back(parseProto(proj, arg.substr(eq+1)));
+			groups.back().terms.push_back(weaver::Prototype(arg.substr(eq+1)));
 			arg = arg.substr(0, eq);
 			eq = arg.rfind("=");
 		}
 		if (not arg.empty()) {
-			groups.back().terms.push_back(parseProto(proj, arg));
+			groups.back().terms.push_back(weaver::Prototype(arg));
 		}
 		reverse(groups.back().terms.begin(), groups.back().terms.end());
 	}
@@ -267,7 +319,7 @@ int compare_command(int argc, char **argv) {
 	} else {
 		for (auto i = groups.begin(); i != groups.end(); i++) {
 			for (auto j = i->terms.begin(); j != i->terms.end(); j++) {
-				proj.incl(j->path);
+				proj.incl(proj.relpathFromModule(j->mod));
 			}
 		}
 	}

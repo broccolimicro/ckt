@@ -11,13 +11,6 @@
 #include "tech.h"
 #include "mod.h"
 
-#include <filesystem>
-#include <fstream>
-
-#include "weaver/project.h"
-
-namespace fs = std::filesystem;
-
 void print_help() {
 	printf("Loom is a circuit synthesis and simulation engine.\n");
 	printf("\nUsage: lm <command> [arguments]\n");

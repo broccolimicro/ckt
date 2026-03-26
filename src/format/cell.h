@@ -10,9 +10,9 @@
 
 namespace cell {
 
-void export_cell(int index, const phy::Library &lib, const sch::Netlist &net);
-void export_cells(const phy::Library &lib, const sch::Netlist &net);
-bool import_cell(phy::Library &lib, sch::Netlist &lst, int idx, bool progress=false, bool debug=false);
-void update_library(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=nullptr, map<int, gdstk::Cell*> *cells=nullptr, bool progress=false, bool debug=false);
+void export_cell(std::string path, const phy::Library &lib, const sch::Netlist &net, int index);
+void export_cells(std::string path, const phy::Library &lib, const sch::Netlist &net);
+bool import_cell(std::string path, phy::Library &lib, sch::Netlist &lst, int idx, bool progress=false, bool debug=false);
+void update_library(std::string path, phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=nullptr, map<int, gdstk::Cell*> *cells=nullptr, bool progress=false, bool debug=false);
 
 }

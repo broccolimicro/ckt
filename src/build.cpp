@@ -1,5 +1,4 @@
 #include "build.h"
-#include "cli.h"
 
 #include <common/standard.h>
 #include <common/timer.h>
@@ -12,16 +11,19 @@
 #include <parse_ucs/source.h>
 #include <parse_astg/factory.h>
 #include <parse_cog/factory.h>
+#include <parse_gc/factory.h>
 #include <parse_chp/factory.h>
 #include <parse_prs/factory.h>
 #include <parse_spice/factory.h>
 
-#include "weaver/builder.h"
-#include "weaver/project.h"
-#include "weaver/cli.h"
-#include "format/dot.h"
+#include <weaver/project.h>
 
+#include "weaver/builder.h"
+
+#include "format/mod.h"
+#include "format/dot.h"
 #include "format/cog.h"
+#include "format/gc.h"
 #include "format/spice.h"
 #include "format/gds.h"
 #include "format/verilog.h"
@@ -86,20 +88,23 @@ void build_help() {
 
 int build_command(int argc, char **argv) {
 	parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
+	parse_ucs::function::registry.insert({"struct", parse_ucs::language(&parse_gc::produce, &parse_gc::expect, &parse_gc::register_syntax)});
 	parse_ucs::function::registry.insert({"proto", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
 	parse_ucs::function::registry.insert({"circ", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
 
 	weaver::Term::pushDialect("func", factoryCog);
+	weaver::Term::pushDialect("struct", factoryGc);
 	weaver::Term::pushDialect("proto", factoryCogw);
 	weaver::Term::pushDialect("circ", factoryPrs);
 
 	weaver::Project proj;
 	if (proj.hasMod()) {
-		proj.readMod();
+		readMod(proj);
 	}
 
 	proj.pushFiletype("", "wv", "", readWv, loadWv);
 	proj.pushFiletype("func", "cog", "", readCog, loadCog);
+	proj.pushFiletype("struct", "gc", "", readGc, loadGc, writeGc);
 	proj.pushFiletype("proto", "cogw", "", readCog, loadCogw);
 	proj.pushFiletype("circ", "prs", "ckt", readPrs, loadPrs, writePrs);
 	proj.pushFiletype("spice", "spi", "spi", readSpice, loadSpice, writeSpice);
@@ -108,11 +113,10 @@ int build_command(int argc, char **argv) {
 	proj.pushFiletype("func", "astg", "state", readAstg, loadAstg, writeAstg);
 	proj.pushFiletype("proto", "astgw", "state", readAstg, loadAstgw, writeAstgw);
 
-	vector<Proto> protos;
+	vector<weaver::Prototype> protos;
 
 	Build builder(proj);
 	
-	bool manualCells = false;
 	for (int i = 0; i < argc; i++) {
 		string arg = argv[i];
 
@@ -138,14 +142,13 @@ int build_command(int argc, char **argv) {
 				printf("expected path to tech file.\n");
 				return 0;
 			}
-			proj.setTechPath(argv[i], not manualCells);
+			proj.setTech(argv[i]);
 		} else if (arg == "--cells" or arg == "-c") {
 			if (++i >= argc) {
 				printf("expected path to cell directory.\n");
 				return 0;
 			}
-			proj.setCellsDir(argv[i]);
-			manualCells = true;
+			proj.setTechLib(argv[i]);
 		} else if (arg == "--logic") {
 			if (++i >= argc) {
 				printf("error: expected logic family (raw, cmos)\n");
@@ -243,7 +246,7 @@ int build_command(int argc, char **argv) {
 		} else if (arg == "--no-ghosts") {
 			builder.noGhosts = true;
 		} else {
-			protos.push_back(parseProto(proj, arg));
+			protos.push_back(weaver::Prototype(arg));
 		}
 	}
 
@@ -262,25 +265,27 @@ int build_command(int argc, char **argv) {
 		}
 	}
 
-	if (protos.empty()) {
+	/*if (protos.empty()) {
 		proj.incl("top.wv");
 		proj.load(prgm);
-		builder.build(prgm);
+		builder.push(prgm);
 	} else {
 		for (auto i = protos.begin(); i != protos.end(); i++) {
-			proj.incl(i->path);
+			proj.incl(proj.relpathFromModule(i->mod));
 		}
 		proj.load(prgm);
 		for (auto i = protos.begin(); i != protos.end(); i++) {
-			vector<weaver::TermId> curr = findProto(prgm, *i);
+			vector<weaver::TermId> curr = prgm.findTerms(*i);
 			if (curr.empty()) {
 				error("", "module not found for term '" + i->to_string() + "'", __FILE__, __LINE__);
 			}
 			for (auto j = curr.begin(); j != curr.end(); j++) {
-				builder.build(prgm, *j);
+				builder.push(prgm, *j);
 			}
 		}
 	}
+
+	builder.build(prgm);*/
 
 	if (builder.debug) {
 		prgm.print();

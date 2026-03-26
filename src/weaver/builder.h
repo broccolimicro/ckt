@@ -1,12 +1,9 @@
 #pragma once
 
 #include <common/standard.h>
-#include <parse/parse.h>
 
 #include <weaver/program.h>
-#include <phy/Tech.h>
-
-#include "project.h"
+#include <weaver/project.h>
 
 struct Build {
 	Build(weaver::Project &proj);
@@ -66,15 +63,5 @@ struct Build {
 	void incl(int target);
 	void excl(int target);
 	bool has(int target) const;
-
-	void build(weaver::Program &prgm, weaver::TermId term=weaver::TermId());
-
-	// TODO(edward.bingham) generalize this into lowering and analysis stages, create a DAG to generalize the compilation algorithm
-	bool chpToFlow(weaver::Program &prgm, int modIdx, int termIdx, vector<weaver::TermId> *result = nullptr) const;
-	bool flowToVerilog(weaver::Program &prgm, int modIdx, int termIdx, vector<weaver::TermId> *result = nullptr) const;
-
-	bool hseToPrs(weaver::Program &prgm, int modIdx, int termIdx, vector<weaver::TermId> *result = nullptr) const;
-	bool prsToSpi(weaver::Program &prgm, int modIdx, int termIdx, vector<weaver::TermId> *result = nullptr);
-	bool spiToGds(weaver::Program &prgm, int modIdx, int termIdx, vector<weaver::TermId> *result = nullptr);
 };
 

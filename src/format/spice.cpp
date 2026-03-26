@@ -14,7 +14,11 @@
 #include <interpret_sch/export.h>
 
 void readSpice(weaver::Project &proj, weaver::Source &source, string buffer) {
-	if (not proj.tech.isLoaded() and not phy::loadTech(proj.tech)) {
+	if (not proj.tech.def.has_value()) {
+		proj.tech.def = make_any<phy::Tech>();
+	}
+	phy::Tech &tech = proj.tech.as<phy::Tech>();
+	if (not tech.isLoaded() and not phy::loadTech(&tech, proj.tech.path, proj.tech.args)) {
 		cout << "Unable to load techfile \'" + proj.tech.path + "\'." << endl;
 		return;
 	}
@@ -30,19 +34,37 @@ void readSpice(weaver::Project &proj, weaver::Source &source, string buffer) {
 }
 
 void loadSpice(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
+	if (not proj.tech.def.has_value()) {
+		proj.tech.def = make_any<phy::Tech>();
+	}
+	phy::Tech &tech = proj.tech.as<phy::Tech>();
+	if (not tech.isLoaded() and not phy::loadTech(&tech, proj.tech.path, proj.tech.args)) {
+		cout << "Unable to load techfile \'" + proj.tech.path + "\'." << endl;
+		return;
+	}
+
 	string name = source.path.stem().string();
 	sch::Netlist net;
-	sch::import_netlist(proj.tech, net, *(parse_spice::netlist*)source.syntax.get(), source.tokens.get());
+	sch::import_netlist(tech, net, *(parse_spice::netlist*)source.syntax.get(), source.tokens.get());
 
 	int kind = weaver::Term::getDialect("spice");
 	int modIdx = prgm.getModule(source.modName);
 
-	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, name, vector<weaver::Instance>()));
+	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term(name, vector<weaver::Instance>()));
 
-	prgm.mods[modIdx].terms[termIdx].def = net;
+	prgm.mods[modIdx].terms[termIdx].variants.push_back(weaver::Variant(-1, net, weaver::Metadata(kind)));
 }
 
-void writeSpice(fs::path path, const weaver::Project &proj, const weaver::Program &prgm, int modIdx, int termIdx) {
+void writeSpice(fs::path path, weaver::Project &proj, const weaver::Program &prgm, int modIdx, int termIdx, int varIdx) {
+	if (not proj.tech.def.has_value()) {
+		proj.tech.def = make_any<phy::Tech>();
+	}
+	phy::Tech &tech = proj.tech.as<phy::Tech>();
+	if (not tech.isLoaded() and not phy::loadTech(&tech, proj.tech.path, proj.tech.args)) {
+		cout << "Unable to load techfile \'" + proj.tech.path + "\'." << endl;
+		return;
+	}
+
 	string pathstr = path.string();
 	ofstream fout(pathstr.c_str(), ios::out);
 	if (not fout.is_open()) {
@@ -50,8 +72,8 @@ void writeSpice(fs::path path, const weaver::Project &proj, const weaver::Progra
 		return;
 	}
 
-	const sch::Netlist &net = prgm.mods[modIdx].terms[termIdx].as<sch::Netlist>();
-	string buffer = sch::export_netlist(proj.tech, net).to_string();
+	const sch::Netlist &net = prgm.mods[modIdx].terms[termIdx].variants[varIdx].as<sch::Netlist>();
+	string buffer = sch::export_netlist(tech, net).to_string();
 	fout.write(buffer.c_str(), buffer.size());
 	fout.close();
 }

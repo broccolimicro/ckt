@@ -19,9 +19,9 @@
 #include <prs/production_rule.h>
 #include <prs/bubble.h>
 
-#include "weaver/project.h"
-#include "weaver/cli.h"
+#include <weaver/project.h>
 
+#include "format/mod.h"
 #include "format/dot.h"
 #include "format/cog.h"
 #include "format/spice.h"
@@ -80,19 +80,15 @@ void show_help() {
 	printf(" -s,--sync       Render half synchronization actions\n");
 }
 
-void show(ShowOptions opts, weaver::Term &t, string outPath) {
-	if (t.kind < 0) {
-		internal("", "dialect not defined for term '" + t.decl.name + "'", __FILE__, __LINE__);
-		return;
-	}
-	if (t.dialect().name == "func") {
-		chp::graph g = t.as<chp::graph>();
+void show(ShowOptions opts, weaver::Term &t, weaver::Variant &v, string outPath) {
+	if (v.meta.dialect() == "func") {
+		chp::graph g = v.as<chp::graph>();
 		if (opts.process) {
 			g.post_process(opts.proper, opts.aggressive);
 		}
 		gvdot::render(outPath, chp::export_graph(g, opts.labels).to_string());
-	} else if (t.dialect().name == "proto") {
-		hse::graph g = t.as<hse::graph>();
+	} else if (v.meta.dialect() == "proto") {
+		hse::graph g = v.as<hse::graph>();
 		if (opts.process) {
 			g.post_process(opts.proper, opts.aggressive);
 		}
@@ -105,6 +101,16 @@ void show(ShowOptions opts, weaver::Term &t, string outPath) {
 		} else {
 			gvdot::render(outPath, hse::export_graph(g, opts.horiz, opts.labels, opts.notations, opts.ghost, opts.encodings).to_string());
 		}
+	}
+}
+
+void show(ShowOptions opts, weaver::Term &t, string outPath) {
+	if (t.variants.empty()) {
+		internal("", "dialect not defined for term '" + t.decl.name + "'", __FILE__, __LINE__);
+		return;
+	}
+	for (auto i = t.variants.begin(); i != t.variants.end(); i++) {
+		show(opts, t, *i, outPath);
 	}
 }
 
@@ -134,7 +140,7 @@ int show_command(int argc, char **argv) {
 
 	weaver::Project proj;
 	if (proj.hasMod()) {
-		proj.readMod();
+		readMod(proj);
 	}
 
 	proj.pushFiletype("", "wv", "", readWv, loadWv);
@@ -147,7 +153,7 @@ int show_command(int argc, char **argv) {
 	proj.pushFiletype("func", "astg", "state", readAstg, loadAstg, writeAstg);
 	proj.pushFiletype("proto", "astgw", "state", readAstg, loadAstgw, writeAstgw);
 
-	vector<Proto> protos;
+	vector<weaver::Prototype> protos;
 
 	ShowOptions opts;
 
@@ -176,7 +182,7 @@ int show_command(int argc, char **argv) {
 		} else if (arg == "-pn" or arg == "--petri") {
 			opts.petri = true;
 		} else {
-			protos.push_back(parseProto(proj, arg));
+			protos.push_back(weaver::Prototype(arg));
 		}
 	}
 
@@ -192,7 +198,7 @@ int show_command(int argc, char **argv) {
 		proj.incl("top.wv");
 	} else {
 		for (auto j = protos.begin(); j != protos.end(); j++) {
-			proj.incl(j->path);
+			proj.incl(proj.relpathFromModule(j->mod));
 		}
 	}
 
@@ -207,7 +213,7 @@ int show_command(int argc, char **argv) {
 		}
 	} else {
 		for (auto i = protos.begin(); i != protos.end(); i++) {
-			vector<weaver::TermId> curr = findProto(prgm, *i);
+			vector<weaver::TermId> curr = prgm.findTerms(*i);
 			if (curr.empty()) {
 				error("", "module not found for term '" + i->to_string() + "'", __FILE__, __LINE__);
 			}

@@ -33,12 +33,12 @@ void loadPrs(weaver::Project &proj, weaver::Program &prgm, const weaver::Source 
 	int kind = weaver::Term::getDialect("circ");
 	int modIdx = prgm.getModule(source.modName);
 
-	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, name, vector<weaver::Instance>()));
+	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term(name, vector<weaver::Instance>()));
 
-	prgm.mods[modIdx].terms[termIdx].def = pr;
+	prgm.mods[modIdx].terms[termIdx].variants.push_back(weaver::Variant(-1, pr, weaver::Metadata(kind)));
 }
 
-void writePrs(fs::path path, const weaver::Project &proj, const weaver::Program &prgm, int modIdx, int termIdx) {
+void writePrs(fs::path path, weaver::Project &proj, const weaver::Program &prgm, int modIdx, int termIdx, int varIdx) {
 	string pathstr = path.string();
 	ofstream fout(pathstr.c_str(), ios::out);
 	if (not fout.is_open()) {
@@ -46,7 +46,7 @@ void writePrs(fs::path path, const weaver::Project &proj, const weaver::Program 
 		return;
 	}
 
-	const prs::production_rule_set &pr = prgm.mods[modIdx].terms[termIdx].as<prs::production_rule_set>();
+	const prs::production_rule_set &pr = prgm.mods[modIdx].terms[termIdx].variants[varIdx].as<prs::production_rule_set>();
 	string buffer = prs::export_production_rule_set(pr).to_string();
 	fout.write(buffer.c_str(), buffer.size());
 	fout.close();

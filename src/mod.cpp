@@ -1,5 +1,4 @@
 #include "mod.h"
-#include "cli.h"
 
 #include <common/standard.h>
 #include <common/timer.h>
@@ -16,10 +15,11 @@
 #include <parse_prs/factory.h>
 #include <parse_spice/factory.h>
 
-#include "weaver/unpacker.h"
-#include "weaver/project.h"
-#include "weaver/cli.h"
+#include <weaver/project.h>
 
+#include "weaver/unpacker.h"
+
+#include "format/mod.h"
 #include "format/cog.h"
 #include "format/spice.h"
 #include "format/gds.h"
@@ -53,7 +53,7 @@ int mod_command(int argc, char **argv) {
 
 	weaver::Project proj;
 	if (proj.hasMod()) {
-		proj.readMod();
+		readMod(proj);
 	}
 
 	proj.pushFiletype("", "wv", "", readWv, loadWv);
@@ -66,7 +66,7 @@ int mod_command(int argc, char **argv) {
 	proj.pushFiletype("func", "astg", "state", readAstg, loadAstg, writeAstg);
 	proj.pushFiletype("proto", "astgw", "state", readAstg, loadAstgw, writeAstgw);
 
-	vector<Proto> protos;
+	vector<weaver::Prototype> protos;
 	bool show = false;
 	bool debug = false;
 
@@ -83,26 +83,26 @@ int mod_command(int argc, char **argv) {
 			proj.rootDir = proj.workDir;
 			proj.modName = argv[i];
 			proj.setTech("sky130");
-			proj.writeMod();
+			writeMod(proj);
 			return 0;
 		} else if (arg == "vendor") {
 			if (not proj.hasMod()) {
 				printf("please initialize your module with the following.\n\n$ lm mod init my_module\n");
 				return 1;
 			}
-			proj.readMod();
+			readMod(proj);
 			proj.vendor();
 			return 0;
 		} else if (arg == "tidy") {
 			proj.tidy();
-			proj.writeMod();
+			writeMod(proj);
 			return 0;
 		} else if (arg == "show") {
 			show = true;
 		} else if (arg == "-d" or arg == "--debug") {
 			debug = true;
 		} else if (show) {
-			protos.push_back(parseProto(proj, arg));
+			protos.push_back(weaver::Prototype(arg));
 		}
 	}
 
@@ -118,7 +118,7 @@ int mod_command(int argc, char **argv) {
 		proj.incl("top.wv");
 	} else {
 		for (auto i = protos.begin(); i != protos.end(); i++) {
-			proj.incl(i->path);
+			proj.incl(proj.pathFromModule(i->mod));
 		}
 	}
 	proj.load(prgm);

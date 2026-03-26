@@ -36,9 +36,9 @@ void loadAstg(weaver::Project &proj, weaver::Program &prgm, const weaver::Source
 	int kind = weaver::Term::getDialect("func");
 	int modIdx = prgm.getModule(source.modName);
 
-	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, name, vector<weaver::Instance>()));
+	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term(name, vector<weaver::Instance>()));
 
-	prgm.mods[modIdx].terms[termIdx].def = g;
+	prgm.mods[modIdx].terms[termIdx].variants.push_back(weaver::Variant(-1, g, weaver::Metadata(kind)));
 }
 
 void loadAstgw(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
@@ -53,12 +53,12 @@ void loadAstgw(weaver::Project &proj, weaver::Program &prgm, const weaver::Sourc
 	int kind = weaver::Term::getDialect("proto");
 	int modIdx = prgm.getModule(source.modName);
 
-	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, name, vector<weaver::Instance>()));
+	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term(name, vector<weaver::Instance>()));
 
-	prgm.mods[modIdx].terms[termIdx].def = g;
+	prgm.mods[modIdx].terms[termIdx].variants.push_back(weaver::Variant(-1, g, weaver::Metadata(kind)));
 }
 
-void writeAstg(fs::path path, const weaver::Project &proj, const weaver::Program &prgm, int modIdx, int termIdx) {
+void writeAstg(fs::path path, weaver::Project &proj, const weaver::Program &prgm, int modIdx, int termIdx, int varIdx) {
 	string pathstr = path.string();
 	ofstream fout(pathstr.c_str(), ios::out);
 	if (not fout.is_open()) {
@@ -66,13 +66,13 @@ void writeAstg(fs::path path, const weaver::Project &proj, const weaver::Program
 		return;
 	}
 
-	const chp::graph &g = prgm.mods[modIdx].terms[termIdx].as<chp::graph>();
+	const chp::graph &g = prgm.mods[modIdx].terms[termIdx].variants[varIdx].as<chp::graph>();
 	string buffer = chp::export_astg(g).to_string();
 	fout.write(buffer.c_str(), buffer.size());
 	fout.close();
 }
 
-void writeAstgw(fs::path path, const weaver::Project &proj, const weaver::Program &prgm, int modIdx, int termIdx) {
+void writeAstgw(fs::path path, weaver::Project &proj, const weaver::Program &prgm, int modIdx, int termIdx, int varIdx) {
 	string pathstr = path.string();
 	ofstream fout(pathstr.c_str(), ios::out);
 	if (not fout.is_open()) {
@@ -80,7 +80,7 @@ void writeAstgw(fs::path path, const weaver::Project &proj, const weaver::Progra
 		return;
 	}
 
-	const hse::graph &g = prgm.mods[modIdx].terms[termIdx].as<hse::graph>();
+	const hse::graph &g = prgm.mods[modIdx].terms[termIdx].variants[varIdx].as<hse::graph>();
 	string buffer = hse::export_astg(g).to_string();
 	fout.write(buffer.c_str(), buffer.size());
 	fout.close();

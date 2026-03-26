@@ -33,12 +33,14 @@ void loadCog(weaver::Project &proj, weaver::Program &prgm, const weaver::Source 
 	g.name = name;
 	chp::import_chp(g, *(parse_cog::composition*)source.syntax.get(), source.tokens.get(), true);
 
+	g.post_process(true);
+
 	int kind = weaver::Term::getDialect("func");
 	int modIdx = prgm.getModule(source.modName);
 
-	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, name, vector<weaver::Instance>()));
+	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term(name, vector<weaver::Instance>()));
 
-	prgm.mods[modIdx].terms[termIdx].def = g;
+	prgm.mods[modIdx].terms[termIdx].variants.push_back(weaver::Variant(-1, g, weaver::Metadata(kind)));
 }
 
 void loadCogw(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
@@ -53,9 +55,9 @@ void loadCogw(weaver::Project &proj, weaver::Program &prgm, const weaver::Source
 	int kind = weaver::Term::getDialect("proto");
 	int modIdx = prgm.getModule(source.modName);
 
-	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term::procOf(kind, name, vector<weaver::Instance>()));
+	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term(name, vector<weaver::Instance>()));
 
-	prgm.mods[modIdx].terms[termIdx].def = g;
+	prgm.mods[modIdx].terms[termIdx].variants.push_back(weaver::Variant(-1, g, weaver::Metadata(kind)));
 }
 
 std::any factoryCog(string name, const parse::syntax *syntax, tokenizer *tokens) {
@@ -63,6 +65,7 @@ std::any factoryCog(string name, const parse::syntax *syntax, tokenizer *tokens)
 	g.name = name;
 	if (syntax != nullptr) {
 		chp::import_chp(g, *(const parse_cog::composition *)syntax, tokens, true);
+		g.post_process(true);
 	}
 	return g;
 }
