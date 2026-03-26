@@ -52,7 +52,7 @@ bool decompose(Build &builder, weaver::Program &prgm, weaver::TermId id, int ind
 		weaver::TermId subId = prgm.createTerm(id.mod, weaver::Term(term.decl.name + "_" + std::to_string(pid), args));
 		weaver::Term &subTerm = prgm.termAt(subId);
 		subTerm.variants.push_back(weaver::Variant(-1, sub[pid], weaver::Metadata(var.meta.kind)));
-		builder.todo.push_back(subId);
+		//builder.todo.push_back(subId);
 
 		rules.rules.push_back(gc::GuardedCommand(arithmetic::Choice({arithmetic::Parallel({arithmetic::Action(arithmetic::call(subTerm.decl.name, {}))})})));
 	}

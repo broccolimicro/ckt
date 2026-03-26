@@ -1107,7 +1107,7 @@ int sim_command(int argc, char **argv) {
 		proj.incl("top.wv");
 		proto = weaver::Prototype("top.top");
 	} else {
-		proj.incl(proto.path);
+		proj.incl(proj.relpathFromModule(proto.mod));
 	}
 
 	proj.load(prgm);
