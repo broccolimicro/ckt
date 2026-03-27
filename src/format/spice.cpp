@@ -47,12 +47,10 @@ void loadSpice(weaver::Project &proj, weaver::Program &prgm, const weaver::Sourc
 	sch::Netlist net;
 	sch::import_netlist(tech, net, *(parse_spice::netlist*)source.syntax.get(), source.tokens.get());
 
-	int kind = weaver::Term::getDialect("spice");
-	int modIdx = prgm.getModule(source.modName);
-
-	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term(name, vector<weaver::Instance>()));
-
-	prgm.mods[modIdx].terms[termIdx].variants.push_back(weaver::Variant(-1, net, weaver::Metadata(kind)));
+	weaver::TermId id;
+	id.mod   = prgm.getModule(source.modName);
+	id.index = prgm.modAt(id).createTerm(weaver::Term(name, vector<weaver::Instance>()));
+	id.var   = prgm.termAt(id).createVariant(weaver::Variant("spice", net));
 }
 
 void writeSpice(fs::path path, weaver::Project &proj, const weaver::Program &prgm, int modIdx, int termIdx, int varIdx) {

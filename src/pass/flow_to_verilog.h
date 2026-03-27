@@ -4,5 +4,5 @@
 #include <weaver/program.h>
 #include <weaver/term.h>
 
-bool flowToVerilog(Build &builder, weaver::Program &prgm, weaver::TermId id, int index);
+bool flowToVerilog(Build &builder, weaver::Program &prgm, weaver::TermId id, std::vector<weaver::TermId> &dst);
 

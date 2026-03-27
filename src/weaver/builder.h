@@ -56,6 +56,8 @@ struct Build {
 	
 	vector<bool> targets;
 
+	vector<weaver::TermId> todo;
+
 	void set(int target);
 	bool get(int target) const;
 
@@ -63,5 +65,8 @@ struct Build {
 	void incl(int target);
 	void excl(int target);
 	bool has(int target) const;
+
+	void push(weaver::Program &prgm, weaver::TermId term=weaver::TermId());
+	void build(weaver::Program &prgm);
 };
 

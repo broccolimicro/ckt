@@ -127,7 +127,7 @@ void verifyImpl(weaver::Program &prgm, weaver::TermId idx) {
 		int super = t0.variants[i].super;
 		if (super < 0) {
 			for (auto j = t0.impl.begin(); j != t0.impl.end(); j++) {
-				if (not j->defined()) {
+				if (not j->hasTerm()) {
 					printf("error: undefined implements relationship\n");
 					continue;
 				}
@@ -161,7 +161,7 @@ void verifyGroup(weaver::Program &prgm, Group group) {
 			}
 		} else {
 			for (auto j = idx.begin(); j != idx.end(); j++) {
-				if (j->defined()) {
+				if (j->hasTerm()) {
 					verifyImpl(prgm, *j);
 				} else {
 					printf("error: term not found '%s'\n", group.terms[0].to_string().c_str());
@@ -192,7 +192,7 @@ void verifyGroup(weaver::Program &prgm, Group group) {
 		printf("%s = %s:\n", group.terms[i-1].to_string().c_str(), group.terms[i].to_string().c_str());
 		for (auto j = prev.begin(); j != prev.end(); j++) {
 			for (auto k = curr.begin(); k != curr.end(); k++) {
-				if (k->defined() and j->defined()) {
+				if (k->hasTerm() and j->hasTerm()) {
 					weaver::Term &t0 = prgm.termAt(*j);
 					weaver::Term &t1 = prgm.termAt(*k);
 					if (prevVariant >= (int)t0.variants.size()) {
@@ -204,7 +204,7 @@ void verifyGroup(weaver::Program &prgm, Group group) {
 						continue;
 					}	
 					compare(prgm, t0.variants[prevVariant], t1.variants[currVariant]);
-				} else if (k->defined() and j->mod >= 0) {
+				} else if (k->hasTerm() and j->mod >= 0) {
 					weaver::Term &t1 = prgm.termAt(*k);
 					if (currVariant >= (int)t1.variants.size()) {
 						printf("error: variant not found '%s'\n", group.terms[i].to_string().c_str());
@@ -221,7 +221,7 @@ void verifyGroup(weaver::Program &prgm, Group group) {
 							compare(prgm, t0.variants[prevVariant], t1.variants[currVariant]);
 						}
 					}
-				} else if (k->mod >= 0 and j->defined()) {
+				} else if (k->mod >= 0 and j->hasTerm()) {
 					weaver::Term &t0 = prgm.termAt(*j);
 					if (prevVariant >= (int)t0.variants.size()) {
 						printf("error: variant not found '%s'\n", group.terms[i-1].to_string().c_str());

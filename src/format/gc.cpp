@@ -31,12 +31,10 @@ void loadGc(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &
 	rules.name = name;
 	gc::import_rule_set(*(parse_gc::rule_set*)source.syntax.get(), rules, 0, source.tokens.get(), true);
 
-	int kind = weaver::Term::getDialect("struct");
-	int modIdx = prgm.getModule(source.modName);
-
-	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term(name, vector<weaver::Instance>()));
-
-	prgm.mods[modIdx].terms[termIdx].variants.push_back(weaver::Variant(-1, rules, weaver::Metadata(kind)));
+	weaver::TermId id;
+	id.mod   = prgm.getModule(source.modName);
+	id.index = prgm.modAt(id).createTerm(weaver::Term(name, vector<weaver::Instance>()));
+	id.var   = prgm.termAt(id).createVariant(weaver::Variant("struct", rules));
 }
 
 void writeGc(fs::path path, weaver::Project &proj, const weaver::Program &prgm, int modIdx, int termIdx, int varIdx) {

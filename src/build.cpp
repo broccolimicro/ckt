@@ -265,8 +265,8 @@ int build_command(int argc, char **argv) {
 		}
 	}
 
-	/*if (protos.empty()) {
-		proj.incl("top.wv");
+	if (protos.empty()) {
+		proj.incl(proj.relpathFromModule("top"));
 		proj.load(prgm);
 		builder.push(prgm);
 	} else {
@@ -285,7 +285,7 @@ int build_command(int argc, char **argv) {
 		}
 	}
 
-	builder.build(prgm);*/
+	builder.build(prgm);
 
 	if (builder.debug) {
 		prgm.print();

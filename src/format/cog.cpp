@@ -35,12 +35,10 @@ void loadCog(weaver::Project &proj, weaver::Program &prgm, const weaver::Source 
 
 	g.post_process(true);
 
-	int kind = weaver::Term::getDialect("func");
-	int modIdx = prgm.getModule(source.modName);
-
-	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term(name, vector<weaver::Instance>()));
-
-	prgm.mods[modIdx].terms[termIdx].variants.push_back(weaver::Variant(-1, g, weaver::Metadata(kind)));
+	weaver::TermId id;
+	id.mod   = prgm.getModule(source.modName);
+	id.index = prgm.modAt(id).createTerm(weaver::Term(name, vector<weaver::Instance>()));
+	id.var   = prgm.termAt(id).createVariant(weaver::Variant("func", g));
 }
 
 void loadCogw(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
@@ -52,12 +50,10 @@ void loadCogw(weaver::Project &proj, weaver::Program &prgm, const weaver::Source
 	g.post_process(true);
 	g.check_variables();
 
-	int kind = weaver::Term::getDialect("proto");
-	int modIdx = prgm.getModule(source.modName);
-
-	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term(name, vector<weaver::Instance>()));
-
-	prgm.mods[modIdx].terms[termIdx].variants.push_back(weaver::Variant(-1, g, weaver::Metadata(kind)));
+	weaver::TermId id;
+	id.mod   = prgm.getModule(source.modName);
+	id.index = prgm.modAt(id).createTerm(weaver::Term(name, vector<weaver::Instance>()));
+	id.var   = prgm.termAt(id).createVariant(weaver::Variant("proto", g));
 }
 
 std::any factoryCog(string name, const parse::syntax *syntax, tokenizer *tokens) {

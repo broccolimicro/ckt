@@ -3,25 +3,20 @@
 #include <flow/synthesize.h>
 #include <flow/func.h>
 
-bool flowToVerilog(Build &builder, weaver::Program &prgm, weaver::TermId &id, int index) {
+bool flowToVerilog(Build &builder, weaver::Program &prgm, weaver::TermId id, std::vector<weaver::TermId> &dst) {
 	if (builder.timing != Build::TIMING_CLOCKED
 		and builder.timing != Build::TIMING_MIXED) {
 		return false;
 	}
 
-	weaver::Term &term = prgm.termAt(id);
-	weaver::Variant &var = term.variants[index];
-	if (var.meta.dialect() != "flow") {
+	if (not id.hasVar() or prgm.varAt(id).meta.dialect() != "flow") {
 		return false;
 	}
-	flow::Func &fn = var.as<flow::Func>();
+	flow::Func &fn = prgm.varAt(id).as<flow::Func>();
+	clocked::Module rtl = flow::synthesizeModuleFromFunc(fn);
 
-	var.derived.push_back(term.variants.size());
-	term.variants.push_back(
-		weaver::Variant(
-			index,
-			flow::synthesizeModuleFromFunc(fn),
-			weaver::Metadata(weaver::Term::findDialect("verilog"))));
+	id.var = prgm.termAt(id).createVariant(weaver::Variant("verilog", rtl, id.var));
+	dst.push_back(id);
 	return true;
 }
 

@@ -29,6 +29,9 @@
 #include <interpret_prs/export.h>
 #include <interpret_sch/export.h>
 
+#include "../pass/chp_to_flow.h"
+#include "../pass/flow_to_verilog.h"
+
 #include "../format/cell.h"
 #include "../format/dot.h"
 
@@ -80,5 +83,69 @@ void Build::excl(int target) {
 
 bool Build::has(int target) const {
 	return targets[target];
+}
+
+void Build::push(weaver::Program &prgm, weaver::TermId id) {
+	if (not id.hasMod()) {
+		for (int i = 0; i < (int)prgm.mods.size(); i++) {
+			for (int j = 0; j < (int)prgm.mods[i].terms.size(); j++) {
+				todo.push_back(weaver::TermId(i, j));
+			}
+		}
+	} else if (not id.hasTerm()) {
+		if (id.mod >= (int)prgm.mods.size()) {
+			printf("error: module not defined\n");
+			return;
+		}
+		for (int j = 0; j < (int)prgm.modAt(id).terms.size(); j++) {
+			todo.push_back(weaver::TermId(id.mod, j));
+		}
+	} else {
+		if (id.mod >= (int)prgm.mods.size()) {
+			printf("error: module not defined\n");
+			return;
+		}
+		if (id.index >= (int)prgm.modAt(id).terms.size()) {
+			printf("error: term not defined in module\n");
+			return;
+		}
+		if (id.var >= (int)prgm.termAt(id).variants.size()) {
+			printf("error: variant not defined in term\n");
+			return;
+		}
+
+		todo.push_back(id);
+	}
+}
+
+void Build::build(weaver::Program &prgm) {
+	while (not todo.empty()) {
+		weaver::TermId id = todo.back();
+		todo.pop_back();
+
+		if (prgm.termAt(id).variants.empty()) {
+			printf("error: term had no variants\n");
+			continue;
+		}
+
+		if (id.var < 0) {
+			id.var = prgm.termAt(id).variants.size()-1;
+		}
+
+		std::string dialect = prgm.varAt(id).meta.dialect();
+		if (dialect == "func") {
+			if (flatten(*this, prgm, id)) {
+				if (not chpToFlow(*this, prgm, id, todo)) {
+					printf("error: unable to bind flat chp to flow\n");
+				}
+			} else if (not decompose(*this, prgm, id, todo)) {
+				printf("error: unable to decompose chp\n");
+			}
+		} else if (dialect == "flow") {
+			if (not flowToVerilog(*this, prgm, id, todo)) {
+				printf("error: unable to synthesize clocked module\n");
+			}
+		}
+	}
 }
 

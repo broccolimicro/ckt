@@ -26,12 +26,10 @@ void loadGds(weaver::Project &proj, weaver::Program &prgm, const weaver::Source 
 	phy::Library lib(tech);
 	import_library(lib, source.path.string());
 
-	int kind = weaver::Term::getDialect("layout");
-	int modIdx = prgm.getModule(source.modName);
-
-	int termIdx = prgm.mods[modIdx].createTerm(weaver::Term(name, vector<weaver::Instance>()));
-
-	prgm.mods[modIdx].terms[termIdx].variants.push_back(weaver::Variant(-1, lib, weaver::Metadata(kind)));
+	weaver::TermId id;
+	id.mod   = prgm.getModule(source.modName);
+	id.index = prgm.modAt(id).createTerm(weaver::Term(name, vector<weaver::Instance>()));
+	id.var   = prgm.termAt(id).createVariant(weaver::Variant("layout", lib));
 }
 
 void writeGds(fs::path path, weaver::Project &proj, const weaver::Program &prgm, int modIdx, int termIdx, int varIdx) {
