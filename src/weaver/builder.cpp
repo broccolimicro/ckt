@@ -6,8 +6,6 @@
 #include <common/timer.h>
 #include <common/text.h>
 
-#include <prs/bubble.h>
-#include <prs/synthesize.h>
 #include <sch/Netlist.h>
 #include <sch/Tapeout.h>
 #include <sch/Placer.h>
@@ -24,11 +22,10 @@
 #include "../pass/chp_to_flow.h"
 #include "../pass/flow_to_verilog.h"
 #include "../pass/hse_to_prs.h"
+#include "../pass/prs_to_spi.h"
 
 #include "../format/cell.h"
 #include "../format/dot.h"
-
-#define MAX_PROCESS_SIZE 256
 
 Build::Build(weaver::Project &proj) : proj(proj) {
 	logic = LOGIC_CMOS;
@@ -157,6 +154,22 @@ void Build::build(weaver::Program &prgm) {
 
 			if (not hseToPrs(*this, prgm, id)) {
 				printf("error: unable to generate production rules\n");
+			}
+		} else if (dialect == "circ") {
+			if (not bubble(*this, prgm, id)) {
+				printf("warning: unable to bubble reshuffle process\n");
+			}
+
+			if (not keepers(*this, prgm, id)) {
+				printf("warning: unable to add keepers\n");
+			}
+
+			if (not sizing(*this, prgm, id)) {
+				printf("error: unable to size prs\n");
+			}
+
+			if (not prsToSpi(*this, prgm, id)) {
+				printf("error: unable to generate netlist\n");
 			}
 		}
 	}
