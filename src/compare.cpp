@@ -315,11 +315,11 @@ int compare_command(int argc, char **argv) {
 	loadGlobalTypes(prgm);
 
 	if (groups.empty()) {
-		proj.incl("top.wv");
+		proj.incl(proj.modName);
 	} else {
 		for (auto i = groups.begin(); i != groups.end(); i++) {
 			for (auto j = i->terms.begin(); j != i->terms.end(); j++) {
-				proj.incl(proj.relpathFromModule(j->mod));
+				proj.incl(j->mod);
 			}
 		}
 	}

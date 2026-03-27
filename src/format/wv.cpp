@@ -26,8 +26,8 @@ void readWv(weaver::Project &proj, weaver::Source &source, string buffer) {
 
 	for (auto j = syntax.incl.begin(); j != syntax.incl.end(); j++) {
 		for (auto k = j->path.begin(); k != j->path.end(); k++) {
-			string modPath = k->second.substr(1, k->second.size()-2)+".wv";
-			proj.incl(modPath, source.path.parent_path());
+			string modPath = k->second.substr(1, k->second.size()-2);
+			proj.incl(modPath);
 		}
 	}
 }

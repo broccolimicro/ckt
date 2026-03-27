@@ -266,12 +266,12 @@ int build_command(int argc, char **argv) {
 	}
 
 	if (protos.empty()) {
-		proj.incl(proj.relpathFromModule("top"));
+		proj.incl(proj.modName);
 		proj.load(prgm);
 		builder.push(prgm);
 	} else {
 		for (auto i = protos.begin(); i != protos.end(); i++) {
-			proj.incl(proj.relpathFromModule(i->mod));
+			proj.incl(i->mod);
 		}
 		proj.load(prgm);
 		for (auto i = protos.begin(); i != protos.end(); i++) {

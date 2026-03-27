@@ -1104,10 +1104,10 @@ int sim_command(int argc, char **argv) {
 	loadGlobalTypes(prgm);
 
 	if (proto.empty()) {
-		proj.incl("top.wv");
+		proj.incl(proj.modName);
 		proto = weaver::Prototype("top.top");
 	} else {
-		proj.incl(proj.relpathFromModule(proto.mod));
+		proj.incl(proto.mod);
 	}
 
 	proj.load(prgm);

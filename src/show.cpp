@@ -195,10 +195,10 @@ int show_command(int argc, char **argv) {
 	loadGlobalTypes(prgm);
 
 	if (protos.empty()) {
-		proj.incl("top.wv");
+		proj.incl(proj.modName);
 	} else {
 		for (auto j = protos.begin(); j != protos.end(); j++) {
-			proj.incl(proj.relpathFromModule(j->mod));
+			proj.incl(j->mod);
 		}
 	}
 

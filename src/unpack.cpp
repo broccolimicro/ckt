@@ -95,12 +95,12 @@ int unpack_command(int argc, char **argv) {
 	loadGlobalTypes(prgm);
 
 	/*if (protos.empty()) {
-		proj.incl("top.wv");
+		proj.incl(proj.modName);
 		proj.load(prgm);
 		unpacker.unpack(prgm);
 	} else {
 		for (auto i = protos.begin(); i != protos.end(); i++) {
-			proj.incl(proj.relpathFromModule(i->mod));
+			proj.incl(i->mod);
 		}
 		proj.load(prgm);
 		for (auto i = protos.begin(); i != protos.end(); i++) {

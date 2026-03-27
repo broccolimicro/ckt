@@ -3,7 +3,7 @@
 #include <flow/synthesize.h>
 #include <flow/func.h>
 
-bool flowToVerilog(Build &builder, weaver::Program &prgm, weaver::TermId id, std::vector<weaver::TermId> &dst) {
+bool flowToVerilog(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 	if (builder.timing != Build::TIMING_CLOCKED
 		and builder.timing != Build::TIMING_MIXED) {
 		return false;
@@ -16,7 +16,7 @@ bool flowToVerilog(Build &builder, weaver::Program &prgm, weaver::TermId id, std
 	clocked::Module rtl = flow::synthesizeModuleFromFunc(fn);
 
 	id.var = prgm.termAt(id).createVariant(weaver::Variant("verilog", rtl, id.var));
-	dst.push_back(id);
+	builder.todo.push_back(id);
 	return true;
 }
 

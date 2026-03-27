@@ -6,12 +6,6 @@
 #include <common/timer.h>
 #include <common/text.h>
 
-#include <chp/synthesize.h>
-#include <flow/synthesize.h>
-
-#include <hse/elaborator.h>
-#include <hse/encoder.h>
-#include <hse/synthesize.h>
 #include <prs/bubble.h>
 #include <prs/synthesize.h>
 #include <sch/Netlist.h>
@@ -22,8 +16,6 @@
 #include <interpret_chp/export_dot.h>
 #include <interpret_flow/export_dot.h>
 #include <interpret_flow/export_verilog.h>
-#include <interpret_hse/export_cli.h>
-#include <interpret_hse/export.h>
 #include <interpret_phy/import.h>
 #include <interpret_phy/export.h>
 #include <interpret_prs/export.h>
@@ -31,6 +23,7 @@
 
 #include "../pass/chp_to_flow.h"
 #include "../pass/flow_to_verilog.h"
+#include "../pass/hse_to_prs.h"
 
 #include "../format/cell.h"
 #include "../format/dot.h"
@@ -134,16 +127,36 @@ void Build::build(weaver::Program &prgm) {
 
 		std::string dialect = prgm.varAt(id).meta.dialect();
 		if (dialect == "func") {
-			if (flatten(*this, prgm, id)) {
-				if (not chpToFlow(*this, prgm, id, todo)) {
-					printf("error: unable to bind flat chp to flow\n");
+			if (not flatten(*this, prgm, id)) {
+				if (not decompose(*this, prgm, id)) {
+					// TODO(edward.bingham) or convert to HSE
+					printf("error: unable to flatten or decompose chp\n");
 				}
-			} else if (not decompose(*this, prgm, id, todo)) {
-				printf("error: unable to decompose chp\n");
+				continue;
 			}
-		} else if (dialect == "flow") {
-			if (not flowToVerilog(*this, prgm, id, todo)) {
+
+			if (not chpToFlow(*this, prgm, id)) {
+				printf("error: unable to bind flat chp to flow\n");
+			}
+		} else if (dialect == "flow" and timing == TIMING_CLOCKED) {
+			if (not flowToVerilog(*this, prgm, id)) {
 				printf("error: unable to synthesize clocked module\n");
+			}
+		} else if (dialect == "proto" and timing == TIMING_QDI) {
+			do {
+				if (not elaborate(*this, prgm, id)) {
+					printf("error: unable to elaborate stated space\n");
+					break;
+				}
+
+				if (not conflicts(*this, prgm, id)) {
+					printf("error: unable to determine state conflicts\n");
+					break;
+				}
+			} while (encode(*this, prgm, id));
+
+			if (not hseToPrs(*this, prgm, id)) {
+				printf("error: unable to generate production rules\n");
 			}
 		}
 	}
