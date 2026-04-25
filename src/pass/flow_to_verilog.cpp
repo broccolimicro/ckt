@@ -9,7 +9,7 @@ bool flowToVerilog(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 		return false;
 	}
 
-	if (not id.hasVar() or prgm.varAt(id).meta.dialect() != "flow") {
+	if (not id.hasVar() or prgm.varAt(id).meta.dialect != "flow") {
 		return false;
 	}
 	flow::Func &fn = prgm.varAt(id).as<flow::Func>();

@@ -33,9 +33,11 @@ void readWv(weaver::Project &proj, weaver::Source &source, string buffer) {
 }
 
 void loadWv(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
+	auto lang = source.filetype->as<weaver::Language>();
+
 	int index = prgm.getModule(source.modName);
 	// load symbols to break dependency chains
 	import_symbols(prgm, index, *(parse_ucs::source*)source.syntax.get(), source.tokens.get());
 	// link up all of the dependencies
-	import_module(prgm, index, *(parse_ucs::source*)source.syntax.get(), source.tokens.get());
+	import_module(*lang, prgm, index, *(parse_ucs::source*)source.syntax.get(), source.tokens.get());
 }

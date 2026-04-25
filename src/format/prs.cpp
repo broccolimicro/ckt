@@ -36,7 +36,7 @@ void loadPrs(weaver::Project &proj, weaver::Program &prgm, const weaver::Source 
 	id.var   = prgm.termAt(id).createVariant(weaver::Variant("circ", pr));
 }
 
-void writePrs(fs::path path, weaver::Project &proj, const weaver::Program &prgm, int modIdx, int termIdx, int varIdx) {
+void writePrs(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, int modIdx, int termIdx, int varIdx) {
 	string pathstr = path.string();
 	ofstream fout(pathstr.c_str(), ios::out);
 	if (not fout.is_open()) {
@@ -50,7 +50,7 @@ void writePrs(fs::path path, weaver::Project &proj, const weaver::Program &prgm,
 	fout.close();
 }
 
-std::any factoryPrs(string name, const parse::syntax *syntax, tokenizer *tokens) {
+std::any factoryPrs(std::any *lib, string name, const parse::syntax *syntax, tokenizer *tokens) {
 	prs::production_rule_set pr;
 	pr.name = name;
 	if (syntax != nullptr) {

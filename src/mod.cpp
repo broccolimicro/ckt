@@ -27,6 +27,9 @@
 #include "format/prs.h"
 #include "format/wv.h"
 #include "format/astg.h"
+#include "format/gc.h"
+
+#include <interpret_wv/import.h>
 
 void mod_help() {
 	printf("Usage: lm mod <command> [arguments]\n");
@@ -47,16 +50,18 @@ int mod_command(int argc, char **argv) {
 	parse_ucs::function::registry.insert({"proto", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
 	parse_ucs::function::registry.insert({"circ", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
 
-	weaver::Term::pushDialect("func", factoryCog);
-	weaver::Term::pushDialect("proto", factoryCogw);
-	weaver::Term::pushDialect("circ", factoryPrs);
+	weaver::Language lang;
+	lang.dialects.insert({"func", factoryCog});
+	lang.dialects.insert({"struct", factoryGc});
+	lang.dialects.insert({"proto", factoryCogw});
+	lang.dialects.insert({"circ", factoryPrs});
 
 	weaver::Project proj;
 	if (proj.hasMod()) {
 		readMod(proj);
 	}
 
-	proj.pushFiletype("", "wv", "", readWv, loadWv);
+	proj.pushFiletype("", "wv", "", readWv, loadWv, nullptr, lang);
 	proj.pushFiletype("func", "cog", "", readCog, loadCog);
 	proj.pushFiletype("proto", "cogw", "", readCog, loadCogw);
 	proj.pushFiletype("circ", "prs", "ckt", readPrs, loadPrs, writePrs);

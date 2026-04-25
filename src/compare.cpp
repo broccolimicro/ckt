@@ -28,6 +28,7 @@
 #include "format/prs.h"
 #include "format/wv.h"
 #include "format/astg.h"
+#include "format/gc.h"
 
 #include <sch/Netlist.h>
 #include <sch/Tapeout.h>
@@ -36,6 +37,8 @@
 #include <phy/Script.h>
 #include <phy/Layout.h>
 #include <phy/Library.h>
+
+#include <interpret_wv/import.h>
 
 const bool debug = false;
 
@@ -103,19 +106,19 @@ void compare(sch::Netlist &n0, sch::Netlist &n1) {
 }
 
 void compare(weaver::Program &prgm, weaver::Variant &child, weaver::Variant &parent) {
-	if (child.meta.dialect() == "layout" and parent.meta.dialect() == "spice") {
+	if (child.meta.dialect == "layout" and parent.meta.dialect == "spice") {
 		phy::Library &lib = child.as<phy::Library>();
 		sch::Netlist s0;
 		extract(s0, lib);
 
 		compare(s0, parent.as<sch::Netlist>());
-	} else if (child.meta.dialect() == "spice" and parent.meta.dialect() == "child") {
+	} else if (child.meta.dialect == "spice" and parent.meta.dialect == "child") {
 		phy::Library &lib = parent.as<phy::Library>();
 		sch::Netlist s1;
 		extract(s1, lib);
 
 		compare(child.as<sch::Netlist>(), s1);
-	} else if (child.meta.dialect() == "spice" and parent.meta.dialect() == "spice") {
+	} else if (child.meta.dialect == "spice" and parent.meta.dialect == "spice") {
 		compare(child.as<sch::Netlist>(), parent.as<sch::Netlist>());
 	}
 	printf("done\n\n");
@@ -269,16 +272,18 @@ int compare_command(int argc, char **argv) {
 	parse_ucs::function::registry.insert({"proto", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
 	parse_ucs::function::registry.insert({"circ", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
 
-	weaver::Term::pushDialect("func", factoryCog);
-	weaver::Term::pushDialect("proto", factoryCogw);
-	weaver::Term::pushDialect("circ", factoryPrs);
+	weaver::Language lang;
+	lang.dialects.insert({"func", factoryCog});
+	lang.dialects.insert({"struct", factoryGc});
+	lang.dialects.insert({"proto", factoryCogw});
+	lang.dialects.insert({"circ", factoryPrs});
 
 	weaver::Project proj;
 	if (proj.hasMod()) {
 		readMod(proj);
 	}
 
-	proj.pushFiletype("", "wv", "", readWv, loadWv);
+	proj.pushFiletype("", "wv", "", readWv, loadWv, nullptr, lang);
 	proj.pushFiletype("func", "cog", "", readCog, loadCog);
 	proj.pushFiletype("proto", "cogw", "", readCog, loadCogw);
 	proj.pushFiletype("circ", "prs", "ckt", readPrs, loadPrs, writePrs);

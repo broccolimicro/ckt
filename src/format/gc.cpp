@@ -37,7 +37,7 @@ void loadGc(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &
 	id.var   = prgm.termAt(id).createVariant(weaver::Variant("struct", rules));
 }
 
-void writeGc(fs::path path, weaver::Project &proj, const weaver::Program &prgm, int modIdx, int termIdx, int varIdx) {
+void writeGc(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, int modIdx, int termIdx, int varIdx) {
 	string pathstr = path.string();
 	ofstream fout(pathstr.c_str(), ios::out);
 	if (not fout.is_open()) {
@@ -51,7 +51,7 @@ void writeGc(fs::path path, weaver::Project &proj, const weaver::Program &prgm, 
 	fout.close();
 }
 
-std::any factoryGc(string name, const parse::syntax *syntax, tokenizer *tokens) {
+std::any factoryGc(std::any *lib, string name, const parse::syntax *syntax, tokenizer *tokens) {
 	gc::GuardedCommands rules;
 	rules.name = name;
 	if (syntax != nullptr) {

@@ -47,6 +47,7 @@
 
 #include <weaver/project.h>
 #include "format/mod.h"
+#include "back/asic.h"
 
 #include <filesystem>
 #include <chrono>
@@ -103,12 +104,8 @@ int tech_cells_command(weaver::Project &proj, int argc, char **argv) {
 		return 1;
 	}
 
-	if (not proj.tech.def.has_value()) {
-		proj.tech.def = make_any<phy::Tech>();
-	}
-	phy::Tech &tech = proj.tech.as<phy::Tech>();
-	if (not tech.isLoaded() and not phy::loadTech(&tech, proj.tech.path, proj.tech.args)) {
-		cout << "Unable to load techfile \'" + proj.tech.path + "\'." << endl;
+	phy::Tech *tech = loadASIC(proj);
+	if (not tech) {
 		return 1;
 	}
 
@@ -116,7 +113,7 @@ int tech_cells_command(weaver::Project &proj, int argc, char **argv) {
 	printf("Importing cells...\n");
 	for (auto path = files.begin(); path != files.end(); path++) {
 		printf("\t%s\n", path->c_str());
-		phy::Library lib(tech);
+		phy::Library lib(*tech);
 		import_library(lib, *path);
 		if (lib.macros.empty()) {
 			continue;
@@ -144,7 +141,7 @@ int tech_cells_command(weaver::Project &proj, int argc, char **argv) {
 			string cellPath = proj.tech.lib + "/" + spi->name;
 			export_layout(cellPath+".gds", *gds);
 			export_lef(cellPath+".lef", *gds);
-			export_spi(cellPath+".spi", tech, net, *spi);
+			export_spi(cellPath+".spi", *tech, net, *spi);
 		}
 	}
 

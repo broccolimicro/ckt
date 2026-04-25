@@ -37,11 +37,13 @@
 #include "format/prs.h"
 #include "format/wv.h"
 #include "format/astg.h"
+#include "format/gc.h"
 
 #include "format/vcd.h"
 
 #include <interpret_arithmetic/import.h>
 #include <interpret_boolean/import.h>
+#include <interpret_wv/import.h>
 
 #include <interpret_hse/export_cli.h>
 #include <interpret_chp/export_cli.h>
@@ -1051,16 +1053,18 @@ int sim_command(int argc, char **argv) {
 	parse_ucs::function::registry.insert({"proto", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
 	parse_ucs::function::registry.insert({"circ", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
 
-	weaver::Term::pushDialect("func", factoryCog);
-	weaver::Term::pushDialect("proto", factoryCogw);
-	weaver::Term::pushDialect("circ", factoryPrs);
+	weaver::Language lang;
+	lang.dialects.insert({"func", factoryCog});
+	lang.dialects.insert({"struct", factoryGc});
+	lang.dialects.insert({"proto", factoryCogw});
+	lang.dialects.insert({"circ", factoryPrs});
 
 	weaver::Project proj;
 	if (proj.hasMod()) {
 		readMod(proj);
 	}
 
-	proj.pushFiletype("", "wv", "", readWv, loadWv);
+	proj.pushFiletype("", "wv", "", readWv, loadWv, nullptr, lang);
 	proj.pushFiletype("func", "cog", "", readCog, loadCog);
 	proj.pushFiletype("proto", "cogw", "", readCog, loadCogw);
 	proj.pushFiletype("circ", "prs", "ckt", readPrs, loadPrs, writePrs);
@@ -1142,7 +1146,7 @@ int sim_command(int argc, char **argv) {
 
 	const weaver::Variant &var = fn.variants[proto.variant];
 
-	if (var.meta.dialect() == "func") {
+	if (var.meta.dialect == "func") {
 		vector<chp::term_index> steps;
 		if (sfilename != "") {
 			FILE *seq = fopen(sfilename.c_str(), "r");
@@ -1163,7 +1167,7 @@ int sim_command(int argc, char **argv) {
 		chp::graph g = var.as<chp::graph>();
 		g.post_process(true);
 		chpsim(g, steps);
-	} else if (var.meta.dialect() == "proto") {
+	} else if (var.meta.dialect == "proto") {
 		vector<hse::term_index> steps;
 		if (sfilename != "") {
 			FILE *seq = fopen(sfilename.c_str(), "r");
@@ -1183,7 +1187,7 @@ int sim_command(int argc, char **argv) {
 		
 		hse::graph g = var.as<hse::graph>();
 		hsesim(g, steps);
-	} else if (var.meta.dialect() == "circ") {
+	} else if (var.meta.dialect == "circ") {
 		/*vector<prs::term_index> steps;
 		if (sfilename != "") {
 			FILE *seq = fopen(sfilename.c_str(), "r");
@@ -1211,7 +1215,7 @@ int sim_command(int argc, char **argv) {
 
 		prsim(pr, debug);//, steps);
 	} else {
-		error("", "unrecognized dialect '" + var.meta.dialect() + "'", __FILE__, __LINE__);
+		error("", "unrecognized dialect '" + var.meta.dialect + "'", __FILE__, __LINE__);
 	}
 
 	complete();

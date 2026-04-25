@@ -1,12 +1,14 @@
 #include "prs_to_spi.h"
 
+#include "../back/asic.h"
+
 #include <prs/bubble.h>
 #include <prs/synthesize.h>
 #include <sch/Netlist.h>
 #include <phy/Script.h>
 
 bool bubble(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
-	if (not id.hasVar() or prgm.varAt(id).meta.dialect() != "circ") {
+	if (not id.hasVar() or prgm.varAt(id).meta.dialect != "circ") {
 		return false;
 	}
 	if (prgm.varAt(id).meta.has("circ.bubble")) {
@@ -33,7 +35,7 @@ bool bubble(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
 }
 
 bool keepers(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
-	if (not id.hasVar() or prgm.varAt(id).meta.dialect() != "circ") {
+	if (not id.hasVar() or prgm.varAt(id).meta.dialect != "circ") {
 		return false;
 	}
 	if (prgm.varAt(id).meta.has("circ.keepers")) {
@@ -50,7 +52,7 @@ bool keepers(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
 }
 
 bool sizing(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
-	if (not id.hasVar() or prgm.varAt(id).meta.dialect() != "circ") {
+	if (not id.hasVar() or prgm.varAt(id).meta.dialect != "circ") {
 		return false;
 	}
 	if (prgm.varAt(id).meta.has("circ.sizing")) {
@@ -65,31 +67,27 @@ bool sizing(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
 }
 
 bool prsToSpi(Build &builder, weaver::Program &prgm, weaver::TermId id) {
-	if (not id.hasVar() or prgm.varAt(id).meta.dialect() != "circ"
+	if (not id.hasVar() or prgm.varAt(id).meta.dialect != "circ"
 		or not prgm.varAt(id).meta.has("circ.keepers")
 		or not prgm.varAt(id).meta.has("circ.sizing")) {
 		return false;
 	}
 
-	if (not builder.proj.tech.def.has_value()) {
-		builder.proj.tech.def = make_any<phy::Tech>();
-	}
-	phy::Tech &tech = builder.proj.tech.as<phy::Tech>();
-	if (not tech.isLoaded() and not phy::loadTech(&tech, builder.proj.tech.path, builder.proj.tech.args)) {
-		cout << "Unable to load techfile \'" + builder.proj.tech.path + "\'." << endl;
+	phy::Tech *tech = loadASIC(builder.proj);
+	if (not tech) {
 		return false;
 	}
 
 	prs::production_rule_set &pr = prgm.varAt(id).as<prs::production_rule_set>();
 
-	sch::Netlist net;
-	net.subckts.push_back(prs::build_netlist(tech, pr, builder.progress));
-
+	sch::Netlist *net = prgm.getLib<sch::Netlist>("spice");
+	int index = (int)net->subckts.size();
+	net->subckts.push_back(prs::build_netlist(*tech, pr, builder.progress));
 	if (builder.debug) {
-		net.subckts.back().print();
+		net->subckts.back().print();
 	}
 
-	id.var = prgm.termAt(id).createVariant(weaver::Variant("spice", net, id.var));
+	id.var = prgm.termAt(id).createVariant(weaver::Variant("spice", index, id.var));
 	builder.todo.push_back(id);
 	return true;
 }

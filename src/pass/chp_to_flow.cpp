@@ -4,9 +4,10 @@
 #include <gc/guarded_command.h>
 
 bool flatten(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
-	if (not id.hasVar() or prgm.varAt(id).meta.dialect() != "func") {
+	if (not id.hasVar() or prgm.varAt(id).meta.dialect != "func") {
 		return false;
 	}
+
 	chp::graph &g = prgm.varAt(id).as<chp::graph>();
 
 	if (g.isFlat()) {
@@ -21,7 +22,7 @@ bool flatten(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
 }
 
 bool decompose(Build &builder, weaver::Program &prgm, weaver::TermId id) {
-	if (not id.hasVar() or prgm.varAt(id).meta.dialect() != "func") {
+	if (not id.hasVar() or prgm.varAt(id).meta.dialect != "func") {
 		return false;
 	}
 	if (prgm.varAt(id).meta.has("func.decompose")) {
@@ -36,21 +37,21 @@ bool decompose(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 		return false;
 	}
 
-	int kind = prgm.varAt(id).meta.kind;
+	string dialect = prgm.varAt(id).meta.dialect;
 	id.var = prgm.termAt(id).createVariant(weaver::Variant("struct", std::any(), id.var));
 	builder.todo.push_back(id);
 
 	gc::GuardedCommands rules;
 	for (size_t pid = 0; pid < sub.size(); pid++) {
 		vector<weaver::Instance> args = prgm.termAt(id).decl.args;
-		for (int i = (int)args.size()-1; i >= 0; i--) {
-			if (g.netIndex(args[i].name) < 0) {
-				args.erase(args.begin()+i);
+		for (int j = (int)args.size()-1; j >= 0; j--) {
+			if (g.netIndex(args[j].name) < 0) {
+				args.erase(args.begin()+j);
 			}
 		}
 
 		weaver::TermId subId = prgm.createTerm(id.mod, weaver::Term(sub[pid].name, args));
-		subId.var = prgm.termAt(subId).createVariant(weaver::Variant(kind, sub[pid]));
+		subId.var = prgm.termAt(subId).createVariant(weaver::Variant(dialect, sub[pid]));
 		builder.todo.push_back(subId);
 
 		rules.rules.push_back(gc::GuardedCommand(arithmetic::Choice({arithmetic::Parallel({arithmetic::Action(arithmetic::call(prgm.termAt(subId).decl.name, {}))})})));
@@ -61,11 +62,10 @@ bool decompose(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 }
 
 bool chpToFlow(Build &builder, weaver::Program &prgm, weaver::TermId id) {
-	if (not id.hasVar() or prgm.varAt(id).meta.dialect() != "func") {
+	if (not id.hasVar() or prgm.varAt(id).meta.dialect != "func") {
 		return false;
 	}
 	chp::graph &g = prgm.varAt(id).as<chp::graph>();
-
 	if (not g.isFlat()) {
 		return false;
 	}

@@ -30,6 +30,9 @@
 #include "format/prs.h"
 #include "format/wv.h"
 #include "format/astg.h"
+#include "format/gc.h"
+
+#include <interpret_wv/import.h>
 
 #include <interpret_chp/export.h>
 #include <interpret_hse/export.h>
@@ -81,13 +84,13 @@ void show_help() {
 }
 
 void show(ShowOptions opts, weaver::Term &t, weaver::Variant &v, string outPath) {
-	if (v.meta.dialect() == "func") {
+	if (v.meta.dialect == "func") {
 		chp::graph g = v.as<chp::graph>();
 		if (opts.process) {
 			g.post_process(opts.proper, opts.aggressive);
 		}
 		gvdot::render(outPath, chp::export_graph(g, opts.labels).to_string());
-	} else if (v.meta.dialect() == "proto") {
+	} else if (v.meta.dialect == "proto") {
 		hse::graph g = v.as<hse::graph>();
 		if (opts.process) {
 			g.post_process(opts.proper, opts.aggressive);
@@ -134,16 +137,18 @@ int show_command(int argc, char **argv) {
 	parse_ucs::function::registry.insert({"proto", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
 	parse_ucs::function::registry.insert({"circ", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
 
-	weaver::Term::pushDialect("func", factoryCog);
-	weaver::Term::pushDialect("proto", factoryCogw);
-	weaver::Term::pushDialect("circ", factoryPrs);
+	weaver::Language lang;
+	lang.dialects.insert({"func", factoryCog});
+	lang.dialects.insert({"struct", factoryGc});
+	lang.dialects.insert({"proto", factoryCogw});
+	lang.dialects.insert({"circ", factoryPrs});
 
 	weaver::Project proj;
 	if (proj.hasMod()) {
 		readMod(proj);
 	}
 
-	proj.pushFiletype("", "wv", "", readWv, loadWv);
+	proj.pushFiletype("", "wv", "", readWv, loadWv, nullptr, lang);
 	proj.pushFiletype("func", "cog", "", readCog, loadCog);
 	proj.pushFiletype("proto", "cogw", "", readCog, loadCogw);
 	proj.pushFiletype("circ", "prs", "ckt", readPrs, loadPrs, writePrs);

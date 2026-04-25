@@ -13,13 +13,11 @@
 #include <interpret_sch/import.h>
 #include <interpret_sch/export.h>
 
+#include "../back/asic.h"
+
 void readSpice(weaver::Project &proj, weaver::Source &source, string buffer) {
-	if (not proj.tech.def.has_value()) {
-		proj.tech.def = make_any<phy::Tech>();
-	}
-	phy::Tech &tech = proj.tech.as<phy::Tech>();
-	if (not tech.isLoaded() and not phy::loadTech(&tech, proj.tech.path, proj.tech.args)) {
-		cout << "Unable to load techfile \'" + proj.tech.path + "\'." << endl;
+	phy::Tech *tech = loadASIC(proj);
+	if (not tech) {
 		return;
 	}
 
@@ -34,18 +32,14 @@ void readSpice(weaver::Project &proj, weaver::Source &source, string buffer) {
 }
 
 void loadSpice(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
-	if (not proj.tech.def.has_value()) {
-		proj.tech.def = make_any<phy::Tech>();
-	}
-	phy::Tech &tech = proj.tech.as<phy::Tech>();
-	if (not tech.isLoaded() and not phy::loadTech(&tech, proj.tech.path, proj.tech.args)) {
-		cout << "Unable to load techfile \'" + proj.tech.path + "\'." << endl;
+	phy::Tech *tech = loadASIC(proj);
+	if (not tech) {
 		return;
 	}
 
 	string name = source.path.stem().string();
 	sch::Netlist net;
-	sch::import_netlist(tech, net, *(parse_spice::netlist*)source.syntax.get(), source.tokens.get());
+	sch::import_netlist(*tech, net, *(parse_spice::netlist*)source.syntax.get(), source.tokens.get());
 
 	weaver::TermId id;
 	id.mod   = prgm.getModule(source.modName);
@@ -53,13 +47,9 @@ void loadSpice(weaver::Project &proj, weaver::Program &prgm, const weaver::Sourc
 	id.var   = prgm.termAt(id).createVariant(weaver::Variant("spice", net));
 }
 
-void writeSpice(fs::path path, weaver::Project &proj, const weaver::Program &prgm, int modIdx, int termIdx, int varIdx) {
-	if (not proj.tech.def.has_value()) {
-		proj.tech.def = make_any<phy::Tech>();
-	}
-	phy::Tech &tech = proj.tech.as<phy::Tech>();
-	if (not tech.isLoaded() and not phy::loadTech(&tech, proj.tech.path, proj.tech.args)) {
-		cout << "Unable to load techfile \'" + proj.tech.path + "\'." << endl;
+void writeSpice(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, int modIdx, int termIdx, int varIdx) {
+	phy::Tech *tech = loadASIC(proj);
+	if (not tech) {
 		return;
 	}
 
@@ -71,7 +61,7 @@ void writeSpice(fs::path path, weaver::Project &proj, const weaver::Program &prg
 	}
 
 	const sch::Netlist &net = prgm.mods[modIdx].terms[termIdx].variants[varIdx].as<sch::Netlist>();
-	string buffer = sch::export_netlist(tech, net).to_string();
+	string buffer = sch::export_netlist(*tech, net).to_string();
 	fout.write(buffer.c_str(), buffer.size());
 	fout.close();
 }

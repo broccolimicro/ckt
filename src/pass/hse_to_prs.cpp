@@ -7,7 +7,7 @@
 #include <interpret_hse/export.h>
 
 bool elaborate(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
-	if (not id.hasVar() or prgm.varAt(id).meta.dialect() != "proto") {
+	if (not id.hasVar() or prgm.varAt(id).meta.dialect != "proto") {
 		return false;
 	}
 	if (prgm.varAt(id).meta.has("proto.states")) {
@@ -31,7 +31,7 @@ bool elaborate(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
 }
 
 bool conflicts(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
-	if (not id.hasVar() or prgm.varAt(id).meta.dialect() != "proto"
+	if (not id.hasVar() or prgm.varAt(id).meta.dialect != "proto"
 		or not prgm.varAt(id).meta.has("proto.states")) {
 		return false;
 	}
@@ -51,7 +51,7 @@ bool conflicts(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
 }
 
 bool encode(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
-	if (not id.hasVar() or prgm.varAt(id).meta.dialect() != "proto"
+	if (not id.hasVar() or prgm.varAt(id).meta.dialect != "proto"
 		or not prgm.varAt(id).meta.has("proto.states")
 		or not prgm.varAt(id).meta.has("proto.conflicts")) {
 		return false;
@@ -68,7 +68,7 @@ bool encode(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
 }
 
 bool hseToPrs(Build &builder, weaver::Program &prgm, weaver::TermId id) {
-	if (not id.hasVar() or prgm.varAt(id).meta.dialect() != "proto"
+	if (not id.hasVar() or prgm.varAt(id).meta.dialect != "proto"
 		or not prgm.varAt(id).meta.has("proto.states")
 		or not prgm.varAt(id).meta.has("proto.conflicts")) {
 		return false;

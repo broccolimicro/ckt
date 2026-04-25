@@ -122,7 +122,7 @@ void Build::build(weaver::Program &prgm) {
 			id.var = prgm.termAt(id).variants.size()-1;
 		}
 
-		std::string dialect = prgm.varAt(id).meta.dialect();
+		std::string dialect = prgm.varAt(id).meta.dialect;
 		if (dialect == "func") {
 			if (not flatten(*this, prgm, id)) {
 				if (not decompose(*this, prgm, id)) {
