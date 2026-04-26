@@ -1,6 +1,7 @@
 #include "tech.h"
 
 #include <common/standard.h>
+#include <common/text.h>
 #include <parse/parse.h>
 #include <parse/default/block_comment.h>
 #include <parse/default/line_comment.h>
@@ -51,11 +52,6 @@
 
 #include <filesystem>
 #include <chrono>
-#define KNRM  "\x1B[0m"
-#define KRED  "\x1B[31m"
-#define KGRN  "\x1B[32m"
-#define KYEL  "\x1B[33m"
-#define KBLU  "\x1B[34m"
 using namespace std::chrono;
 
 //const bool debug = false;
@@ -129,7 +125,7 @@ int tech_cells_command(weaver::Project &proj, int argc, char **argv) {
 			spi->cleanDangling(true);
 			spi->combineDevices();
 			spi->canonicalize();
-			spi->name = "cell_" + sch::idToString(spi->id);
+			spi->name = "cell_" + encodeBase32(spi->id);
 			gds->name = spi->name;
 			printf("%s\n", spi->name.c_str());	
 
