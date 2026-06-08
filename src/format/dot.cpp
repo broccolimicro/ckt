@@ -21,6 +21,11 @@ void render(string filename, string content) {
 #ifdef GRAPHVIZ_SUPPORTED
 		graphviz::Agraph_t* G = graphviz::agmemread(content.c_str());
 		graphviz::GVC_t* gvc = graphviz::gvContext();
+		if (not G) {
+			cerr << "ERROR: graphviz failed to parse DOT input: ```"
+				<< endl << content.c_str() << endl << "```" << endl;
+			return;
+		}
 		graphviz::gvLayout(gvc, G, "dot");
 		graphviz::gvRenderFilename(gvc, G, format.c_str(), (filename+"."+format).c_str());
 		graphviz::gvFreeLayout(gvc, G);
