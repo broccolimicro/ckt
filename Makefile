@@ -14,14 +14,14 @@ INCLUDE_PATHS = $(DEPEND:%=-I../../lib/%) -I../../lib/gdstk/build/include $(shel
 LIBRARY_PATHS = $(DEPEND:%=-L../../lib/%) -L.
 LIBRARIES     = $(DEPEND:%=-l%) -ldl
 LIBFILES      = $(foreach dep,$(DEPEND),../../lib/$(dep)/lib$(dep).a)
-CXXFLAGS      = -std=c++20 -g -Wall -fmessage-length=0 -D CL_HPP_MINIMUM_OPENCL_VERSION=120 -D CL_HPP_TARGET_OPENCL_VERSION=120 -D CL_HPP_ENABLE_EXCEPTIONS 
-LDFLAGS       = 
+CXXFLAGS      = -std=c++20 -g -Wall -fmessage-length=0 -D CL_HPP_MINIMUM_OPENCL_VERSION=120 -D CL_HPP_TARGET_OPENCL_VERSION=120 -D CL_HPP_ENABLE_EXCEPTIONS
+LDFLAGS       =
 
 ifeq ($(COVERAGE),0)
 CXXFLAGS += -O2
 else
 CXXFLAGS += -O0 --coverage -fprofile-arcs -ftest-coverage
-LDFLAGS  += --coverage -fprofile-arcs -ftest-coverage 
+LDFLAGS  += --coverage -fprofile-arcs -ftest-coverage
 endif
 
 SOURCES	     := $(shell mkdir -p $(SRCDIR); find $(SRCDIR) -name '*.cpp')
@@ -101,9 +101,9 @@ version:
 $(TARGET): $(OBJECTS) $(LIBFILES)
 	$(CXX) $(LIBRARY_PATHS) $(CXXFLAGS) $(LDFLAGS) $(OBJECTS) -o $(TARGET) $(LIBRARIES)
 
-build/$(SRCDIR)/%.o: $(SRCDIR)/%.cpp 
+build/$(SRCDIR)/%.o: $(SRCDIR)/%.cpp
 	@mkdir -p $(dir $@)
-	@$(CXX) $(CXXFLAGS) $(INCLUDE_PATHS) -MM -MF $(patsubst %.o,%.d,$@) -MT $@ -c $<
+	@$(CXX) $(CXXFLAGS) $(INCLUDE_PATHS) -MM -MF $(patsubst %.o,%.d,$@) -MT $@ $<
 	$(CXX) $(CXXFLAGS) $(INCLUDE_PATHS) -c -o $@ $<
 
 $(TEST_TARGET): setgv $(TEST_OBJECTS) $(filter-out build/$(SRCDIR)/main.o, $(OBJECTS))
@@ -118,7 +118,7 @@ coverage: clean
 
 build/$(TESTDIR)/%.o: $(TESTDIR)/%.cpp
 	@mkdir -p $(dir $@)
-	@$(CXX) $(CXXFLAGS) $(GTEST_I) $(INCLUDE_PATHS) -MM -MF $(patsubst %.o,%.d,$@) -MT $@ -c $<
+	@$(CXX) $(CXXFLAGS) $(GTEST_I) $(INCLUDE_PATHS) -MM -MF $(patsubst %.o,%.d,$@) -MT $@ $<
 	$(CXX) $(CXXFLAGS) $(GTEST_I) $(INCLUDE_PATHS) $< -c -o $@
 
 build/$(TESTDIR)/gtest_main.o: $(GTEST)/googletest/src/gtest_main.cc
