@@ -45,6 +45,13 @@ void compare_help() {
 	printf("Usage: lm compare [options] [<module|term>[=<module|term>...]...]\n");
 	printf("Verify that the two circuit files are the same.\n");
 
+	printf("Options:\n");
+	printf(" -v,--verbose     display verbose messages\n");
+	printf(" -d,--debug       display internal debugging messages\n");
+	printf(" -h,--help        display this help text\n");
+	printf(" -p,--progress    display progress information\n");
+	printf("\n");
+
 	printf("\nSupported file formats:\n");
 	//printf(" *.chp                   communicating hardware processes\n");
 	//printf(" *.hse                   handshaking expansions\n");
@@ -67,6 +74,8 @@ void cleanup(sch::Subckt &s) {
 void compare(sch::Subckt s0, sch::Subckt s1) {
 	printf("\t%s = %s...[", s0.name.c_str(), s1.name.c_str());
 	fflush(stdout);
+	cleanup(s0);
+	cleanup(s1);
 
 	if (s0.compare(s1) == 0) {
 		printf("%sMATCH%s]\n", KGRN, KNRM);
@@ -84,42 +93,40 @@ void compare(weaver::Program &prgm, weaver::Variant &child, weaver::Variant &par
 		phy::Layout &macro = child.as<phy::Layout>();
 		sch::Subckt s0;
 		extract(s0, macro);
-		cleanup(s0);
 
 		compare(s0, parent.as<sch::Subckt>());
 	} else if (child.meta.dialect == "spice" and parent.meta.dialect == "layout") {
 		phy::Layout &macro = parent.as<phy::Layout>();
 		sch::Subckt s1;
 		extract(s1, macro);
-		cleanup(s1);
 
 		compare(child.as<sch::Subckt>(), s1);
 	} else if (child.meta.dialect == "spice" and parent.meta.dialect == "spice") {
 		compare(child.as<sch::Subckt>(), parent.as<sch::Subckt>());
 	}
-	printf("done\n\n");
 }
 
 void verifyImpl(weaver::Program &prgm, weaver::TermId idx) {
 	weaver::Term &t0 = prgm.termAt(idx);
 	for (int i = (int)t0.variants.size()-1; i >= 0; i--) {
 		int super = t0.variants[i].super;
-		if (super < 0) {
-			for (auto j = t0.impl.begin(); j != t0.impl.end(); j++) {
-				if (not j->hasTerm()) {
-					printf("error: undefined implements relationship\n");
-					continue;
-				}
-
-				weaver::Term &t1 = prgm.termAt(*j);
-				if (t1.variants.empty()) {
-					continue;
-				}
-
-				compare(prgm, t0.variants[i], t1.variants[0]);
-			}
-		} else {
+		if (super >= 0) {
 			compare(prgm, t0.variants[i], t0.variants[super]);
+			continue;
+		}
+
+		for (auto j = t0.impl.begin(); j != t0.impl.end(); j++) {
+			if (not j->hasTerm()) {
+				printf("error: undefined implements relationship\n");
+				continue;
+			}
+
+			weaver::Term &t1 = prgm.termAt(*j);
+			if (t1.variants.empty()) {
+				continue;
+			}
+
+			compare(prgm, t0.variants[i], t1.variants[0]);
 		}
 	}
 }
@@ -271,20 +278,36 @@ int compare_command(int argc, char **argv) {
 
 	vector<Group> groups;
 
+	bool debug = false;
+	bool progress = false;
+
 	for (int i = 0; i < argc; i++) {
 		string arg = argv[i];
-		groups.push_back(Group());
 
-		size_t eq = arg.rfind("=");
-		while (eq != string::npos) {
-			groups.back().terms.push_back(weaver::Prototype(arg.substr(eq+1)));
-			arg = arg.substr(0, eq);
-			eq = arg.rfind("=");
+		if (arg == "--verbose" or arg == "-v") {
+			set_verbose(true);
+		} else if (arg == "--debug" or arg == "-d") {
+			set_debug(true);
+			debug = true;
+		} else if (arg == "-h" or arg == "--help") {
+			compare_help();
+			return 0;
+		} else if (arg == "--progress" or arg == "-p") {
+			progress = true;
+		} else {
+			groups.push_back(Group());
+
+			size_t eq = arg.rfind("=");
+			while (eq != string::npos) {
+				groups.back().terms.push_back(weaver::Prototype(arg.substr(eq+1)));
+				arg = arg.substr(0, eq);
+				eq = arg.rfind("=");
+			}
+			if (not arg.empty()) {
+				groups.back().terms.push_back(weaver::Prototype(arg));
+			}
+			reverse(groups.back().terms.begin(), groups.back().terms.end());
 		}
-		if (not arg.empty()) {
-			groups.back().terms.push_back(weaver::Prototype(arg));
-		}
-		reverse(groups.back().terms.begin(), groups.back().terms.end());
 	}
 
 	if (groups.empty() and not proj.hasMod()) {
@@ -306,6 +329,10 @@ int compare_command(int argc, char **argv) {
 	}
 
 	proj.load(prgm);
+
+	if (debug) {
+		prgm.print();
+	}
 
 	if (groups.empty()) {
 		for (auto i = prgm.begin(); i != prgm.end(); i = prgm.next(i)) {

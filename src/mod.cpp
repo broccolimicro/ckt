@@ -108,6 +108,10 @@ int mod_command(int argc, char **argv) {
 			debug = true;
 		} else if (show) {
 			protos.push_back(weaver::Prototype(arg));
+		} else {
+			error("", "unrecognized command '" + arg + "'", __FILE__, __LINE__);
+			complete();
+			return is_clean();
 		}
 	}
 
@@ -131,27 +135,9 @@ int mod_command(int argc, char **argv) {
 	if (debug) {
 		prgm.print();
 	} else {
-		for (auto i = prgm.mods.begin(); i != prgm.mods.end(); i++) {
-			for (auto j = i->terms.begin(); j != i->terms.end(); j++) {
-				string name = i->name;
-				if (name.rfind(proj.modName+"/", 0) == 0) {
-					name = name.substr(proj.modName.size()+1);
-				}
-				printf("%s:", name.c_str());
-				if (j->decl.recv.defined()) {
-					printf("%s::", prgm.typeAt(j->decl.recv).name.c_str());
-				}
-				printf("%s(", j->decl.name.c_str());
-				for (int k = 0; k < (int)j->decl.args.size(); k++) {
-					if (k != 0) {
-						printf(",");
-					}
-					if (j->decl.args[k].type.defined()) {
-						printf("%s", prgm.typeAt(j->decl.args[k].type).name.c_str());
-					}
-				}
-				printf(")\n");
-			}
+		for (auto i = prgm.begin(); i != prgm.end(); i = prgm.next(i)) {
+			std::string name = prgm.getPrototype(i).to_string();
+			printf("%s\n", name.c_str());
 		}
 	}
 

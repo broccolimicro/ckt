@@ -37,15 +37,35 @@ void loadSpice(weaver::Project &proj, weaver::Program &prgm, const weaver::Sourc
 		return;
 	}
 
-	string name = source.path.stem().string();
 	std::vector<sch::Subckt> lst;
 	sch::import_netlist(*tech, lst, *(parse_spice::netlist*)source.syntax.get(), source.tokens.get());
 
-	for (auto i = lst.begin(); i != lst.end(); i++) {
-		weaver::TermId id;
-		id.mod   = prgm.getModule(source.modName);
-		id.index = prgm.modAt(id).createTerm(weaver::Term(name, vector<weaver::Instance>()));
-		id.var   = prgm.termAt(id).createVariant(weaver::Variant("spice", *i));
+	for (auto ckt = lst.begin(); ckt != lst.end(); ckt++) {
+		weaver::Prototype proto(ckt->name);
+		proto.mod = source.modName;
+
+		weaver::TermId id = prgm.getTerm(proto);
+		if (prgm.termValid(id)) {
+			auto &term = prgm.termAt(id);
+			id.var   = term.createVariant(weaver::Variant("spice", *ckt));
+			// Look for the parent
+			for (int i = id.var-1; i >= 0; i--) {
+				if (term.variants[i].meta.dialect == "prs") {
+					term.variants[id.var].super = i;
+					term.variants[i].derived.push_back(id.var);
+					break;
+				}
+			}
+			// look for children
+			for (int i = id.var-1; i >= 0; i--) {
+				if (term.variants[i].super < 0 and term.variants[i].meta.dialect == "layout") {
+					term.variants[i].super = id.var;
+					term.variants[id.var].derived.push_back(i);
+				}
+			}
+		} else {
+			internal("", "term not defined '" + proto.to_string() + "'", __FILE__, __LINE__);
+		}
 	}
 }
 

@@ -26,29 +26,23 @@ void loadGds(weaver::Project &proj, weaver::Program &prgm, const weaver::Source 
 
 	for (auto macro = lib.begin(); macro != lib.end(); macro++) {
 		weaver::Prototype proto(macro->name);
-		vector<weaver::TermId> ids = prgm.findTerms(proto);
-		
-		if (ids.empty()) {
-			int mod = prgm.getModule(proto.mod);
-			vector<weaver::Instance> args;
-			weaver::TypeId recv;
-			if (not proto.unqualified) {
-				// TODO(edward.bingham) add variable names by looking at ports
-				for (auto arg = proto.args.begin(); arg != proto.args.end(); arg++) {
-					args.push_back(prgm.findInstance(*arg, "", mod));
+		proto.mod = source.modName;
+
+		weaver::TermId id = prgm.getTerm(proto);
+		if (prgm.termValid(id)) {
+			auto &term = prgm.termAt(id);
+			id.var = term.createVariant(weaver::Variant("layout", *macro));
+			// look for the parent
+			for (int i = id.var-1; i >= 0; i--) {
+				if (term.variants[i].meta.dialect == "spice") {
+					term.variants[id.var].super = i;
+					term.variants[i].derived.push_back(id.var);
+					break;
 				}
-				recv = prgm.findType("", proto.recv, mod);
 			}
-
-			int idx = prgm.mods[mod].createTerm(weaver::Term(proto.name, args, weaver::TypeId(), recv));
-			ids.push_back(weaver::TermId(mod, idx));
+		} else {
+			internal("", "term not defined '" + proto.to_string() + "'", __FILE__, __LINE__);
 		}
-
-		if (ids.size() > 1u) {
-			error("", "ambiguous process names", __FILE__, __LINE__);
-		}
-		weaver::TermId id = ids[0];
-		id.var = prgm.termAt(id).createVariant(weaver::Variant("layout", *macro));
 	}
 }
 
