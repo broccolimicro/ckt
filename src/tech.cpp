@@ -109,34 +109,33 @@ int tech_cells_command(weaver::Project &proj, int argc, char **argv) {
 	for (auto path = files.begin(); path != files.end(); path++) {
 		printf("\t%s\n", path->c_str());
 		std::vector<phy::Layout> lib;
-		import_library(lib, *path);
+		import_library(lib, *tech, *path);
 		if (lib.empty()) {
 			continue;
 		}
 
-		std::vector<sch::Subckt> net;
-		extract(net, lib);
-		for (int i = 0; i < (int)net.size(); i++) {
-			auto spi = net.begin()+i;
-			auto gds = lib.begin()+i;
-			printf("\t\t%s -> ", spi->name.c_str());
+		for (int i = 0; i < (int)lib.size(); i++) {
+			sch::Subckt ckt;
+			extract(ckt, lib[i]);
+			
+			printf("\t\t%s -> ", ckt.name.c_str());
 			fflush(stdout);
-			spi->cleanDangling(true);
-			spi->combineDevices();
-			spi->canonicalize();
-			spi->name = "cell_" + encodeBase32(spi->id);
-			gds->name = spi->name;
-			printf("%s\n", spi->name.c_str());	
+			ckt.cleanDangling(true);
+			ckt.combineDevices();
+			ckt.canonicalize();
+			ckt.name = "cell_" + encodeBase32(ckt.id);
+			lib[i].name = ckt.name;
+			printf("%s\n", ckt.name.c_str());	
 
 			if (not libFound) {
 				filesystem::create_directory(proj.tech.lib);
 				libFound = true;
 			}
 		
-			string cellPath = proj.tech.lib + "/" + spi->name;
-			export_layout(cellPath+".gds", *gds);
-			export_lef(cellPath+".lef", *gds);
-			export_spi(cellPath+".spi", *tech, net, *spi);
+			string cellPath = proj.tech.lib + "/" + ckt.name;
+			export_layout(cellPath+".gds", lib[i]);
+			export_lef(cellPath+".lef", lib[i]);
+			export_spi(cellPath+".spi", *tech, ckt);
 		}
 	}
 

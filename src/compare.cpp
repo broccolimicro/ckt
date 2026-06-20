@@ -58,7 +58,13 @@ struct Group {
 	vector<weaver::Prototype> terms;
 };
 
-void compare(sch::Subckt &s0, sch::Subckt &s1) {
+void cleanup(sch::Subckt &s) {
+	s.cleanDangling(true);
+	s.combineDevices();
+	s.canonicalize();
+}
+
+void compare(sch::Subckt s0, sch::Subckt s1) {
 	printf("\t%s = %s...[", s0.name.c_str(), s1.name.c_str());
 	fflush(stdout);
 
@@ -73,52 +79,23 @@ void compare(sch::Subckt &s0, sch::Subckt &s1) {
 	}
 }
 
-void compare(sch::Netlist &n0, sch::Netlist &n1) {
-	vector<bool> c0(n0.subckts.size(), false);
-	vector<bool> c1(n1.subckts.size(), false);
-	for (auto i = n0.subckts.begin(); i != n0.subckts.end(); i++) {
-		bool found = false;
-		for (auto j = n1.subckts.begin(); j != n1.subckts.end(); j++) {
-			if (i->name == j->name) {
-				if (not c0[i-n0.subckts.begin()]) {
-					i->cleanDangling(true);
-					i->combineDevices();
-					i->canonicalize();
-					c0[i-n0.subckts.begin()] = true;
-				}
-				if (not c1[j-n1.subckts.begin()]) {
-					j->cleanDangling(true);
-					j->combineDevices();
-					j->canonicalize();
-					c1[j-n1.subckts.begin()] = true;
-				}
-
-				compare(*i, *j);
-				found = true;
-				break;
-			}
-		}
-		if (not found) {
-			printf("\t%s...[%sNOT FOUND%s]\n", i->name.c_str(), KYEL, KNRM);
-		}
-	}
-}
-
 void compare(weaver::Program &prgm, weaver::Variant &child, weaver::Variant &parent) {
 	if (child.meta.dialect == "layout" and parent.meta.dialect == "spice") {
-		phy::Library &lib = child.as<phy::Library>();
-		sch::Netlist s0;
-		extract(s0, lib);
+		phy::Layout &macro = child.as<phy::Layout>();
+		sch::Subckt s0;
+		extract(s0, macro);
+		cleanup(s0);
 
-		compare(s0, parent.as<sch::Netlist>());
-	} else if (child.meta.dialect == "spice" and parent.meta.dialect == "child") {
-		phy::Library &lib = parent.as<phy::Library>();
-		sch::Netlist s1;
-		extract(s1, lib);
+		compare(s0, parent.as<sch::Subckt>());
+	} else if (child.meta.dialect == "spice" and parent.meta.dialect == "layout") {
+		phy::Layout &macro = parent.as<phy::Layout>();
+		sch::Subckt s1;
+		extract(s1, macro);
+		cleanup(s1);
 
-		compare(child.as<sch::Netlist>(), s1);
+		compare(child.as<sch::Subckt>(), s1);
 	} else if (child.meta.dialect == "spice" and parent.meta.dialect == "spice") {
-		compare(child.as<sch::Netlist>(), parent.as<sch::Netlist>());
+		compare(child.as<sch::Subckt>(), parent.as<sch::Subckt>());
 	}
 	printf("done\n\n");
 }

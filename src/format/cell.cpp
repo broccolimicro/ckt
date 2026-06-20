@@ -33,7 +33,7 @@ void export_cells(std::string path, const phy::Tech &tech, const weaver::Module 
 		filesystem::create_directory(path);
 	}
 	for (auto i = mod.terms.begin(); i != mod.terms.end(); i++) {
-		if (i->name.rfind("cell_", 0) == 0) {
+		if (i->decl.name.rfind("cell_", 0) == 0) {
 			export_cell(path, tech, mod.name, *i);
 		}
 	}
@@ -49,7 +49,7 @@ void export_cells(std::string path, const phy::Tech &tech, const weaver::Program
 }
 
 // returns whether the cell was imported
-bool import_cell(std::string path, weaver::Term &term, bool progress, bool debug) {
+bool import_cell(std::string path, const phy::Tech &tech, weaver::Term &term, bool progress, bool debug) {
 	string cellPath = path + "/" + term.decl.name+".gds";
 	if (progress) {
 		printf("  %s...", term.decl.name.c_str());
@@ -87,8 +87,8 @@ bool import_cell(std::string path, weaver::Term &term, bool progress, bool debug
 	spiNet.combineDevices();
 	spiNet.canonicalize();
 
+	phy::Layout macro(tech);
 	if (filesystem::exists(cellPath)) {
-		phy::Layout macro;
 		bool imported = import_layout(macro, cellPath, spiNet.name);
 		if (progress) {
 			if (imported) {
@@ -151,30 +151,23 @@ bool import_cell(std::string path, weaver::Term &term, bool progress, bool debug
 	return false;
 }
 
-void update_library(std::string path, weaver::Program &prgm, gdstk::GdsWriter *stream, map<int, gdstk::Cell*> *cells, bool progress, bool debug) {
+void update_library(std::string path, const phy::Tech &tech, weaver::Module &mod, bool progress, bool debug) {
 	bool libFound = filesystem::exists(path);
 	if (progress) {
 		printf("Load cell layouts:\n");
 	}
 
 	Timer tmr;
-	for (int i = 0; i < (int)lst.subckts.size(); i++) {
-		if (lst.subckts[i].isCell) {
-			if (not import_cell(path, lib, lst, i, progress, debug)) {
+	for (int i = 0; i < (int)mod.terms.size(); i++) {
+		if (mod.terms[i].decl.name.rfind("cell_", 0) == 0) {
+			if (not import_cell(path, tech, mod.terms[i], progress, debug)) {
 				// We generated a new cell, save this to the cell library
 				if (not libFound) {
 					filesystem::create_directory(path);
 					libFound = true;
 				}
-				string cellPath = path + "/" + lib.macros[i].name;
-				export_layout(cellPath+".gds", lib.macros[i]);
-				export_lef(cellPath+".lef", lib.macros[i]);
-				export_spi(cellPath+".spi", *lib.tech, lst, lst.subckts[i]);
+				export_cell(path, tech, mod.name, mod.terms[i]);
 			}
-			if (stream != nullptr and cells != nullptr) {
-				export_layout(*stream, lib, i, *cells);
-			}
-			lst.mapToLayout(i, lib.macros[i]);
 		}
 	}
 	if (progress) {
