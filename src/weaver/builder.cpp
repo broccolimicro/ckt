@@ -23,6 +23,7 @@
 #include "../pass/flow_to_verilog.h"
 #include "../pass/hse_to_prs.h"
 #include "../pass/prs_to_spi.h"
+#include "../pass/spi_to_gds.h"
 
 #include "../format/dot.h"
 
@@ -169,6 +170,10 @@ void Build::build(weaver::Program &prgm) {
 
 			if (not prsToSpi(*this, prgm, id)) {
 				printf("error: unable to generate netlist\n");
+			}
+		} else if (dialect == "spice") {
+			if (not noCells and not mapCells(*this, prgm, id)) {
+				printf("err: unable to break subckt into cells\n");
 			}
 		}
 	}
