@@ -6,7 +6,7 @@
 #include <parse/default/new_line.h>
 
 #include <parse_spice/factory.h>
-#include <sch/Netlist.h>
+#include <sch/Subckt.h>
 #include <phy/Tech.h>
 #include <phy/Script.h>
 
@@ -38,30 +38,44 @@ void loadSpice(weaver::Project &proj, weaver::Program &prgm, const weaver::Sourc
 	}
 
 	string name = source.path.stem().string();
-	sch::Netlist net;
-	sch::import_netlist(*tech, net, *(parse_spice::netlist*)source.syntax.get(), source.tokens.get());
+	std::vector<sch::Subckt> lst;
+	sch::import_netlist(*tech, lst, *(parse_spice::netlist*)source.syntax.get(), source.tokens.get());
 
-	weaver::TermId id;
-	id.mod   = prgm.getModule(source.modName);
-	id.index = prgm.modAt(id).createTerm(weaver::Term(name, vector<weaver::Instance>()));
-	id.var   = prgm.termAt(id).createVariant(weaver::Variant("spice", net));
+	for (auto i = lst.begin(); i != lst.end(); i++) {
+		weaver::TermId id;
+		id.mod   = prgm.getModule(source.modName);
+		id.index = prgm.modAt(id).createTerm(weaver::Term(name, vector<weaver::Instance>()));
+		id.var   = prgm.termAt(id).createVariant(weaver::Variant("spice", *i));
+	}
 }
 
 void writeSpice(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, int modIdx, int termIdx, int varIdx) {
+	static std::set<std::string> prev;
+
 	phy::Tech *tech = loadASIC(proj);
 	if (not tech) {
 		return;
 	}
 
+	// If we keep updating a single file, then we don't want to have to read
+	// the whole file over again. However, on each compile, we do want to
+	// obliterate old build files.
 	string pathstr = path.string();
-	ofstream fout(pathstr.c_str(), ios::out);
+	ofstream fout;
+	if (prev.find(pathstr) != prev.end() and fs::exists(path)) {
+		fout = ofstream(pathstr.c_str(), ios::out | ios::ate);
+	} else {
+		fout = ofstream(pathstr.c_str(), ios::out);
+		prev.insert(pathstr);
+	}
+
 	if (not fout.is_open()) {
-		printf("error: unable to write to file '%s'\n", pathstr.c_str());
+		error("", "unable to write to file '" + pathstr + "'", __FILE__, __LINE__);
 		return;
 	}
 
-	const sch::Netlist &net = prgm.mods[modIdx].terms[termIdx].variants[varIdx].as<sch::Netlist>();
-	string buffer = sch::export_netlist(*tech, net).to_string();
+	const sch::Subckt &ckt = prgm.mods[modIdx].terms[termIdx].variants[varIdx].as<sch::Subckt>();
+	string buffer = sch::export_subckt(*tech, ckt).to_string();
 	fout.write(buffer.c_str(), buffer.size());
 	fout.close();
 }

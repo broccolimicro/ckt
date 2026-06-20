@@ -30,13 +30,12 @@
 #include "format/astg.h"
 #include "format/gc.h"
 
-#include <sch/Netlist.h>
+#include <sch/Subckt.h>
 #include <sch/Tapeout.h>
 
 #include <phy/Tech.h>
 #include <phy/Script.h>
 #include <phy/Layout.h>
-#include <phy/Library.h>
 
 #include <interpret_wv/import.h>
 

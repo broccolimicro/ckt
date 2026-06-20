@@ -50,7 +50,7 @@ void writePrs(fs::path path, weaver::Project &proj, const weaver::Filetype &lang
 	fout.close();
 }
 
-std::any factoryPrs(std::any *lib, string name, const parse::syntax *syntax, tokenizer *tokens) {
+std::any factoryPrs(string name, const parse::syntax *syntax, tokenizer *tokens) {
 	prs::production_rule_set pr;
 	pr.name = name;
 	if (syntax != nullptr) {

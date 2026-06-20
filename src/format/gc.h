@@ -5,5 +5,5 @@
 void readGc(weaver::Project &proj, weaver::Source &source, string buffer);
 void loadGc(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source);
 void writeGc(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, int modIdx, int termIdx, int varIdx);
-std::any factoryGc(std::any *lib, string name, const parse::syntax *syntax, tokenizer *tokens);
+std::any factoryGc(string name, const parse::syntax *syntax, tokenizer *tokens);
 

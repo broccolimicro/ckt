@@ -51,7 +51,7 @@ void writeGc(fs::path path, weaver::Project &proj, const weaver::Filetype &lang,
 	fout.close();
 }
 
-std::any factoryGc(std::any *lib, string name, const parse::syntax *syntax, tokenizer *tokens) {
+std::any factoryGc(string name, const parse::syntax *syntax, tokenizer *tokens) {
 	gc::GuardedCommands rules;
 	rules.name = name;
 	if (syntax != nullptr) {

@@ -26,7 +26,7 @@
 #include <interpret_prs/import.h>
 #include <interpret_prs/export.h>
 
-#include <sch/Netlist.h>
+#include <sch/Subckt.h>
 #include <sch/Tapeout.h>
 #include <interpret_sch/import.h>
 #include <interpret_sch/export.h>
@@ -34,7 +34,6 @@
 #include <phy/Tech.h>
 #include <phy/Script.h>
 #include <phy/Layout.h>
-#include <phy/Library.h>
 #include <interpret_phy/import.h>
 #include <interpret_phy/export.h>
 
@@ -109,17 +108,17 @@ int tech_cells_command(weaver::Project &proj, int argc, char **argv) {
 	printf("Importing cells...\n");
 	for (auto path = files.begin(); path != files.end(); path++) {
 		printf("\t%s\n", path->c_str());
-		phy::Library lib(*tech);
+		std::vector<phy::Layout> lib;
 		import_library(lib, *path);
-		if (lib.macros.empty()) {
+		if (lib.empty()) {
 			continue;
 		}
 
-		sch::Netlist net;
+		std::vector<sch::Subckt> net;
 		extract(net, lib);
-		for (int i = 0; i < (int)net.subckts.size(); i++) {
-			auto spi = net.subckts.begin()+i;
-			auto gds = lib.macros.begin()+i;
+		for (int i = 0; i < (int)net.size(); i++) {
+			auto spi = net.begin()+i;
+			auto gds = lib.begin()+i;
 			printf("\t\t%s -> ", spi->name.c_str());
 			fflush(stdout);
 			spi->cleanDangling(true);

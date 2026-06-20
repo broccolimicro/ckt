@@ -6,7 +6,7 @@
 #include <common/timer.h>
 #include <common/text.h>
 
-#include <sch/Netlist.h>
+#include <sch/Subckt.h>
 #include <sch/Tapeout.h>
 #include <sch/Placer.h>
 #include <phy/Script.h>
@@ -24,7 +24,6 @@
 #include "../pass/hse_to_prs.h"
 #include "../pass/prs_to_spi.h"
 
-#include "../format/cell.h"
 #include "../format/dot.h"
 
 Build::Build(weaver::Project &proj) : proj(proj) {

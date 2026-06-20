@@ -56,7 +56,7 @@ void loadCogw(weaver::Project &proj, weaver::Program &prgm, const weaver::Source
 	id.var   = prgm.termAt(id).createVariant(weaver::Variant("proto", g));
 }
 
-std::any factoryCog(std::any *lib, string name, const parse::syntax *syntax, tokenizer *tokens) {
+std::any factoryCog(string name, const parse::syntax *syntax, tokenizer *tokens) {
 	chp::graph g;
 	g.name = name;
 	if (syntax != nullptr) {
@@ -66,7 +66,7 @@ std::any factoryCog(std::any *lib, string name, const parse::syntax *syntax, tok
 	return g;
 }
 
-std::any factoryCogw(std::any *lib, string name, const parse::syntax *syntax, tokenizer *tokens) {
+std::any factoryCogw(string name, const parse::syntax *syntax, tokenizer *tokens) {
 	hse::graph g;
 	g.name = name;
 	if (syntax != nullptr) {

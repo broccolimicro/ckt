@@ -4,7 +4,7 @@
 
 #include <prs/bubble.h>
 #include <prs/synthesize.h>
-#include <sch/Netlist.h>
+#include <sch/Subckt.h>
 #include <phy/Script.h>
 
 bool bubble(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
@@ -80,14 +80,12 @@ bool prsToSpi(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 
 	prs::production_rule_set &pr = prgm.varAt(id).as<prs::production_rule_set>();
 
-	sch::Netlist *net = prgm.getLib<sch::Netlist>("spice");
-	int index = (int)net->subckts.size();
-	net->subckts.push_back(prs::build_netlist(*tech, pr, builder.progress));
+	sch::Subckt ckt = prs::build_netlist(*tech, pr, builder.progress);
 	if (builder.debug) {
-		net->subckts.back().print();
+		ckt.print();
 	}
 
-	id.var = prgm.termAt(id).createVariant(weaver::Variant("spice", index, id.var));
+	id.var = prgm.termAt(id).createVariant(weaver::Variant("spice", ckt, id.var));
 	builder.todo.push_back(id);
 	return true;
 }

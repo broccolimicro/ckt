@@ -9,37 +9,50 @@ using namespace std::filesystem;
 
 namespace cell {
 
-void export_cell(std::string path, const phy::Library &lib, const sch::Netlist &net, int index) {
-	if (lib.macros[index].name.rfind("cell_", 0) == 0) {
-		string cellPath = path + "/" + lib.macros[index].name;
-		if (not filesystem::exists(cellPath+".gds")) {
-			export_layout(cellPath+".gds", lib.macros[index]);
-			export_lef(cellPath+".lef", lib.macros[index]);
-			if (index < (int)net.subckts.size()) {
-				export_spi(cellPath+".spi", *lib.tech, net, net.subckts[index]);
-			}
+void export_cell(std::string path, const phy::Tech &tech, std::string mod, const weaver::Term &term) {
+	bool spiceFound = false;
+	bool layoutFound = false;
+	string cellPath = path + "/" + term.decl.name;
+	// TODO(edward.bingham) this assumes that the appropriate subckt and layout
+	// to export is the most recently compiled variant. However, this may not
+	// be the case, we need to have more logic about the compile graph here.
+	for (auto i = term.variants.rbegin(); i != term.variants.rend(); i++) {
+		if (not spiceFound and i->meta.dialect == "spice") {
+			export_spi(cellPath+".spi", tech, i->as<sch::Subckt>());
+			spiceFound = true;
+		} else if (not layoutFound and i->meta.dialect == "layout") {
+			export_layout(cellPath+".gds", i->as<phy::Layout>());
+			export_lef(cellPath+".lef", i->as<phy::Layout>());
+			layoutFound = true;
 		}
 	}
 }
 
-void export_cells(std::string path, const phy::Library &lib, const sch::Netlist &net) {
+void export_cells(std::string path, const phy::Tech &tech, const weaver::Module &mod) {
 	if (not filesystem::exists(path)) {
 		filesystem::create_directory(path);
 	}
-	for (int i = 0; i < (int)lib.macros.size(); i++) {
-		export_cell(path, lib, net, i);
+	for (auto i = mod.terms.begin(); i != mod.terms.end(); i++) {
+		if (i->name.rfind("cell_", 0) == 0) {
+			export_cell(path, tech, mod.name, *i);
+		}
+	}
+}
+
+void export_cells(std::string path, const phy::Tech &tech, const weaver::Program &prgm) {
+	if (not filesystem::exists(path)) {
+		filesystem::create_directory(path);
+	}
+	for (auto i = prgm.mods.begin(); i != prgm.mods.end(); i++) {
+		export_cells(path, tech, *i);
 	}
 }
 
 // returns whether the cell was imported
-bool import_cell(std::string path, phy::Library &lib, sch::Netlist &lst, int idx, bool progress, bool debug) {
-	if (idx >= (int)lib.macros.size()) {
-		lib.macros.resize(idx+1, Layout(*lib.tech));
-	}
-	lib.macros[idx].name = lst.subckts[idx].name;
-	string cellPath = path + "/" + lib.macros[idx].name+".gds";
+bool import_cell(std::string path, weaver::Term &term, bool progress, bool debug) {
+	string cellPath = path + "/" + term.decl.name+".gds";
 	if (progress) {
-		printf("  %s...", lib.macros[idx].name.c_str());
+		printf("  %s...", term.decl.name.c_str());
 		fflush(stdout);
 		printf("[");
 	}
@@ -48,24 +61,46 @@ bool import_cell(std::string path, phy::Library &lib, sch::Netlist &lst, int idx
 	float searchDelay = 0.0;
 	float genDelay = 0.0;
 
-	sch::Subckt spiNet = lst.subckts[idx];
+	int spiIdx = -1;
+	int phyIdx = -1;
+
+	for (int i = (int)term.variants.size()-1; i >= 0; i--) {
+		if (spiIdx < 0 and term.variants[i].meta.dialect == "spice") {
+			spiIdx = i;
+		} else if (phyIdx < 0 and term.variants[i].meta.dialect == "layout") {
+			phyIdx = i;
+		}
+	}
+
+	if (spiIdx < 0) {
+		// TODO(edward.bingham) should we try to load the spi in the cell library then?
+		return false;
+	}
+
+	if (phyIdx >= 0) {
+		// TODO(edward.bingham) check for updates?
+		return true;
+	}
+
+	sch::Subckt spiNet = term.variants[spiIdx].as<sch::Subckt>();
 	spiNet.cleanDangling(true);
 	spiNet.combineDevices();
 	spiNet.canonicalize();
 
 	if (filesystem::exists(cellPath)) {
-		bool imported = import_layout(lib.macros[idx], cellPath, lib.macros[idx].name);
+		phy::Layout macro;
+		bool imported = import_layout(macro, cellPath, spiNet.name);
 		if (progress) {
 			if (imported) {
-				lib.macros[idx].trace();
+				macro.trace();
 				sch::Subckt gdsNet(true);
-				extract(gdsNet, lib.macros[idx], true);
+				extract(gdsNet, macro, true);
 				gdsNet.cleanDangling(true);
 				gdsNet.combineDevices();
 				gdsNet.canonicalize();
 				searchDelay = tmr.since();
 				if (gdsNet.compare(spiNet) == 0) {
-					printf("%sFOUND %d DBUNIT2 AREA%s]\t%gs\n", KGRN, lib.macros[idx].box.area(), KNRM, searchDelay);
+					printf("%sFOUND %d DBUNIT2 AREA%s]\t%gs\n", KGRN, macro.box.area(), KNRM, searchDelay);
 				} else {
 					printf("%sFAILED LVS%s, ", KRED, KNRM);
 					imported = false;
@@ -76,15 +111,16 @@ bool import_cell(std::string path, phy::Library &lib, sch::Netlist &lst, int idx
 			}
 		}
 		if (imported) {
+			phyIdx = term.createVariant(weaver::Variant("layout", macro));
 			return true;
 		} else {
-			lib.macros[idx].clear();
+			macro.clear();
 		}
 	}
 
 	tmr.reset();
 
-	int result = sch::buildCell(lib, lst, idx);
+	int result = sch::buildCell(macro, spiNet);
 	if (progress) {
 		if (result == 1) {
 			genDelay = tmr.since();
@@ -94,14 +130,15 @@ bool import_cell(std::string path, phy::Library &lib, sch::Netlist &lst, int idx
 			printf("%sFAILED ROUTING%s]\t(%gs %gs)\n", KRED, KNRM, searchDelay, genDelay);
 		} else {
 			sch::Subckt gdsNet(true);
-			extract(gdsNet, lib.macros[idx], true);
+			extract(gdsNet, macro, true);
 			gdsNet.cleanDangling(true);
 			gdsNet.combineDevices();
 			gdsNet.canonicalize();
 
 			genDelay = tmr.since();
 			if (gdsNet.compare(spiNet) == 0) {
-				printf("%sGENERATED %d DBUNIT2 AREA%s]\t(%gs %gs)\n", KGRN, lib.macros[idx].box.area(), KNRM, searchDelay, genDelay);
+				printf("%sGENERATED %d DBUNIT2 AREA%s]\t(%gs %gs)\n", KGRN, macro.box.area(), KNRM, searchDelay, genDelay);
+				phyIdx = term.createVariant(weaver::Variant("layout", macro));
 			} else {
 				printf("%sFAILED LVS%s]\t(%gs %gs)\n", KRED, KNRM, searchDelay, genDelay);
 				if (debug) {
@@ -114,14 +151,13 @@ bool import_cell(std::string path, phy::Library &lib, sch::Netlist &lst, int idx
 	return false;
 }
 
-void update_library(std::string path, phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream, map<int, gdstk::Cell*> *cells, bool progress, bool debug) {
+void update_library(std::string path, weaver::Program &prgm, gdstk::GdsWriter *stream, map<int, gdstk::Cell*> *cells, bool progress, bool debug) {
 	bool libFound = filesystem::exists(path);
 	if (progress) {
 		printf("Load cell layouts:\n");
 	}
 
 	Timer tmr;
-	lib.macros.reserve(lst.subckts.size()+lib.macros.size());
 	for (int i = 0; i < (int)lst.subckts.size(); i++) {
 		if (lst.subckts[i].isCell) {
 			if (not import_cell(path, lib, lst, i, progress, debug)) {
