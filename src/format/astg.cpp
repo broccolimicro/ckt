@@ -33,7 +33,7 @@ void loadAstg(weaver::Project &proj, weaver::Program &prgm, const weaver::Source
 	g.name = name;
 	g = chp::import_chp(*(parse_astg::graph*)source.syntax.get(), source.tokens.get());
 
-	weaver::Prototype proto = prgm.parseMangledName(name);
+	weaver::Prototype proto = weaver::Prototype::fromMangled(name);
 
 	weaver::TermId id;
 	id.mod   = prgm.getModule(source.modName);
@@ -50,7 +50,7 @@ void loadAstgw(weaver::Project &proj, weaver::Program &prgm, const weaver::Sourc
 	g.post_process(true, false, false, false);
 	g.check_variables();
 
-	weaver::Prototype proto = prgm.parseMangledName(name);
+	weaver::Prototype proto = weaver::Prototype::fromMangled(name);
 
 	weaver::TermId id;
 	id.mod   = prgm.getModule(source.modName);

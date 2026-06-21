@@ -31,7 +31,7 @@ void loadGc(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &
 	rules.name = name;
 	gc::import_rule_set(*(parse_gc::rule_set*)source.syntax.get(), rules, 0, source.tokens.get(), true);
 
-	weaver::Prototype proto = prgm.parseMangledName(name);
+	weaver::Prototype proto = weaver::Prototype::fromMangled(name);
 
 	weaver::TermId id;
 	id.mod   = prgm.getModule(source.modName);

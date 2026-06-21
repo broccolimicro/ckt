@@ -25,7 +25,7 @@ void loadGds(weaver::Project &proj, weaver::Program &prgm, const weaver::Source 
 	import_library(lib, *tech, source.path.string());
 
 	for (auto macro = lib.begin(); macro != lib.end(); macro++) {
-		weaver::Prototype proto = prgm.parseMangledName(macro->name);
+		weaver::Prototype proto = weaver::Prototype::fromMangled(macro->name);
 		proto.mod = source.modName;
 
 		weaver::TermId id = prgm.getTerm(proto);

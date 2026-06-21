@@ -35,7 +35,7 @@ void loadCog(weaver::Project &proj, weaver::Program &prgm, const weaver::Source 
 
 	g.post_process(true);
 
-	weaver::Prototype proto = prgm.parseMangledName(name);
+	weaver::Prototype proto = weaver::Prototype::fromMangled(name);
 
 	weaver::TermId id;
 	id.mod   = prgm.getModule(source.modName);
@@ -52,7 +52,7 @@ void loadCogw(weaver::Project &proj, weaver::Program &prgm, const weaver::Source
 	g.post_process(true);
 	g.check_variables();
 
-	weaver::Prototype proto = prgm.parseMangledName(name);
+	weaver::Prototype proto = weaver::Prototype::fromMangled(name);
 
 	weaver::TermId id;
 	id.mod   = prgm.getModule(source.modName);

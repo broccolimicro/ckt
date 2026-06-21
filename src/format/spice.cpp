@@ -41,7 +41,7 @@ void loadSpice(weaver::Project &proj, weaver::Program &prgm, const weaver::Sourc
 	sch::import_netlist(*tech, lst, *(parse_spice::netlist*)source.syntax.get(), source.tokens.get());
 
 	for (auto ckt = lst.begin(); ckt != lst.end(); ckt++) {
-		weaver::Prototype proto = prgm.parseMangledName(ckt->name);
+		weaver::Prototype proto = weaver::Prototype::fromMangled(ckt->name);
 		proto.mod = source.modName;
 
 		weaver::TermId id = prgm.getTerm(proto);

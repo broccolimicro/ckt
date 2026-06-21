@@ -59,7 +59,7 @@ bool mapCells(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 		weaver::TermId cellId;
 		while (true) {
 			cellId = prgm.getTerm(mod, decl);
-			cell.name = prgm.mangleName(cellId);
+			cell.name = prgm.getPrototype(cellId).mangle();
 			if (prgm.termAt(cellId).variants.empty()) {
 				cellId.var = prgm.termAt(cellId).createVariant(weaver::Variant("spice", cell));
 				prgm.varAt(cellId).meta.set("spi.cell");
