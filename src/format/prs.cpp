@@ -30,9 +30,11 @@ void loadPrs(weaver::Project &proj, weaver::Program &prgm, const weaver::Source 
 	pr.name = name;
 	prs::import_production_rule_set(*(parse_prs::production_rule_set*)source.syntax.get(), pr, -1, -1, prs::attributes(), 0, source.tokens.get(), true);
 
+	weaver::Prototype proto = prgm.parseMangledName(name);
+
 	weaver::TermId id;
 	id.mod   = prgm.getModule(source.modName);
-	id.index = prgm.modAt(id).createTerm(weaver::Term(name, vector<weaver::Instance>()));
+	id.index = prgm.modAt(id).createTerm(weaver::Term(proto.name, vector<weaver::Instance>()));
 	id.var   = prgm.termAt(id).createVariant(weaver::Variant("circ", pr));
 }
 

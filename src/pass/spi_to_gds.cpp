@@ -1,6 +1,7 @@
 #include "spi_to_gds.h"
 
 #include "../back/asic.h"
+#include "../format/cell.h"
 
 #include <sch/Subckt.h>
 #include <sch/Tapeout.h>
@@ -24,7 +25,7 @@ bool mapCells(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 		or prgm.varAt(id).meta.dialect != "spice") {
 		return false;
 	}
-	if (prgm.varAt(id).meta.has("spi.cells")) {
+	if (prgm.varAt(id).meta.has("spi.mapped") or prgm.varAt(id).meta.has("spi.cell")) {
 		return true;
 	}
 	phy::Tech *tech = loadASIC(builder.proj);
@@ -39,7 +40,7 @@ bool mapCells(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 
 	vector<sch::Subckt> cells = sch::mapCells(*tech, ckt, builder.progress);
 	id.var = prgm.termAt(id).createVariant(weaver::Variant("spice", ckt, id.var));
-	prgm.varAt(id).meta.set("spi.cells");
+	prgm.varAt(id).meta.set("spi.mapped");
 	builder.todo.push_back(id);
 
 	// Load the cells into weaver as terms
@@ -58,9 +59,10 @@ bool mapCells(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 		weaver::TermId cellId;
 		while (true) {
 			cellId = prgm.getTerm(mod, decl);
+			cell.name = prgm.mangleName(cellId);
 			if (prgm.termAt(cellId).variants.empty()) {
-				cell.name = decl.name;
 				cellId.var = prgm.termAt(cellId).createVariant(weaver::Variant("spice", cell));
+				prgm.varAt(cellId).meta.set("spi.cell");
 				builder.todo.push_back(cellId);
 				break;
 			}
@@ -75,16 +77,49 @@ bool mapCells(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 			decl.name = baseName + "_" + ::to_string(++step);
 		}
 
-		prgm.varAt(id).as<sch::Subckt>().renameType(originalName, decl.name);
+		prgm.varAt(id).as<sch::Subckt>().renameType(originalName, cell.name);
 	}
 	return true;
 }
 
-/*void buildCell(Build &builder, weaver::Program &prgm, weaver::TermId id) {
-	
+bool buildCell(Build &builder, weaver::Program &prgm, weaver::TermId id) {
+	if (not id.hasVar()
+		or prgm.varAt(id).meta.dialect != "spice") {
+		printf("not spice\n");
+		return false;
+	}
+	if (prgm.varAt(id).meta.has("spi.mapped")) {
+		return true;
+	}
+	if (not prgm.varAt(id).meta.has("spi.cell")) {
+		printf("no spi.cell\n");
+		return false;
+	}
+	phy::Tech *tech = loadASIC(builder.proj);
+	if (not tech) {
+		printf("tech failed to load\n");
+		return false;
+	}
+
+	array<int, 2> vars{-1, -1};
+	if (not cell::import_cell(builder.proj.tech.lib, *tech, prgm.termAt(id), &vars, builder.progress, builder.debug)) {
+		// We generated a new cell, save this to the cell library
+		if (not filesystem::exists(builder.proj.tech.lib)) {
+			filesystem::create_directory(builder.proj.tech.lib);
+		}
+		cell::export_cell(builder.proj.tech.lib, *tech, prgm.termAt(id));
+	}
+
+	if (vars[1] >= 0) {
+		id.var = vars[1];
+		builder.todo.push_back(id);
+		return true;
+	}
+	printf("layout not defined after import\n");
+	return false;
 }
 
-void doPlacement(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=nullptr, map<int, gdstk::Cell*> *cells=nullptr, bool progress=false, bool debug=false) {
+/*void doPlacement(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=nullptr, map<int, gdstk::Cell*> *cells=nullptr, bool progress=false, bool debug=false) {
 	if (progress) {
 		printf("Placing Cells:\n");
 	}

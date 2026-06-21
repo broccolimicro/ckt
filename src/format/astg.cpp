@@ -33,9 +33,11 @@ void loadAstg(weaver::Project &proj, weaver::Program &prgm, const weaver::Source
 	g.name = name;
 	g = chp::import_chp(*(parse_astg::graph*)source.syntax.get(), source.tokens.get());
 
+	weaver::Prototype proto = prgm.parseMangledName(name);
+
 	weaver::TermId id;
 	id.mod   = prgm.getModule(source.modName);
-	id.index = prgm.modAt(id).createTerm(weaver::Term(name, vector<weaver::Instance>()));
+	id.index = prgm.modAt(id).createTerm(weaver::Term(proto.name, vector<weaver::Instance>()));
 	id.var   = prgm.termAt(id).createVariant(weaver::Variant("func", g));
 }
 
@@ -48,9 +50,11 @@ void loadAstgw(weaver::Project &proj, weaver::Program &prgm, const weaver::Sourc
 	g.post_process(true, false, false, false);
 	g.check_variables();
 
+	weaver::Prototype proto = prgm.parseMangledName(name);
+
 	weaver::TermId id;
 	id.mod   = prgm.getModule(source.modName);
-	id.index = prgm.modAt(id).createTerm(weaver::Term(name, vector<weaver::Instance>()));
+	id.index = prgm.modAt(id).createTerm(weaver::Term(proto.name, vector<weaver::Instance>()));
 	id.var   = prgm.termAt(id).createVariant(weaver::Variant("proto", g));
 }
 

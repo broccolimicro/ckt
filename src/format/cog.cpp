@@ -35,9 +35,11 @@ void loadCog(weaver::Project &proj, weaver::Program &prgm, const weaver::Source 
 
 	g.post_process(true);
 
+	weaver::Prototype proto = prgm.parseMangledName(name);
+
 	weaver::TermId id;
 	id.mod   = prgm.getModule(source.modName);
-	id.index = prgm.modAt(id).createTerm(weaver::Term(name, vector<weaver::Instance>()));
+	id.index = prgm.modAt(id).createTerm(weaver::Term(proto.name, vector<weaver::Instance>()));
 	id.var   = prgm.termAt(id).createVariant(weaver::Variant("func", g));
 }
 
@@ -50,9 +52,11 @@ void loadCogw(weaver::Project &proj, weaver::Program &prgm, const weaver::Source
 	g.post_process(true);
 	g.check_variables();
 
+	weaver::Prototype proto = prgm.parseMangledName(name);
+
 	weaver::TermId id;
 	id.mod   = prgm.getModule(source.modName);
-	id.index = prgm.modAt(id).createTerm(weaver::Term(name, vector<weaver::Instance>()));
+	id.index = prgm.modAt(id).createTerm(weaver::Term(proto.name, vector<weaver::Instance>()));
 	id.var   = prgm.termAt(id).createVariant(weaver::Variant("proto", g));
 }
 

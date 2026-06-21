@@ -41,7 +41,7 @@ void loadSpice(weaver::Project &proj, weaver::Program &prgm, const weaver::Sourc
 	sch::import_netlist(*tech, lst, *(parse_spice::netlist*)source.syntax.get(), source.tokens.get());
 
 	for (auto ckt = lst.begin(); ckt != lst.end(); ckt++) {
-		weaver::Prototype proto(ckt->name);
+		weaver::Prototype proto = prgm.parseMangledName(ckt->name);
 		proto.mod = source.modName;
 
 		weaver::TermId id = prgm.getTerm(proto);
@@ -81,21 +81,20 @@ void writeSpice(fs::path path, weaver::Project &proj, const weaver::Filetype &la
 	// the whole file over again. However, on each compile, we do want to
 	// obliterate old build files.
 	string pathstr = path.string();
-	ofstream fout;
-	if (prev.find(pathstr) != prev.end() and fs::exists(path)) {
-		fout = ofstream(pathstr.c_str(), ios::out | ios::ate);
+	FILE *fptr = nullptr;
+	if (prev.insert(pathstr).second and fs::exists(path)) {
+		fptr = fopen(pathstr.c_str(), "w");
 	} else {
-		fout = ofstream(pathstr.c_str(), ios::out);
-		prev.insert(pathstr);
+		fptr = fopen(pathstr.c_str(), "a");
 	}
 
-	if (not fout.is_open()) {
+	if (fptr == nullptr) {
 		error("", "unable to write to file '" + pathstr + "'", __FILE__, __LINE__);
 		return;
 	}
 
 	const sch::Subckt &ckt = prgm.mods[modIdx].terms[termIdx].variants[varIdx].as<sch::Subckt>();
 	string buffer = sch::export_subckt(*tech, ckt).to_string();
-	fout.write(buffer.c_str(), buffer.size());
-	fout.close();
+	fwrite(buffer.c_str(), sizeof(char), buffer.size(), fptr);
+	fclose(fptr);
 }

@@ -3,33 +3,8 @@
 #include <common/standard.h>
 #include <common/timer.h>
 #include <common/text.h>
-#include <parse/parse.h>
-#include <parse/default/block_comment.h>
-#include <parse/default/line_comment.h>
-#include <parse/default/new_line.h>
 
-#include <parse_ucs/source.h>
-#include <parse_astg/factory.h>
-#include <parse_cog/factory.h>
-#include <parse_chp/factory.h>
-#include <parse_prs/factory.h>
-#include <parse_spice/factory.h>
-
-#include <weaver/project.h>
-
-#include "weaver/unpacker.h"
-
-#include "format/mod.h"
-#include "format/cog.h"
-#include "format/spice.h"
-#include "format/gds.h"
-#include "format/verilog.h"
-#include "format/prs.h"
-#include "format/wv.h"
-#include "format/astg.h"
-#include "format/gc.h"
-
-#include <interpret_wv/import.h>
+#include "format.h"
 
 void mod_help() {
 	printf("Usage: lm mod <command> [arguments]\n");
@@ -46,30 +21,12 @@ int mod_command(int argc, char **argv) {
 		return 0;
 	}
 
-	parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
-	parse_ucs::function::registry.insert({"proto", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
-	parse_ucs::function::registry.insert({"circ", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
-
-	weaver::Language lang;
-	lang.dialects.insert({"func", factoryCog});
-	lang.dialects.insert({"struct", factoryGc});
-	lang.dialects.insert({"proto", factoryCogw});
-	lang.dialects.insert({"circ", factoryPrs});
-
 	weaver::Project proj;
 	if (proj.hasMod()) {
 		readMod(proj);
 	}
 
-	proj.pushFiletype("", "wv", "", readWv, loadWv, nullptr, lang);
-	proj.pushFiletype("func", "cog", "", readCog, loadCog);
-	proj.pushFiletype("proto", "cogw", "", readCog, loadCogw);
-	proj.pushFiletype("circ", "prs", "ckt", readPrs, loadPrs, writePrs);
-	proj.pushFiletype("spice", "spi", "spi", readSpice, loadSpice, writeSpice);
-	proj.pushFiletype("verilog", "v", "rtl", nullptr, nullptr, writeVerilog);
-	proj.pushFiletype("layout", "gds", "gds", nullptr, loadGds, writeGds);
-	proj.pushFiletype("func", "astg", "state", readAstg, loadAstg, writeAstg);
-	proj.pushFiletype("proto", "astgw", "state", readAstg, loadAstgw, writeAstgw);
+	loadAllFormats(proj);
 
 	vector<weaver::Prototype> protos;
 	bool show = false;

@@ -172,8 +172,14 @@ void Build::build(weaver::Program &prgm) {
 				printf("error: unable to generate netlist\n");
 			}
 		} else if (dialect == "spice") {
-			if (not noCells and not mapCells(*this, prgm, id)) {
-				printf("err: unable to break subckt into cells\n");
+			if (not noCells) {
+				if (not mapCells(*this, prgm, id)) {
+					printf("err: unable to break subckt into cells\n");
+				}
+
+				if (not buildCell(*this, prgm, id)) {
+					printf("err: unable to load cell layout\n");
+				}
 			}
 		}
 	}

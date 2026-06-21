@@ -25,7 +25,7 @@ void loadGds(weaver::Project &proj, weaver::Program &prgm, const weaver::Source 
 	import_library(lib, *tech, source.path.string());
 
 	for (auto macro = lib.begin(); macro != lib.end(); macro++) {
-		weaver::Prototype proto(macro->name);
+		weaver::Prototype proto = prgm.parseMangledName(macro->name);
 		proto.mod = source.modName;
 
 		weaver::TermId id = prgm.getTerm(proto);
@@ -47,26 +47,28 @@ void loadGds(weaver::Project &proj, weaver::Program &prgm, const weaver::Source 
 }
 
 void writeGds(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, int modIdx, int termIdx, int varIdx) {
-	static std::set<std::string> prev;
+	static std::map<std::string, gdstk::GdsWriter> prev;
 
 	phy::Tech *tech = loadASIC(proj);
 	if (not tech) {
 		return;
 	}
+	
+	const phy::Layout &macro = prgm.mods[modIdx].terms[termIdx].variants[varIdx].as<phy::Layout>();
 
 	// If we keep updating a single file, then we don't want to have to read
 	// the whole file over again. However, on each compile, we do want to
 	// obliterate old build files.
 	// max_points = 0 -> don't fracture polygons as we write them to the file
-	gdstk::GdsWriter writer{nullptr, 0.0, 0.0, 0};
 	string pathstr = path.string();
-	if (prev.find(pathstr) != prev.end() and fs::exists(path)) {
-		writer = gdstk::GdsWriter{fopen(pathstr.c_str(), "ab"), ((double)tech->dbunit)*1e-6, ((double)tech->dbunit)*1e-6, 0};
+	auto pos = prev.insert({pathstr, gdstk::GdsWriter{nullptr, 0.0, 0.0, 0}});
+	auto &writer = pos.first->second;
+	if (not pos.second and fs::exists(path)) {
+		writer.out = fopen(pathstr.c_str(), "r+b");
+		fseek(writer.out, -2*sizeof(uint16_t), SEEK_END);
 	} else {
 		std::string name = path.stem();
 		writer = gdstk::gdswriter_init(pathstr.c_str(), name.c_str(), ((double)tech->dbunit)*1e-6, ((double)tech->dbunit)*1e-6, 0, nullptr, nullptr);
-		fseek(writer.out, -2*sizeof(uint16_t), SEEK_END);
-		prev.insert(pathstr);
 	}
 
 	if (writer.out == nullptr) {
@@ -75,8 +77,6 @@ void writeGds(fs::path path, weaver::Project &proj, const weaver::Filetype &lang
 		error("", "unable to update gds file", __FILE__, __LINE__);
 	}
 
-	const phy::Layout &macro = prgm.mods[modIdx].terms[termIdx].variants[varIdx].as<phy::Layout>();
-
-	writer.write_cell(*export_layout(macro));
+	export_layout(writer, macro);
 	writer.close();
 }
