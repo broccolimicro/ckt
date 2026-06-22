@@ -168,11 +168,14 @@ int show_command(int argc, char **argv) {
 
 	proj.load(prgm);
 
-	fs::create_directories(proj.rootDir / proj.BUILD / "dbg");
 	if (protos.empty()) {
+		fs::path debugDir = proj.rootDir / proj.BUILD / "dbg";
 		for (auto i = prgm.mods.begin(); i != prgm.mods.end(); i++) {
 			for (auto j = i->terms.begin(); j != i->terms.end(); j++) {
-				show(opts, *j, proj.buildPath("dbg", j->decl.name+".png").string());
+				fs::path emitDir = debugDir / proj.rootpathFromModule(i->name);
+				std::filesystem::create_directories(emitDir.string());
+				std::string filename = prgm.getPrototype(j->decl, i->name).mangle(false) + ".png";
+				show(opts, *j, (emitDir / filename).string());
 			}
 		}
 	} else {
