@@ -81,6 +81,7 @@ bool prsToSpi(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 	prs::production_rule_set &pr = prgm.varAt(id).as<prs::production_rule_set>();
 
 	sch::Subckt ckt = prs::build_netlist(*tech, pr, builder.progress);
+	ckt.comment = "wv: proto=\"" + prgm.getPrototype(id).to_string() + "\"";
 	if (builder.debug) {
 		ckt.print();
 	}

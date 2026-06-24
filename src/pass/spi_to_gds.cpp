@@ -89,7 +89,7 @@ struct SchLinker : sch::Linker {
 	SchLinker(const weaver::Program &prgm) : prgm(prgm) {}
 	~SchLinker() {}
 
-	sch::Implementation find(std::string type) override {
+	sch::Implementation find(const sch::Instance &inst) override {
 		sch::Implementation result;
 
 	}

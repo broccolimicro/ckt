@@ -104,17 +104,7 @@ void writeSpice(fs::path path, weaver::Project &proj, const weaver::Filetype &la
 	}
 
 	const sch::Subckt &ckt = prgm.mods[modIdx].terms[termIdx].variants[varIdx].as<sch::Subckt>();
-	parse_spice::subckt ast = sch::export_subckt(*tech, ckt);
-	ast.caption.push_back("PORTS:");
-	for (auto &inst : prgm.mods[modIdx].terms[termIdx].decl.args) {
-		ast.caption.push_back(inst.name + " " + prgm.getTypename(inst).to_string());
-	}
-
-	cout << ast.to_string() << endl;
-
-	ast.caption.push_back(prgm.getPrototype({modIdx, termIdx}).to_string());
-
-	string buffer = ast.to_string();
+	string buffer = sch::export_subckt(*tech, ckt).to_string();
 	fwrite(buffer.c_str(), sizeof(char), buffer.size(), fptr);
 	fclose(fptr);
 }
