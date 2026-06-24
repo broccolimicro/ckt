@@ -5,6 +5,7 @@
 
 #include <sch/Subckt.h>
 #include <sch/Tapeout.h>
+#include <sch/Placer.h>
 
 weaver::Decl declFromSubckt(const weaver::Program &prgm, const sch::Subckt &ckt) {
 	weaver::TypeId wireType(prgm.global, prgm.mods[prgm.global].findType("wire"));
@@ -82,17 +83,22 @@ bool mapCells(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 	return true;
 }
 
-bool buildCell(Build &builder, weaver::Program &prgm, weaver::TermId id) {
+struct SchLinker : sch::Linker {
+	const weaver::Program &prgm;
+
+	SchLinker(const weaver::Program &prgm) : prgm(prgm) {}
+	~SchLinker() {}
+
+	sch::Implementation find(std::string type) override {
+		sch::Implementation result;
+
+	}
+};
+
+bool spiToGds(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 	if (not id.hasVar()
 		or prgm.varAt(id).meta.dialect != "spice") {
 		printf("not spice\n");
-		return false;
-	}
-	if (prgm.varAt(id).meta.has("spi.mapped")) {
-		return true;
-	}
-	if (not prgm.varAt(id).meta.has("spi.cell")) {
-		printf("no spi.cell\n");
 		return false;
 	}
 	phy::Tech *tech = loadASIC(builder.proj);
@@ -101,21 +107,43 @@ bool buildCell(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 		return false;
 	}
 
-	array<int, 2> vars{-1, -1};
-	if (not cell::import_cell(builder.proj.tech.lib, *tech, prgm.termAt(id), &vars, builder.progress, builder.debug)) {
-		// We generated a new cell, save this to the cell library
-		if (not filesystem::exists(builder.proj.tech.lib)) {
-			filesystem::create_directory(builder.proj.tech.lib);
-		}
-		cell::export_cell(builder.proj.tech.lib, *tech, prgm.termAt(id));
+	sch::Subckt ckt = prgm.varAt(id).as<sch::Subckt>();
+	if (not ckt.mos.empty() and not ckt.inst.empty()) {
+		error("", "no support for mixed macro/micro layout", __FILE__, __LINE__);
+		return false;
 	}
 
-	if (vars[1] >= 0) {
+	if (ckt.inst.empty()) {
+		array<int, 2> vars{-1, -1};
+		if (not cell::import_cell(builder.proj.tech.lib, *tech, prgm.termAt(id), &vars, builder.progress, builder.debug)) {
+			// We generated a new cell, save this to the cell library
+			if (not filesystem::exists(builder.proj.tech.lib)) {
+				filesystem::create_directory(builder.proj.tech.lib);
+			}
+			cell::export_cell(builder.proj.tech.lib, *tech, prgm.termAt(id));
+		}
+
+		if (vars[1] < 0) {
+			return false;
+		}
+
 		id.var = vars[1];
 		builder.todo.push_back(id);
 		return true;
+	} else if (ckt.mos.empty()) {
+		/*weaver::TermId placedId = id;
+		placedId.var = prgm.termAt(id).createVariant(weaver::Variant("layout", phy::Layout(*tech), id.var));
+
+		phy::Layout &macro = prgm.varAt(placedId).as<phy::Layout>();
+
+		SchLinker linker(prgm);
+		sch::Placer placer(&linker, 0, 0, builder.progress, builder.debug);
+		placer.load(sch::Implementation(&ckt, &macro));
+		sch::Placement prob(placer, 0);
+		prob.solve();
+		prob.save(macro);*/
+		return true;
 	}
-	printf("layout not defined after import\n");
 	return false;
 }
 
@@ -159,92 +187,5 @@ bool buildCell(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 	if (progress) {
 		printf("done\t%gs\n\n", total.since());
 	}
-}
-
-bool spiToGds(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
-	if (not id.hasVar() or
-		or prgm.varAt(id).meta.dialect() != "spice") {
-		return false;
-	}
-	if (prgm.varAt(id).meta.has("spi.cells")) {
-		return true;
-	}
-	phy::Tech *tech = loadASIC(builder);
-	if (not tech) {
-		return false;
-	}
-
-	phy::Library lib(proj.tech);
-	map<int, gdstk::Cell*> cells;
-	if (builder.get(Build::CELLS)) {
-		cell::update_library(lib, net, nullptr, &cells, progress, debug);
-	}
-
-	if (get(Build::PLACE)) {
-		doPlacement(lib, net, nullptr, &cells, progress, debug);
-	}
-}
-
-bool Build::spiToGds(weaver::Program &prgm, int modIdx, int termIdx, vector<weaver::TermId> *result) {
-	std::filesystem::path debugDirPath = proj.rootDir / proj.BUILD / "dbg";
-	string debugDir = debugDirPath.string();
-
-	// Verify expected format of the term
-	if (term.dialect().name != "spice") {
-		fprintf(stderr, "error: dialect '%s' not supported for translation from spice to gds.\n",
-			term.dialect().name.c_str());
-		return false;
-	}
-
-	// Create dialect and module
-	int gdsKind = weaver::Term::getDialect("layout");
-	int gdsIdx = prgm.getModule(prgm.mods[modIdx].name + ">>layout");
-
-	const weaver::Decl &decl = term.decl;
-	if (decl.ret.defined() or decl.recv.defined()) {
-		fprintf(stderr, "error: spice must be a full process for synthesis\n");
-		return false;
-	}
-
-	// Create the new term in the module
-	string name = decl.name;
-	vector<weaver::Instance> args = decl.args;
-
-	sch::Netlist &net = term.as<sch::Netlist>();
-
-	if (noCells) {
-		for (int i = 0; i < (int)net.subckts.size(); i++) {
-			net.subckts[i].isCell = true;
-		}
-	}
-
-	if (not proj.tech.isLoaded() and not phy::loadTech(proj.tech)) {
-		cout << "Unable to load techfile \'" + proj.tech.path + "\'." << endl;
-		return false;
-	}
-
-	Timer cellsTmr;
-	if (get(Build::MAP)) {
-		if (progress) printf("Break subckts into cells:\n");
-		net.mapCells(proj.tech, progress);
-		if (progress) printf("done\t%gs\n\n", cellsTmr.since());
-	}
-
-	phy::Library lib(proj.tech);
-	map<int, gdstk::Cell*> cells;
-	if (get(Build::CELLS)) {
-		cell::update_library(lib, net, nullptr, &cells, progress, debug);
-	}
-
-	if (get(Build::PLACE)) {
-		doPlacement(lib, net, nullptr, &cells, progress, debug);
-	}
-
-	int dstIdx = prgm.mods[gdsIdx].createTerm(weaver::Term::procOf(gdsKind, name, args));
-	if (result != nullptr) {
-		result->push_back(weaver::TermId(gdsIdx, dstIdx));
-	}
-	prgm.mods[gdsIdx].terms[dstIdx].def = lib;
-	return true;
 }*/
 

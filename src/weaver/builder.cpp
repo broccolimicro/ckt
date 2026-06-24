@@ -135,11 +135,11 @@ void Build::build(weaver::Program &prgm) {
 			if (not chpToFlow(*this, prgm, id)) {
 				printf("error: unable to bind flat chp to flow\n");
 			}
-		} else if (dialect == "flow" and timing == TIMING_CLOCKED) {
+		} else if (dialect == "flow" and (timing == TIMING_CLOCKED or timing == TIMING_MIXED)) {
 			if (not flowToVerilog(*this, prgm, id)) {
 				printf("error: unable to synthesize clocked module\n");
 			}
-		} else if (dialect == "proto" and timing == TIMING_QDI) {
+		} else if (dialect == "proto" and (timing == TIMING_QDI or timing == TIMING_MIXED)) {
 			do {
 				if (not elaborate(*this, prgm, id)) {
 					printf("error: unable to elaborate stated space\n");
@@ -172,14 +172,12 @@ void Build::build(weaver::Program &prgm) {
 				printf("error: unable to generate netlist\n");
 			}
 		} else if (dialect == "spice") {
-			if (not noCells) {
-				if (not mapCells(*this, prgm, id)) {
-					printf("err: unable to break subckt into cells\n");
-				}
+			if (not noCells and not mapCells(*this, prgm, id)) {
+				printf("err: unable to break subckt into cells\n");
+			}
 
-				if (not buildCell(*this, prgm, id)) {
-					printf("err: unable to load cell layout\n");
-				}
+			if (not spiToGds(*this, prgm, id)) {
+				printf("err: unable to build layout\n");
 			}
 		}
 	}

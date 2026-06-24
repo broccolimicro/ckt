@@ -37,17 +37,27 @@ void loadSpice(weaver::Project &proj, weaver::Program &prgm, const weaver::Sourc
 		return;
 	}
 
+	weaver::TypeId wireType(prgm.global, prgm.mods[prgm.global].findType("wire"));
+
 	std::vector<sch::Subckt> lst;
 	sch::import_netlist(*tech, lst, *(parse_spice::netlist*)source.syntax.get(), source.tokens.get());
 
-	for (auto ckt = lst.begin(); ckt != lst.end(); ckt++) {
-		weaver::Prototype proto = weaver::Prototype::fromMangled(ckt->name);
+	for (auto &ckt : lst) {
+		weaver::Prototype proto = weaver::Prototype::fromMangled(ckt.name);
 		proto.mod = source.modName;
 
-		weaver::TermId id = prgm.getTerm(proto);
+		int mod = prgm.getModule(proto.mod);
+		weaver::Decl decl = prgm.findDecl(proto, mod);
+		// TODO(edward.bingham) read the port spec in the subckt
+		// caption for the type information
+		for (int j : ckt.ports) {
+			decl.args.push_back(weaver::Instance(wireType, ckt.nets[j].name));
+		}
+
+		weaver::TermId id = prgm.getTerm(mod, decl);
 		if (prgm.termValid(id)) {
 			auto &term = prgm.termAt(id);
-			id.var   = term.createVariant(weaver::Variant("spice", *ckt));
+			id.var   = term.createVariant(weaver::Variant("spice", ckt));
 			// Look for the parent
 			for (int i = id.var-1; i >= 0; i--) {
 				if (term.variants[i].meta.dialect == "prs") {
@@ -94,7 +104,17 @@ void writeSpice(fs::path path, weaver::Project &proj, const weaver::Filetype &la
 	}
 
 	const sch::Subckt &ckt = prgm.mods[modIdx].terms[termIdx].variants[varIdx].as<sch::Subckt>();
-	string buffer = sch::export_subckt(*tech, ckt).to_string();
+	parse_spice::subckt ast = sch::export_subckt(*tech, ckt);
+	ast.caption.push_back("PORTS:");
+	for (auto &inst : prgm.mods[modIdx].terms[termIdx].decl.args) {
+		ast.caption.push_back(inst.name + " " + prgm.getTypename(inst).to_string());
+	}
+
+	cout << ast.to_string() << endl;
+
+	ast.caption.push_back(prgm.getPrototype({modIdx, termIdx}).to_string());
+
+	string buffer = ast.to_string();
 	fwrite(buffer.c_str(), sizeof(char), buffer.size(), fptr);
 	fclose(fptr);
 }
