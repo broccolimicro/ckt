@@ -7,6 +7,8 @@
 #include <sch/Tapeout.h>
 #include <sch/Placer.h>
 
+#include <interpret_wv/export.h>
+
 weaver::Decl declFromSubckt(const weaver::Program &prgm, const sch::Subckt &ckt) {
 	weaver::TypeId wireType(prgm.global, prgm.mods[prgm.global].findType("wire"));
 
@@ -54,6 +56,7 @@ bool mapCells(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 		weaver::Decl decl = declFromSubckt(prgm, cell);
 		decl.name = baseName;
 		int mod = prgm.getModule(builder.proj.tech.name);
+		cell.comment = "wv.decl=\"" + weaver::export_decl(prgm, decl).to_string() + "\"";
 
 		// Create the term and schedule it for compilation
 		int step = 0;
@@ -78,7 +81,13 @@ bool mapCells(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 			decl.name = baseName + "_" + ::to_string(++step);
 		}
 
-		prgm.varAt(id).as<sch::Subckt>().renameType(originalName, cell.name);
+		sch::Subckt &mapped = prgm.varAt(id).as<sch::Subckt>();
+		for (auto i = mapped.inst.begin(); i != mapped.inst.end(); i++) {
+			if (i->type == originalName) {
+				i->type = cell.name;
+				i->comment = "wv.proto=\"" + prgm.getPrototype(cellId).to_string() + "\"";
+			}
+		}
 	}
 	return true;
 }
