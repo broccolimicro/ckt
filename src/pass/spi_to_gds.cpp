@@ -2,26 +2,14 @@
 
 #include "../back/asic.h"
 #include "../format/cell.h"
+#include "../format/spice.h"
 
 #include <sch/Subckt.h>
 #include <sch/Tapeout.h>
 #include <sch/Placer.h>
 
 #include <interpret_wv/export.h>
-
-weaver::Decl declFromSubckt(const weaver::Program &prgm, const sch::Subckt &ckt) {
-	weaver::TypeId wireType(prgm.global, prgm.mods[prgm.global].findType("wire"));
-
-	weaver::Decl decl;
-	decl.name = ckt.name;
-
-	// All of the ports in a cell are wires
-	vector<weaver::Instance> args;
-	for (int j : ckt.ports) {
-		decl.args.push_back(weaver::Instance(wireType, ckt.nets[j].name));
-	}
-	return decl;
-}
+#include <common/timer.h>
 
 bool mapCells(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 	if (not id.hasVar() or not builder.get(Build::MAP)
@@ -53,9 +41,9 @@ bool mapCells(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 		std::string originalName = cell.name;
 		std::string baseName = "cell_" + encodeBase32(cell.id);
 
-		weaver::Decl decl = declFromSubckt(prgm, cell);
-		decl.name = baseName;
 		int mod = prgm.getModule(builder.proj.tech.name);
+		weaver::Decl decl = declFromSubckt(prgm, mod, cell);
+		decl.name = baseName;
 		cell.comment = "wv.decl=\"" + weaver::export_decl(prgm, decl).to_string() + "\"";
 
 		// Create the term and schedule it for compilation
@@ -93,14 +81,44 @@ bool mapCells(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 }
 
 struct SchLinker : sch::Linker {
-	const weaver::Program &prgm;
+	const phy::Tech &tech;
+	weaver::Program &prgm;
+	int mod;
 
-	SchLinker(const weaver::Program &prgm) : prgm(prgm) {}
+	SchLinker(const phy::Tech &tech, weaver::Program &prgm, int mod) : tech(tech), prgm(prgm) {
+		this->mod = mod;
+	}
 	~SchLinker() {}
 
 	sch::Implementation find(const sch::Instance &inst) override {
 		sch::Implementation result;
+		weaver::Prototype proto = protoFromInstance(prgm, mod, inst, false);
+		std::vector<weaver::TermId> terms = prgm.findTerms(proto);
+		if (terms.empty() or not prgm.termValid(terms[0])) {
+			error("", "unable to link '" + proto.to_string() + "'", __FILE__, __LINE__);
+			return result;
+		} else if (terms.size() > 1u) {
+			warning("", "ambiguous instance '" + proto.to_string() + "'", __FILE__, __LINE__);
+		}
 
+		weaver::Term &term = prgm.termAt(terms[0]);
+		proto = prgm.getPrototype(term.decl, prgm.mods[mod].name);
+
+		int i = term.rfindVariant("spice");
+		if (i >= 0 and i < (int)term.variants.size()) {
+			result.ckt = &term.variants[i].as<sch::Subckt>();
+		}
+
+		int j = term.rfindVariant("layout");
+		if (j < 0 or j >= (int)term.variants.size()) {
+			j = term.createVariant(weaver::Variant("layout", phy::Layout(tech, proto.mangle(true)), i));
+		}
+
+		result.macro = &term.variants[j].as<phy::Layout>();
+		if (result.ckt != nullptr and result.macro != nullptr) {
+			result.cktToMacro = result.ckt->mapToLayout(*result.macro);
+		}
+		return result;
 	}
 };
 
@@ -140,61 +158,28 @@ bool spiToGds(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 		builder.todo.push_back(id);
 		return true;
 	} else if (ckt.mos.empty()) {
-		/*weaver::TermId placedId = id;
-		placedId.var = prgm.termAt(id).createVariant(weaver::Variant("layout", phy::Layout(*tech), id.var));
+		if (builder.progress) {
+			printf("Placing %s...", ckt.name.c_str());
+			fflush(stdout);
+		}
+		Timer tmr;
+		weaver::Term &term = prgm.termAt(id);
+		weaver::Prototype proto = prgm.getPrototype(term.decl, prgm.mods[id.mod].name);
 
-		phy::Layout &macro = prgm.varAt(placedId).as<phy::Layout>();
+		id.var = term.createVariant(weaver::Variant("layout", phy::Layout(*tech, proto.mangle(true)), id.var));
+		phy::Layout &macro = term.variants[id.var].as<phy::Layout>();
 
-		SchLinker linker(prgm);
+		SchLinker linker(*tech, prgm, id.mod);
 		sch::Placer placer(&linker, 0, 0, builder.progress, builder.debug);
 		placer.load(sch::Implementation(&ckt, &macro));
 		sch::Placement prob(placer, 0);
 		prob.solve();
-		prob.save(macro);*/
+		prob.save(macro);
+		builder.todo.push_back(id);
+		if (builder.progress) {
+			printf("[%sDONE%s]\t%gs\n", KGRN, KNRM, tmr.since());
+		}
 		return true;
 	}
 	return false;
 }
-
-/*void doPlacement(phy::Library &lib, sch::Netlist &lst, gdstk::GdsWriter *stream=nullptr, map<int, gdstk::Cell*> *cells=nullptr, bool progress=false, bool debug=false) {
-	if (progress) {
-		printf("Placing Cells:\n");
-	}
-
-	if (lib.macros.size() < lst.subckts.size()) {
-		lib.macros.resize(lst.subckts.size(), Layout(*lib.tech));
-	}
-
-	sch::Placer placer(lib, lst, 0, 0, progress, debug);
-
-	Timer total;
-	for (int i = 0; i < (int)lst.subckts.size(); i++) {
-		if (not lst.subckts[i].isCell) {
-			if (progress) {
-				printf("  %s...", lst.subckts[i].name.c_str());
-				fflush(stdout);
-			}
-			Timer tmr;
-			lib.macros[i].name = lst.subckts[i].name;
-			placer.place(i);
-			if (progress) {
-				int area = 0;
-				for (auto j = lst.subckts[i].inst.begin(); j != lst.subckts[i].inst.end(); j++) {
-					if (lst.subckts[j->subckt].isCell) {
-						area += lib.macros[j->subckt].box.area();
-					}
-				}
-				printf("[%s%d DBUNIT2 AREA%s]\t%gs\n", KGRN, area, KNRM, tmr.since());
-			}
-			if (stream != nullptr and cells != nullptr) {
-				export_layout(*stream, lib, i, *cells);
-			}
-			lst.mapToLayout(i, lib.macros[i]);
-		}
-	}
-
-	if (progress) {
-		printf("done\t%gs\n\n", total.since());
-	}
-}*/
-

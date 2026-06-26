@@ -15,6 +15,52 @@
 
 #include "../back/asic.h"
 
+#include <weaver/params.h>
+
+weaver::Decl declFromSubckt(const weaver::Program &prgm, int mod, const sch::Subckt &ckt) {
+	if (not ckt.comment.empty()) {
+		std::map<std::string, std::string> params = weaver::readParams({ckt.comment});
+		
+		auto pos = params.find("wv.decl");
+		if (pos != params.end()) {
+			return prgm.findDecl(weaver::Prototype(pos->second), mod);
+		}
+	}
+
+	weaver::TypeId wireType(prgm.global, prgm.mods[prgm.global].findType("wire"));
+
+	weaver::Decl decl;
+	decl.name = ckt.name;
+
+	// All of the ports in a cell are wires
+	vector<weaver::Instance> args;
+	for (int j : ckt.ports) {
+		decl.args.push_back(weaver::Instance(wireType, ckt.nets[j].name));
+	}
+	return decl;
+}
+
+weaver::Prototype protoFromInstance(const weaver::Program &prgm, int mod, const sch::Instance &inst, bool qualify) {
+	if (not inst.comment.empty()) {
+		std::map<std::string, std::string> params = weaver::readParams({inst.comment});
+		
+		auto pos = params.find("wv.proto");
+		if (pos != params.end()) {
+			return weaver::Prototype(pos->second);
+		}
+	}
+	weaver::Prototype proto = weaver::Prototype::fromMangled(inst.type);
+
+	// TODO(edward.bingham) better to leave unqualified?
+	if (qualify) {
+		proto.unqualified = false;
+		for (int j : inst.ports) {
+			proto.args.push_back(weaver::Typename("wire"));
+		}
+	}
+	return proto;
+}
+
 void readSpice(weaver::Project &proj, weaver::Source &source, string buffer) {
 	phy::Tech *tech = loadASIC(proj);
 	if (not tech) {
