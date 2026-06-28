@@ -18,13 +18,10 @@
 #include <weaver/params.h>
 
 weaver::Decl declFromSubckt(const weaver::Program &prgm, int mod, const sch::Subckt &ckt) {
-	if (not ckt.comment.empty()) {
-		std::map<std::string, std::string> params = weaver::readParams({ckt.comment});
-		
-		auto pos = params.find("wv.decl");
-		if (pos != params.end()) {
-			return prgm.findDecl(weaver::Prototype(pos->second), mod);
-		}
+	std::map<std::string, std::string> params = weaver::readParams({ckt.comment});
+	auto pos = params.find("decl");
+	if (pos != params.end()) {
+		return prgm.findDecl(weaver::Prototype(pos->second), mod);
 	}
 
 	weaver::TypeId wireType(prgm.global, prgm.mods[prgm.global].findType("wire"));
@@ -41,19 +38,17 @@ weaver::Decl declFromSubckt(const weaver::Program &prgm, int mod, const sch::Sub
 }
 
 weaver::Prototype protoFromInstance(const weaver::Program &prgm, int mod, const sch::Instance &inst, bool qualify) {
-	if (not inst.comment.empty()) {
-		std::map<std::string, std::string> params = weaver::readParams({inst.comment});
-		
-		auto pos = params.find("wv.proto");
-		if (pos != params.end()) {
-			return weaver::Prototype(pos->second);
-		}
+	std::map<std::string, std::string> params = weaver::readParams({inst.comment});
+	auto pos = params.find("proto");
+	if (pos != params.end()) {
+		return weaver::Prototype(pos->second);
 	}
-	weaver::Prototype proto = weaver::Prototype::fromMangled(inst.type);
+	weaver::Prototype proto; // = weaver::Prototype::fromMangled(inst.type);
+	proto.name = inst.type;
 
 	// TODO(edward.bingham) better to leave unqualified?
 	if (qualify) {
-		proto.unqualified = false;
+		proto.qualified = true;
 		for (int j : inst.ports) {
 			proto.args.push_back(weaver::Typename("wire"));
 		}
@@ -67,11 +62,11 @@ void readSpice(weaver::Project &proj, weaver::Source &source, string buffer) {
 		return;
 	}
 
-	parse_spice::register_syntax(*source.tokens);
+	parse_spice::netlist::register_syntax(*source.tokens);
 	source.tokens->insert(source.path.string(), buffer, nullptr);
 
 	source.tokens->increment(false);
-	parse_spice::expect(*source.tokens);
+	source.tokens->expect<parse_spice::netlist>();
 	if (source.tokens->decrement(__FILE__, __LINE__)) {
 		source.syntax = shared_ptr<parse::syntax>(new parse_spice::netlist(*source.tokens));
 	}
@@ -89,17 +84,9 @@ void loadSpice(weaver::Project &proj, weaver::Program &prgm, const weaver::Sourc
 	sch::import_netlist(*tech, lst, *(parse_spice::netlist*)source.syntax.get(), source.tokens.get());
 
 	for (auto &ckt : lst) {
-		weaver::Prototype proto = weaver::Prototype::fromMangled(ckt.name);
-		proto.mod = source.modName;
-
-		int mod = prgm.getModule(proto.mod);
-		weaver::Decl decl = prgm.findDecl(proto, mod);
-		// TODO(edward.bingham) read the port spec in the subckt
-		// caption for the type information
-		for (int j : ckt.ports) {
-			decl.args.push_back(weaver::Instance(wireType, ckt.nets[j].name));
-		}
-
+		int mod = prgm.getModule(source.modName);
+		weaver::Decl decl = declFromSubckt(prgm, mod, ckt);
+		
 		weaver::TermId id = prgm.getTerm(mod, decl);
 		if (prgm.termValid(id)) {
 			auto &term = prgm.termAt(id);
@@ -120,12 +107,12 @@ void loadSpice(weaver::Project &proj, weaver::Program &prgm, const weaver::Sourc
 				}
 			}
 		} else {
-			internal("", "term not defined '" + proto.to_string() + "'", __FILE__, __LINE__);
+			internal("", "term not defined '" + prgm.getPrototype(decl, source.modName).to_string() + "'", __FILE__, __LINE__);
 		}
 	}
 }
 
-void writeSpice(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, int modIdx, int termIdx, int varIdx) {
+void writeSpice(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, weaver::TermId id) {
 	static std::set<std::string> prev;
 
 	phy::Tech *tech = loadASIC(proj);
@@ -149,7 +136,7 @@ void writeSpice(fs::path path, weaver::Project &proj, const weaver::Filetype &la
 		return;
 	}
 
-	const sch::Subckt &ckt = prgm.mods[modIdx].terms[termIdx].variants[varIdx].as<sch::Subckt>();
+	const sch::Subckt &ckt = prgm.varAt(id).as<sch::Subckt>();
 	string buffer = sch::export_subckt(*tech, ckt).to_string();
 	fwrite(buffer.c_str(), sizeof(char), buffer.size(), fptr);
 	fclose(fptr);

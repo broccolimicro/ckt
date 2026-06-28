@@ -46,7 +46,7 @@ void loadGds(weaver::Project &proj, weaver::Program &prgm, const weaver::Source 
 	}
 }
 
-void writeGds(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, int modIdx, int termIdx, int varIdx) {
+void writeGds(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, weaver::TermId id) {
 	static std::map<std::string, gdstk::GdsWriter> prev;
 
 	phy::Tech *tech = loadASIC(proj);
@@ -54,7 +54,7 @@ void writeGds(fs::path path, weaver::Project &proj, const weaver::Filetype &lang
 		return;
 	}
 	
-	const phy::Layout &macro = prgm.mods[modIdx].terms[termIdx].variants[varIdx].as<phy::Layout>();
+	const phy::Layout &macro = prgm.varAt(id).as<phy::Layout>();
 
 	// If we keep updating a single file, then we don't want to have to read
 	// the whole file over again. However, on each compile, we do want to

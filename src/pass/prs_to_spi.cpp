@@ -7,6 +7,7 @@
 #include <sch/Subckt.h>
 #include <phy/Script.h>
 
+#include <weaver/params.h>
 #include <interpret_wv/export.h>
 
 bool bubble(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
@@ -83,13 +84,13 @@ bool prsToSpi(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 	prs::production_rule_set &pr = prgm.varAt(id).as<prs::production_rule_set>();
 
 	sch::Subckt ckt = prs::build_netlist(*tech, pr, builder.progress);
-	ckt.comment = "wv.decl=\"" + weaver::export_decl(prgm, prgm.termAt(id).decl).to_string() + "\"";
+	ckt.comment = weaver::writeParams({{"decl", weaver::export_decl(prgm, prgm.termAt(id).decl).to_string()}});
 	if (builder.debug) {
 		ckt.print();
 	}
 
 	id.var = prgm.termAt(id).createVariant(weaver::Variant("spice", ckt, id.var));
-	builder.todo.push_back(id);
+	builder.push(prgm, id);
 	return true;
 }
 

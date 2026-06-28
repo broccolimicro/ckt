@@ -125,11 +125,13 @@ void Build::build(weaver::Program &prgm) {
 		std::string dialect = prgm.varAt(id).meta.dialect;
 		if (dialect == "func") {
 			if (not flatten(*this, prgm, id)) {
-				if (not decompose(*this, prgm, id)) {
-					// TODO(edward.bingham) or convert to HSE
-					printf("error: unable to flatten or decompose chp\n");
+				if (not prgm.varAt(id).meta.has("func.decompose")) {
+					if (not decompose(*this, prgm, id)) {
+						// TODO(edward.bingham) or convert to HSE
+						printf("error: unable to flatten or decompose chp\n");
+					}
+					continue;
 				}
-				continue;
 			}
 
 			if (not chpToFlow(*this, prgm, id)) {
@@ -172,8 +174,12 @@ void Build::build(weaver::Program &prgm) {
 				printf("error: unable to generate netlist\n");
 			}
 		} else if (dialect == "spice") {
-			if (not noCells and not mapCells(*this, prgm, id)) {
-				printf("err: unable to break subckt into cells\n");
+			if (not prgm.varAt(id).meta.has("spi.mapped")
+				and not prgm.varAt(id).meta.has("spi.cell")) {
+				if (not noCells and not mapCells(*this, prgm, id)) {
+					printf("err: unable to break subckt into cells\n");
+				}
+				continue;
 			}
 
 			if (not spiToGds(*this, prgm, id)) {

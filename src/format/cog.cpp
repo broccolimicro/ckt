@@ -17,11 +17,11 @@
 void readCog(weaver::Project &proj, weaver::Source &source, string buffer) {
 	source.tokens->register_token<parse::block_comment>(false);
 	source.tokens->register_token<parse::line_comment>(false);
-	parse_cog::register_syntax(*source.tokens);
+	parse_cog::composition::register_syntax(*source.tokens);
 	source.tokens->insert(source.path.string(), buffer, nullptr);
 
 	source.tokens->increment(false);
-	parse_cog::expect(*source.tokens);
+	source.tokens->expect<parse_cog::composition>();
 	if (source.tokens->decrement(__FILE__, __LINE__)) {
 		source.syntax = shared_ptr<parse::syntax>(new parse_cog::composition(*source.tokens));
 	}
@@ -29,13 +29,10 @@ void readCog(weaver::Project &proj, weaver::Source &source, string buffer) {
 
 void loadCog(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
 	string name = source.path.stem().string();
-	chp::graph g;
-	g.name = name;
-	chp::import_chp(g, *(parse_cog::composition*)source.syntax.get(), source.tokens.get(), true);
-
-	g.post_process(true);
+	chp::graph g = std::any_cast<chp::graph>(factoryCog(name, source.syntax.get(), source.tokens.get()));
 
 	weaver::Prototype proto = weaver::Prototype::fromMangled(name);
+	proto.mod = source.modName;
 
 	weaver::TermId id;
 	id.mod   = prgm.getModule(source.modName);
@@ -45,17 +42,13 @@ void loadCog(weaver::Project &proj, weaver::Program &prgm, const weaver::Source 
 
 void loadCogw(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
 	string name = source.path.stem().string();
-	hse::graph g;
-	g.name = name;
-	hse::import_hse(g, *(parse_cog::composition*)source.syntax.get(), source.tokens.get(), true);
-
-	g.post_process(true);
-	g.check_variables();
+	hse::graph g = std::any_cast<hse::graph>(factoryCogw(name, source.syntax.get(), source.tokens.get()));
 
 	weaver::Prototype proto = weaver::Prototype::fromMangled(name);
+	proto.mod = source.modName;
 
 	weaver::TermId id;
-	id.mod   = prgm.getModule(source.modName);
+	id.mod   = prgm.getModule(proto.mod);
 	id.index = prgm.modAt(id).createTerm(weaver::Term(proto.name, vector<weaver::Instance>()));
 	id.var   = prgm.termAt(id).createVariant(weaver::Variant("proto", g));
 }

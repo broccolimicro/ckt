@@ -12,13 +12,13 @@
 void readWv(weaver::Project &proj, weaver::Source &source, string buffer) {
 	source.tokens->register_token<parse::block_comment>(false);
 	source.tokens->register_token<parse::line_comment>(false);
-	parse_ucs::source::register_syntax(*source.tokens);
-	source.tokens->insert(source.path.string(), buffer, nullptr);
+	parse_ucs::source::register_syntax(*source.tokens, &proj);
+	source.tokens->insert(source.path.string(), buffer, &proj);
 
 	source.tokens->increment(true);
 	source.tokens->expect<parse_ucs::source>();
-	if (source.tokens->decrement(__FILE__, __LINE__)) {
-		source.syntax = shared_ptr<parse::syntax>(new parse_ucs::source(*source.tokens));
+	if (source.tokens->decrement(__FILE__, __LINE__, &proj)) {
+		source.syntax = shared_ptr<parse::syntax>(new parse_ucs::source(*source.tokens, &proj));
 	}
 
 	parse_ucs::source &syntax = *(parse_ucs::source*)source.syntax.get();
@@ -33,11 +33,9 @@ void readWv(weaver::Project &proj, weaver::Source &source, string buffer) {
 }
 
 void loadWv(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
-	auto lang = source.filetype->as<weaver::Language>();
-
 	int index = prgm.getModule(source.modName);
 	// load symbols to break dependency chains
 	import_symbols(prgm, index, *(parse_ucs::source*)source.syntax.get(), source.tokens.get());
 	// link up all of the dependencies
-	import_module(*lang, prgm, index, *(parse_ucs::source*)source.syntax.get(), source.tokens.get());
+	import_module(proj, prgm, index, *(parse_ucs::source*)source.syntax.get(), source.tokens.get());
 }

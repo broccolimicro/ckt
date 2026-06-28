@@ -15,11 +15,11 @@
 void readGc(weaver::Project &proj, weaver::Source &source, string buffer) {
 	source.tokens->register_token<parse::block_comment>(false);
 	source.tokens->register_token<parse::line_comment>(false);
-	parse_gc::register_syntax(*source.tokens);
+	parse_gc::rule_set::register_syntax(*source.tokens);
 	source.tokens->insert(source.path, buffer, nullptr);
 	
 	source.tokens->increment(false);
-	parse_gc::expect(*source.tokens);
+	source.tokens->expect<parse_gc::rule_set>();
 	if (source.tokens->decrement(__FILE__, __LINE__)) {
 		source.syntax = shared_ptr<parse::syntax>(new parse_gc::rule_set(*source.tokens));
 	}
@@ -39,7 +39,7 @@ void loadGc(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &
 	id.var   = prgm.termAt(id).createVariant(weaver::Variant("struct", rules));
 }
 
-void writeGc(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, int modIdx, int termIdx, int varIdx) {
+void writeGc(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, weaver::TermId id) {
 	string pathstr = path.string();
 	ofstream fout(pathstr.c_str(), ios::out);
 	if (not fout.is_open()) {
@@ -47,7 +47,7 @@ void writeGc(fs::path path, weaver::Project &proj, const weaver::Filetype &lang,
 		return;
 	}
 
-	const gc::GuardedCommands &rules = prgm.mods[modIdx].terms[termIdx].variants[varIdx].as<gc::GuardedCommands>();
+	const gc::GuardedCommands &rules = prgm.varAt(id).as<gc::GuardedCommands>();
 	string buffer = gc::export_rule_set(rules).to_string();
 	fout.write(buffer.c_str(), buffer.size());
 	fout.close();

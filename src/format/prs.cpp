@@ -14,11 +14,11 @@
 void readPrs(weaver::Project &proj, weaver::Source &source, string buffer) {
 	source.tokens->register_token<parse::block_comment>(false);
 	source.tokens->register_token<parse::line_comment>(false);
-	parse_prs::register_syntax(*source.tokens);
+	parse_prs::production_rule_set::register_syntax(*source.tokens);
 	source.tokens->insert(source.path, buffer, nullptr);
 	
 	source.tokens->increment(false);
-	parse_prs::expect(*source.tokens);
+	source.tokens->expect<parse_prs::production_rule_set>();
 	if (source.tokens->decrement(__FILE__, __LINE__)) {
 		source.syntax = shared_ptr<parse::syntax>(new parse_prs::production_rule_set(*source.tokens));
 	}
@@ -38,7 +38,7 @@ void loadPrs(weaver::Project &proj, weaver::Program &prgm, const weaver::Source 
 	id.var   = prgm.termAt(id).createVariant(weaver::Variant("circ", pr));
 }
 
-void writePrs(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, int modIdx, int termIdx, int varIdx) {
+void writePrs(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, weaver::TermId id) {
 	string pathstr = path.string();
 	ofstream fout(pathstr.c_str(), ios::out);
 	if (not fout.is_open()) {
@@ -46,7 +46,7 @@ void writePrs(fs::path path, weaver::Project &proj, const weaver::Filetype &lang
 		return;
 	}
 
-	const prs::production_rule_set &pr = prgm.mods[modIdx].terms[termIdx].variants[varIdx].as<prs::production_rule_set>();
+	const prs::production_rule_set &pr = prgm.varAt(id).as<prs::production_rule_set>();
 	string buffer = prs::export_production_rule_set(pr).to_string();
 	fout.write(buffer.c_str(), buffer.size());
 	fout.close();

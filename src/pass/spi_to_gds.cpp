@@ -8,6 +8,7 @@
 #include <sch/Tapeout.h>
 #include <sch/Placer.h>
 
+#include <weaver/params.h>
 #include <interpret_wv/export.h>
 #include <common/timer.h>
 
@@ -32,7 +33,7 @@ bool mapCells(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 	vector<sch::Subckt> cells = sch::mapCells(*tech, ckt, builder.progress);
 	id.var = prgm.termAt(id).createVariant(weaver::Variant("spice", ckt, id.var));
 	prgm.varAt(id).meta.set("spi.mapped");
-	builder.todo.push_back(id);
+	builder.push(prgm, id);
 
 	// Load the cells into weaver as terms
 	// Loop through all subckt instantiations and make sure they have a term in
@@ -44,7 +45,7 @@ bool mapCells(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 		int mod = prgm.getModule(builder.proj.tech.name);
 		weaver::Decl decl = declFromSubckt(prgm, mod, cell);
 		decl.name = baseName;
-		cell.comment = "wv.decl=\"" + weaver::export_decl(prgm, decl).to_string() + "\"";
+		cell.comment = weaver::writeParams({{"decl", weaver::export_decl(prgm, decl).to_string()}});
 
 		// Create the term and schedule it for compilation
 		int step = 0;
@@ -55,7 +56,7 @@ bool mapCells(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 			if (prgm.termAt(cellId).variants.empty()) {
 				cellId.var = prgm.termAt(cellId).createVariant(weaver::Variant("spice", cell));
 				prgm.varAt(cellId).meta.set("spi.cell");
-				builder.todo.push_back(cellId);
+				builder.push(prgm, cellId);
 				break;
 			}
 
@@ -73,7 +74,7 @@ bool mapCells(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 		for (auto i = mapped.inst.begin(); i != mapped.inst.end(); i++) {
 			if (i->type == originalName) {
 				i->type = cell.name;
-				i->comment = "wv.proto=\"" + prgm.getPrototype(cellId).to_string() + "\"";
+				i->comment = weaver::writeParams({{"proto", prgm.getPrototype(cellId).to_string()}});
 			}
 		}
 	}
@@ -93,7 +94,7 @@ struct SchLinker : sch::Linker {
 	sch::Implementation find(const sch::Instance &inst) override {
 		sch::Implementation result;
 		weaver::Prototype proto = protoFromInstance(prgm, mod, inst, false);
-		std::vector<weaver::TermId> terms = prgm.findTerms(proto);
+		std::vector<weaver::TermId> terms = prgm.findTerms(proto, mod);
 		if (terms.empty() or not prgm.termValid(terms[0])) {
 			error("", "unable to link '" + proto.to_string() + "'", __FILE__, __LINE__);
 			return result;
@@ -135,12 +136,7 @@ bool spiToGds(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 	}
 
 	sch::Subckt ckt = prgm.varAt(id).as<sch::Subckt>();
-	if (not ckt.mos.empty() and not ckt.inst.empty()) {
-		error("", "no support for mixed macro/micro layout", __FILE__, __LINE__);
-		return false;
-	}
-
-	if (ckt.inst.empty()) {
+	if (ckt.inst.empty() and not ckt.mos.empty()) {
 		array<int, 2> vars{-1, -1};
 		if (not cell::import_cell(builder.proj.tech.lib, *tech, prgm.termAt(id), &vars, builder.progress, builder.debug)) {
 			// We generated a new cell, save this to the cell library
@@ -155,9 +151,10 @@ bool spiToGds(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 		}
 
 		id.var = vars[1];
-		builder.todo.push_back(id);
+		prgm.varAt(id).meta.set("gds.cell");
+		builder.push(prgm, id);
 		return true;
-	} else if (ckt.mos.empty()) {
+	} else if (ckt.mos.empty() and not ckt.inst.empty()) {
 		if (builder.progress) {
 			printf("Placing %s...", ckt.name.c_str());
 			fflush(stdout);
@@ -175,11 +172,24 @@ bool spiToGds(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 		sch::Placement prob(placer, 0);
 		prob.solve();
 		prob.save(macro);
-		builder.todo.push_back(id);
+		prgm.varAt(id).meta.set("gds.place");
+		builder.push(prgm, id);
 		if (builder.progress) {
 			printf("[%sDONE%s]\t%gs\n", KGRN, KNRM, tmr.since());
 		}
 		return true;
+	} else if (ckt.mos.empty() and ckt.inst.empty()) {
+		weaver::Term &term = prgm.termAt(id);
+		weaver::Prototype proto = prgm.getPrototype(term.decl, prgm.mods[id.mod].name);
+		warning("", "found blackbox \"" + proto.to_string() + "\"", __FILE__, __LINE__);
+
+		id.var = term.createVariant(weaver::Variant("layout", phy::Layout(*tech, proto.mangle(true)), id.var));
+		return true;
+	} else {
+		weaver::Term &term = prgm.termAt(id);
+		weaver::Prototype proto = prgm.getPrototype(term.decl, prgm.mods[id.mod].name);
+		error("", "no support for mixed macro/micro layout in \"" + proto.to_string() + "\"", __FILE__, __LINE__);
+		return false;
 	}
 	return false;
 }

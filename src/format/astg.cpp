@@ -17,7 +17,7 @@
 #include <interpret_hse/export.h>
 
 void readAstg(weaver::Project &proj, weaver::Source &source, string buffer) {
-	parse_astg::register_syntax(*source.tokens);
+	parse_astg::graph::register_syntax(*source.tokens);
 	source.tokens->insert(source.path.string(), buffer, nullptr);
 
 	source.tokens->increment(false);
@@ -58,7 +58,7 @@ void loadAstgw(weaver::Project &proj, weaver::Program &prgm, const weaver::Sourc
 	id.var   = prgm.termAt(id).createVariant(weaver::Variant("proto", g));
 }
 
-void writeAstg(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, int modIdx, int termIdx, int varIdx) {
+void writeAstg(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, weaver::TermId id) {
 	string pathstr = path.string();
 	ofstream fout(pathstr.c_str(), ios::out);
 	if (not fout.is_open()) {
@@ -66,13 +66,13 @@ void writeAstg(fs::path path, weaver::Project &proj, const weaver::Filetype &lan
 		return;
 	}
 
-	const chp::graph &g = prgm.mods[modIdx].terms[termIdx].variants[varIdx].as<chp::graph>();
+	const chp::graph &g = prgm.varAt(id).as<chp::graph>();
 	string buffer = chp::export_astg(g).to_string();
 	fout.write(buffer.c_str(), buffer.size());
 	fout.close();
 }
 
-void writeAstgw(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, int modIdx, int termIdx, int varIdx) {
+void writeAstgw(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, weaver::TermId id) {
 	string pathstr = path.string();
 	ofstream fout(pathstr.c_str(), ios::out);
 	if (not fout.is_open()) {
@@ -80,7 +80,7 @@ void writeAstgw(fs::path path, weaver::Project &proj, const weaver::Filetype &la
 		return;
 	}
 
-	const hse::graph &g = prgm.mods[modIdx].terms[termIdx].variants[varIdx].as<hse::graph>();
+	const hse::graph &g = prgm.varAt(id).as<hse::graph>();
 	string buffer = hse::export_astg(g).to_string();
 	fout.write(buffer.c_str(), buffer.size());
 	fout.close();

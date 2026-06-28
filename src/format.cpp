@@ -25,18 +25,17 @@
 #include "format/astg.h"
 
 void loadAllFormats(weaver::Project &proj) {
-	parse_ucs::function::registry.insert({"func", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
-	parse_ucs::function::registry.insert({"struct", parse_ucs::language(&parse_gc::produce, &parse_gc::expect, &parse_gc::register_syntax)});
-	parse_ucs::function::registry.insert({"proto", parse_ucs::language(&parse_cog::produce, &parse_cog::expect, &parse_cog::register_syntax)});
-	parse_ucs::function::registry.insert({"circ", parse_ucs::language(&parse_prs::produce, &parse_prs::expect, &parse_prs::register_syntax)});
+	proj.pushDialect("func", &parse_cog::factory, factoryCog, nullptr);
+	proj.pushDialect("struct", &parse_gc::factory, factoryGc, nullptr);
+	proj.pushDialect("proto", &parse_cog::factory, factoryCogw, nullptr);
+	proj.pushDialect("circ", &parse_prs::factory, factoryPrs, nullptr);
+	proj.pushDialect("spice", nullptr, nullptr, nullptr);
+	proj.pushDialect("verilog", nullptr, nullptr, nullptr);
+	proj.pushDialect("layout", nullptr, nullptr, nullptr);
+	proj.pushDialect("func", nullptr, nullptr, nullptr);
+	proj.pushDialect("proto", nullptr, nullptr, nullptr);
 
-	weaver::Language lang;
-	lang.dialects.insert({"func", factoryCog});
-	lang.dialects.insert({"struct", factoryGc});
-	lang.dialects.insert({"proto", factoryCogw});
-	lang.dialects.insert({"circ", factoryPrs});
-
-	proj.pushFiletype("", "wv", "", readWv, loadWv, nullptr, weaver::Filetype::MODULE, lang);
+	proj.pushFiletype("", "wv", "", readWv, loadWv, nullptr, weaver::Filetype::MODULE);
 	proj.pushFiletype("func", "cog", "", readCog, loadCog);
 	proj.pushFiletype("struct", "gc", "", readGc, loadGc, writeGc);
 	proj.pushFiletype("proto", "cogw", "", readCog, loadCogw);
