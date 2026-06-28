@@ -19,6 +19,7 @@
 #include <interpret_prs/export.h>
 #include <interpret_sch/export.h>
 
+#include "../pass/link.h"
 #include "../pass/chp_to_flow.h"
 #include "../pass/flow_to_verilog.h"
 #include "../pass/hse_to_prs.h"
@@ -77,9 +78,13 @@ bool Build::has(int target) const {
 
 void Build::push(weaver::Program &prgm, weaver::TermId id) {
 	if (not id.hasMod()) {
-		for (int i = 0; i < (int)prgm.mods.size(); i++) {
-			for (int j = 0; j < (int)prgm.mods[i].terms.size(); j++) {
-				todo.push_back(weaver::TermId(i, j));
+		for (id.mod = 0; id.mod < (int)prgm.mods.size(); id.mod++) {
+			for (id.index = 0; id.index < (int)prgm.mods[id.mod].terms.size(); id.index++) {
+				auto pos = find(todo.begin(), todo.end(), id);
+				if (pos != todo.end()) {
+					todo.erase(pos);
+				}
+				todo.push_back(id);
 			}
 		}
 	} else if (not id.hasTerm()) {
@@ -87,8 +92,12 @@ void Build::push(weaver::Program &prgm, weaver::TermId id) {
 			printf("error: module not defined\n");
 			return;
 		}
-		for (int j = 0; j < (int)prgm.modAt(id).terms.size(); j++) {
-			todo.push_back(weaver::TermId(id.mod, j));
+		for (id.index = 0; id.index < (int)prgm.modAt(id).terms.size(); id.index++) {
+			auto pos = find(todo.begin(), todo.end(), id);
+			if (pos != todo.end()) {
+				todo.erase(pos);
+			}
+			todo.push_back(id);
 		}
 	} else {
 		if (id.mod >= (int)prgm.mods.size()) {
@@ -104,6 +113,10 @@ void Build::push(weaver::Program &prgm, weaver::TermId id) {
 			return;
 		}
 
+		auto pos = find(todo.begin(), todo.end(), id);
+		if (pos != todo.end()) {
+			todo.erase(pos);
+		}
 		todo.push_back(id);
 	}
 }
@@ -123,6 +136,13 @@ void Build::build(weaver::Program &prgm) {
 		}
 
 		std::string dialect = prgm.varAt(id).meta.dialect;
+		if (not prgm.varAt(id).meta.has("wv.link")) {
+			if (not link(*this, prgm, id)) {
+				printf("error: unable to link\n");
+			}
+			continue;
+		}
+
 		if (dialect == "func") {
 			if (not flatten(*this, prgm, id)) {
 				if (not prgm.varAt(id).meta.has("func.decompose")) {

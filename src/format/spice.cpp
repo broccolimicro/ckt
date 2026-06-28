@@ -141,3 +141,13 @@ void writeSpice(fs::path path, weaver::Project &proj, const weaver::Filetype &la
 	fwrite(buffer.c_str(), sizeof(char), buffer.size(), fptr);
 	fclose(fptr);
 }
+
+std::vector<weaver::Prototype> linkSpice(const weaver::Project &proj, const weaver::Program &prgm, weaver::TermId id) {
+	sch::Subckt ckt = prgm.varAt(id).as<sch::Subckt>();
+
+	std::vector<weaver::Prototype> result;
+	for (const sch::Instance &inst : ckt.inst) {
+		result.push_back(protoFromInstance(prgm, id.mod, inst, true));
+	}
+	return result;
+}

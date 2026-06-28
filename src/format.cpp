@@ -29,7 +29,7 @@ void loadAllFormats(weaver::Project &proj) {
 	proj.pushDialect("struct", &parse_gc::factory, factoryGc, nullptr);
 	proj.pushDialect("proto", &parse_cog::factory, factoryCogw, nullptr);
 	proj.pushDialect("circ", &parse_prs::factory, factoryPrs, nullptr);
-	proj.pushDialect("spice", nullptr, nullptr, nullptr);
+	proj.pushDialect("spice", nullptr, nullptr, linkSpice);
 	proj.pushDialect("verilog", nullptr, nullptr, nullptr);
 	proj.pushDialect("layout", nullptr, nullptr, nullptr);
 	proj.pushDialect("func", nullptr, nullptr, nullptr);

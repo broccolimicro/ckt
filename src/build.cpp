@@ -83,7 +83,7 @@ int build_command(int argc, char **argv) {
 			set_debug(true);
 			builder.debug = true;
 		} else if (arg == "--flow_html") {
-			if (!builder.debug) {
+			if (not builder.debug) {
 				printf("warning: --flow_html flag requires --debug to be enabled, ignoring\n");
 			} else {
 				builder.format_expressions_as_html_table = true;
@@ -214,8 +214,8 @@ int build_command(int argc, char **argv) {
 
 	// Create debug dir if it does not already exist
 	std::filesystem::path debugDirPath = proj.rootDir / proj.BUILD / "dbg";
-	if (!std::filesystem::exists(debugDirPath)) {
-		if (!fs::create_directories(debugDirPath)) {
+	if (not std::filesystem::exists(debugDirPath)) {
+		if (not fs::create_directories(debugDirPath)) {
 			string debugDirPathStr = debugDirPath.string();
 			printf("error: %s does not exist & cannot be created\n", debugDirPathStr.c_str());
 			return 1;
@@ -250,7 +250,7 @@ int build_command(int argc, char **argv) {
 
 	proj.save(prgm);
 
-	if (!is_clean()) {
+	if (not is_clean()) {
 		complete();
 		return 1;
 	}
