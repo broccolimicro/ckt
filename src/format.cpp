@@ -35,14 +35,14 @@ void loadAllFormats(weaver::Project &proj) {
 	proj.pushDialect("func", nullptr, nullptr, nullptr);
 	proj.pushDialect("proto", nullptr, nullptr, nullptr);
 
-	proj.pushFiletype("", "wv", "", readWv, loadWv, nullptr, weaver::Filetype::MODULE);
-	proj.pushFiletype("func", "cog", "", readCog, loadCog);
-	proj.pushFiletype("struct", "gc", "", readGc, loadGc, writeGc);
-	proj.pushFiletype("proto", "cogw", "", readCog, loadCogw);
-	proj.pushFiletype("circ", "prs", "ckt", readPrs, loadPrs, writePrs);
-	proj.pushFiletype("spice", "spi", "spi", readSpice, loadSpice, writeSpice, weaver::Filetype::MODULE);
-	proj.pushFiletype("verilog", "v", "rtl", nullptr, nullptr, writeVerilog);
-	proj.pushFiletype("layout", "gds", "gds", nullptr, loadGds, writeGds, weaver::Filetype::PROJECT);
-	proj.pushFiletype("func", "astg", "state", readAstg, loadAstg, writeAstg);
-	proj.pushFiletype("proto", "astgw", "state", readAstg, loadAstgw, writeAstgw);
+	proj.pushFiletype("", "wv", readWv, loadWv, nullptr, weaver::Filetype::MODULE);
+	proj.pushFiletype("func", "cog", readCog, loadCog);
+	proj.pushFiletype("struct", "gc", readGc, loadGc, writeGc);
+	proj.pushFiletype("proto", "cogw", readCog, loadCogw);
+	proj.pushFiletype("circ", "prs", readPrs, loadPrs, writePrs);
+	proj.pushFiletype("spice", "spi", readSpice, loadSpice, writeSpice, weaver::Filetype::MODULE);
+	proj.pushFiletype("verilog", "v", nullptr, nullptr, writeVerilog);
+	proj.pushFiletype("layout", "gds", nullptr, loadGds, writeGds, weaver::Filetype::PROJECT);
+	proj.pushFiletype("func", "astg", readAstg, loadAstg, writeAstg);
+	proj.pushFiletype("proto", "astgw", readAstg, loadAstgw, writeAstgw);
 }
