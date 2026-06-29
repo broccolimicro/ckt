@@ -49,7 +49,7 @@ ifeq ($(OS),Windows_NT)
 			CXXFLAGS += -D AMD64
 		endif
 	endif
-	LIBRARIES += -l:libgdstk.a -l:libclipper.a -l:libqhullstatic_r.a -lz -lOpenCL
+	LIBRARIES += -l:libgdstk.a -l:libqhullstatic_r.a -lz -lOpenCL
 	LIBRARY_PATHS += -L../../lib/gdstk/build/lib -L../../lib/gdstk/build/lib64
 else
 	UNAME_S := $(shell uname -s)
@@ -57,7 +57,7 @@ else
 		CXXFLAGS += -D OSX -mmacos-version-min=26.0 -Wno-missing-braces
 		INCLUDE_PATHS += -I$(shell brew --prefix qhull)/include -I$(shell brew --prefix graphviz)/include -I$(shell brew --prefix opencl-headers)/include -I$(shell brew --prefix opencl-clhpp-headers)/include
 		LIBRARY_PATHS += -L$(shell brew --prefix qhull)/lib -L$(shell brew --prefix graphviz)/lib
-		LIBRARIES += -lgdstk -lclipper -lqhullstatic_r -lz -framework OpenCL
+		LIBRARIES += -lgdstk -lqhullstatic_r -lz -framework OpenCL
 		LIBRARY_PATHS += -L../../lib/gdstk/build/lib
 		LDFLAGS	      += -Wl,-rpath,/opt/homebrew/opt/python@3.15/Frameworks/Python.framework/Versions/Current/lib \
 -Wl,-rpath,/opt/homebrew/opt/python@3.14/Frameworks/Python.framework/Versions/Current/lib \
@@ -70,7 +70,7 @@ else
 -Wl,-rpath,/opt/homebrew/opt/python/Frameworks/Python.framework/Versions/Current/lib
 	else # ifeq ($(UNAME_S),Linux)
 		CXXFLAGS += -D LINUX
-		LIBRARIES += -l:libgdstk.a -l:libclipper.a -l:libqhullstatic_r.a -lz -lOpenCL
+		LIBRARIES += -l:libgdstk.a -l:libqhullstatic_r.a -lz -lOpenCL
 		LIBRARY_PATHS += -L../../lib/gdstk/build/lib -L../../lib/gdstk/build/lib64
 	endif
 	UNAME_P := $(shell uname -p)
