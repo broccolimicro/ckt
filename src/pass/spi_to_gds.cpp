@@ -106,13 +106,14 @@ struct SchLinker : sch::Linker {
 		proto = prgm.getPrototype(term.decl, prgm.mods[mod].name);
 
 		int i = term.rfindVariant("spice");
-		if (i >= 0 and i < (int)term.variants.size()) {
-			result.ckt = &term.variants[i].as<sch::Subckt>();
-		}
-
 		int j = term.rfindVariant("layout");
+
 		if (j < 0 or j >= (int)term.variants.size()) {
 			j = term.createVariant(weaver::Variant("layout", phy::Layout(tech, proto.mangle(true)), i));
+		}
+
+		if (i >= 0 and i < (int)term.variants.size()) {
+			result.ckt = &term.variants[i].as<sch::Subckt>();
 		}
 
 		result.macro = &term.variants[j].as<phy::Layout>();
