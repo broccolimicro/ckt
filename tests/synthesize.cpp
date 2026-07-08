@@ -14,7 +14,6 @@
 #include <parse/default/block_comment.h>
 #include <parse/default/line_comment.h>
 
-#include <parse_cog/branch.h>
 #include <parse_cog/composition.h>
 #include <parse_cog/control.h>
 #include <parse_cog/factory.h>
@@ -75,7 +74,7 @@ chp::graph importCHPFromCogString(const string &cog) {
 	tokenizer tokens;
 	tokens.register_token<parse::block_comment>(false);
 	tokens.register_token<parse::line_comment>(false);
-	parse_cog::register_syntax(tokens);
+	parse_cog::factory.register_syntax(tokens);
 
 	tokens.insert("string_input", cog, nullptr);
 	chp::graph g;
@@ -194,7 +193,7 @@ parse_verilog::module_def synthesizeVerilogFromFunc(const flow::Func &func) {
 	} else {
 		EXPECT_SUBSTRING(verilog, "reg branch_id;");
 	}
-	for (int i = 0; i < branch_count; i++) {
+	for (size_t i = 0; i < branch_count; i++) {
 		EXPECT_SUBSTRING(verilog, "branch_id <= " + std::to_string(i) + ";");
 	}
 
