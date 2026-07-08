@@ -7,9 +7,12 @@
 
 #include <parse_astg/factory.h>
 #include <parse_cog/factory.h>
+#include <parse_cog/adapter.h>
 #include <parse_chp/factory.h>
 #include <chp/graph.h>
 #include <hse/graph.h>
+
+#include <parse_ucs/type_name.h>
 
 #include <interpret_chp/import.h>
 #include <interpret_hse/import.h>
@@ -20,10 +23,13 @@ void readCog(weaver::Project &proj, weaver::Source &source, string buffer) {
 	parse_cog::composition::register_syntax(*source.tokens);
 	source.tokens->insert(source.path.string(), buffer, nullptr);
 
+	parse_cog::adapter cfg;
+	cfg.type_name.set<parse_ucs::type_name>();
+
 	source.tokens->increment(false);
 	source.tokens->expect<parse_cog::composition>();
-	if (source.tokens->decrement(__FILE__, __LINE__)) {
-		source.syntax = shared_ptr<parse::syntax>(new parse_cog::composition(*source.tokens));
+	if (source.tokens->decrement(__FILE__, __LINE__, &cfg)) {
+		source.syntax = shared_ptr<parse::syntax>(new parse_cog::composition(*source.tokens, 0, &cfg));
 	}
 }
 

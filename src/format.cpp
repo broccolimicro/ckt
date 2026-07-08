@@ -13,6 +13,8 @@
 #include <parse_prs/factory.h>
 #include <parse_spice/factory.h>
 
+#include <parse_cog/adapter.h>
+
 #include <interpret_wv/import.h>
 
 #include "format/cog.h"
@@ -24,16 +26,20 @@
 #include "format/wv.h"
 #include "format/astg.h"
 
+parse_cog::adapter parseCogAdapter;
+
 void loadAllFormats(weaver::Project &proj) {
-	proj.pushDialect("func", &parse_cog::factory, factoryCog, nullptr);
-	proj.pushDialect("struct", &parse_gc::factory, factoryGc, nullptr);
-	proj.pushDialect("proto", &parse_cog::factory, factoryCogw, nullptr);
-	proj.pushDialect("circ", &parse_prs::factory, factoryPrs, nullptr);
-	proj.pushDialect("spice", nullptr, nullptr, linkSpice);
-	proj.pushDialect("verilog", nullptr, nullptr, nullptr);
-	proj.pushDialect("layout", nullptr, nullptr, nullptr);
-	proj.pushDialect("func", nullptr, nullptr, nullptr);
-	proj.pushDialect("proto", nullptr, nullptr, nullptr);
+	parseCogAdapter.type_name.set<parse_ucs::type_name>();
+
+	proj.pushDialect("func", parse_cog::factory, factoryCog, nullptr, &parseCogAdapter);
+	proj.pushDialect("struct", parse_gc::factory, factoryGc, nullptr);
+	proj.pushDialect("proto", parse_cog::factory, factoryCogw, nullptr, &parseCogAdapter);
+	proj.pushDialect("circ", parse_prs::factory, factoryPrs, nullptr);
+	proj.pushDialect("spice", parse::factory(), nullptr, linkSpice);
+	proj.pushDialect("verilog", parse::factory(), nullptr, nullptr);
+	proj.pushDialect("layout", parse::factory(), nullptr, nullptr);
+	proj.pushDialect("func", parse::factory(), nullptr, nullptr);
+	proj.pushDialect("proto", parse::factory(), nullptr, nullptr);
 
 	proj.pushFiletype("", "wv", readWv, loadWv, nullptr, weaver::Filetype::MODULE);
 	proj.pushFiletype("func", "cog", readCog, loadCog);
