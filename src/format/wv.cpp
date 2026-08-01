@@ -16,9 +16,9 @@ void readWv(weaver::Project &proj, weaver::Source &source, string buffer) {
 	source.tokens->insert(source.path.string(), buffer, &proj);
 
 	source.tokens->increment(true);
-	source.tokens->expect<parse_ucs::source>();
-	if (source.tokens->decrement(__FILE__, __LINE__, &proj)) {
-		source.syntax = shared_ptr<parse::syntax>(new parse_ucs::source(*source.tokens, &proj));
+	source.tokens->expect<parse_ucs::source>((const parse::registry*)&proj);
+	if (source.tokens->decrement(__FILE__, __LINE__)) {
+		source.syntax = shared_ptr<parse::syntax>(new parse_ucs::source(*source.tokens, (const parse::registry*)&proj));
 	}
 
 	parse_ucs::source &syntax = *(parse_ucs::source*)source.syntax.get();

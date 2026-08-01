@@ -47,7 +47,7 @@ bool decompose(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 		arithmetic::Choice choice({{action}});
 		cout << "LOOK GC ACTION '" << sub[pid].name << "' action=" << action << " choice=" << choice << endl;
 		rules.rules.push_back(gc::GuardedCommand(choice));
-		cout << "export=" << gc::export_rule(rules.rules.back(), rules).to_string() << endl;
+		cout << "export=" << parse_gc::export_rule(rules.rules.back(), rules).to_string() << endl;
 	}
 	for (size_t i = 0; i < g.vars.size(); i++) {
 		rules.vars.push_back(gc::Variable(g.vars[i].name, g.vars[i].region));

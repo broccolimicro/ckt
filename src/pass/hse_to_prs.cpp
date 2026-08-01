@@ -45,7 +45,7 @@ bool conflicts(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
 	enc->check(builder.logic != Build::LOGIC_CMOS, builder.progress);
 
 	if (builder.has(Build::CONFLICTS)) {
-		print_conflicts(*enc);
+		parse_chp::print_conflicts(*enc);
 	}
 	return true;
 }

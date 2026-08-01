@@ -15,7 +15,7 @@ while {
 		ci = (Ad.probe() + Bd.probe() + ci) / pow(2, WIDTH)
 		Bc.recv() and Bd.recv()
 
-	} or await Ac.probe()==1 & Bc.probe()==1 & co~=ci {
+	} or await Ac.probe()==1 & Bc.probe()==1 & co!=ci {
 		Sc.send(0) and Sd.send((Ad.probe() + Bd.probe() + ci) % pow(2, WIDTH))
 		ci = (Ad.probe() + Bd.probe() + ci) / pow(2, WIDTH)
 

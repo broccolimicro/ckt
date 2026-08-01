@@ -45,7 +45,7 @@ bool mapCells(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 		int mod = prgm.getModule(builder.proj.tech.name);
 		weaver::Decl decl = declFromSubckt(prgm, mod, cell);
 		decl.name = baseName;
-		cell.comment = weaver::writeParams({{"decl", weaver::export_decl(prgm, decl).to_string()}});
+		cell.comment = weaver::writeParams({{"decl", parse_ucs::export_decl(prgm, decl).to_string()}});
 
 		// Create the term and schedule it for compilation
 		int step = 0;

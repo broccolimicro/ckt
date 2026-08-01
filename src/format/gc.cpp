@@ -48,7 +48,7 @@ void writeGc(fs::path path, weaver::Project &proj, const weaver::Filetype &lang,
 	}
 
 	const gc::GuardedCommands &rules = prgm.varAt(id).as<gc::GuardedCommands>();
-	string buffer = gc::export_rule_set(rules).to_string();
+	string buffer = parse_gc::export_rule_set(rules).to_string();
 	fout.write(buffer.c_str(), buffer.size());
 	fout.close();
 }

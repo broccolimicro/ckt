@@ -16,7 +16,7 @@ void writeVerilog(fs::path path, weaver::Project &proj, const weaver::Filetype &
 	}
 
 	const clocked::Module &mod = prgm.varAt(id).as<clocked::Module>();
-	string buffer = flow::export_module(mod).to_string();
+	string buffer = parse_verilog::export_module(mod).to_string();
 	fout.write(buffer.c_str(), buffer.size());
 	fout.close();
 }

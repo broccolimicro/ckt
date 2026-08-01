@@ -42,7 +42,7 @@ void readMod(weaver::Project &proj) {
 }
 
 void writeMod(const weaver::Project &proj) {
-	parse_ucs::modfile result = export_modfile(proj);
+	parse_ucs::modfile result = parse_ucs::export_modfile(proj);
 
 	ofstream fout;
 	string pathstr = (proj.rootDir / "lm.mod").string();

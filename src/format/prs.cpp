@@ -47,7 +47,7 @@ void writePrs(fs::path path, weaver::Project &proj, const weaver::Filetype &lang
 	}
 
 	const prs::production_rule_set &pr = prgm.varAt(id).as<prs::production_rule_set>();
-	string buffer = prs::export_production_rule_set(pr).to_string();
+	string buffer = parse_prs::export_production_rule_set(pr).to_string();
 	fout.write(buffer.c_str(), buffer.size());
 	fout.close();
 }

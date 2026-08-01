@@ -24,12 +24,12 @@ void readCog(weaver::Project &proj, weaver::Source &source, string buffer) {
 	source.tokens->insert(source.path.string(), buffer, nullptr);
 
 	parse_cog::adapter cfg;
-	cfg.type_name.set<parse_ucs::type_name>();
+	cfg.type_name.sub.set<parse_ucs::type_name>();
 
 	source.tokens->increment(false);
-	source.tokens->expect<parse_cog::composition>();
-	if (source.tokens->decrement(__FILE__, __LINE__, &cfg)) {
-		source.syntax = shared_ptr<parse::syntax>(new parse_cog::composition(*source.tokens, 0, &cfg));
+	source.tokens->expect<parse_cog::composition>((const parse_cog::adapter*)&cfg);
+	if (source.tokens->decrement(__FILE__, __LINE__)) {
+		source.syntax = shared_ptr<parse::syntax>(new parse_cog::composition(*source.tokens, 0, (const parse_cog::adapter*)&cfg));
 	}
 }
 

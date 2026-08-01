@@ -29,11 +29,11 @@
 parse_cog::adapter parseCogAdapter;
 
 void loadAllFormats(weaver::Project &proj) {
-	parseCogAdapter.type_name.set<parse_ucs::type_name>();
+	parseCogAdapter.type_name.sub.set<parse_ucs::type_name>();
 
-	proj.pushDialect("func", parse_cog::factory, factoryCog, nullptr, &parseCogAdapter);
+	proj.pushDialect("func", parse_cog::factory, factoryCog, nullptr, (const parse_cog::adapter*)&parseCogAdapter);
 	proj.pushDialect("struct", parse_gc::factory, factoryGc, nullptr);
-	proj.pushDialect("proto", parse_cog::factory, factoryCogw, nullptr, &parseCogAdapter);
+	proj.pushDialect("proto", parse_cog::factory, factoryCogw, nullptr, (const parse_cog::adapter*)&parseCogAdapter);
 	proj.pushDialect("circ", parse_prs::factory, factoryPrs, nullptr);
 	proj.pushDialect("spice", parse::factory(), nullptr, linkSpice);
 	proj.pushDialect("verilog", parse::factory(), nullptr, nullptr);

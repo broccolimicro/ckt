@@ -67,7 +67,7 @@ void writeAstg(fs::path path, weaver::Project &proj, const weaver::Filetype &lan
 	}
 
 	const chp::graph &g = prgm.varAt(id).as<chp::graph>();
-	string buffer = chp::export_astg(g).to_string();
+	string buffer = parse_astg::export_astg(g).to_string();
 	fout.write(buffer.c_str(), buffer.size());
 	fout.close();
 }
@@ -81,7 +81,7 @@ void writeAstgw(fs::path path, weaver::Project &proj, const weaver::Filetype &la
 	}
 
 	const hse::graph &g = prgm.varAt(id).as<hse::graph>();
-	string buffer = hse::export_astg(g).to_string();
+	string buffer = parse_astg::export_astg(g).to_string();
 	fout.write(buffer.c_str(), buffer.size());
 	fout.close();
 }
