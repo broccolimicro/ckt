@@ -5,6 +5,7 @@
 #include <common/standard.h>
 #include <common/timer.h>
 #include <common/text.h>
+#include <common/message.h>
 
 #include <sch/Subckt.h>
 #include <sch/Tapeout.h>
@@ -127,7 +128,7 @@ void Build::build(weaver::Program &prgm) {
 		todo.pop_back();
 
 		if (prgm.termAt(id).variants.empty()) {
-			printf("error: term had no variants\n");
+			error("", "term '" + prgm.termAt(id).decl.name + "' had no variants", __FILE__, __LINE__);
 			continue;
 		}
 
@@ -145,12 +146,16 @@ void Build::build(weaver::Program &prgm) {
 
 		if (dialect == "func") {
 			if (not flatten(*this, prgm, id)) {
-				if (not prgm.varAt(id).meta.has("func.decompose")) {
-					if (not decompose(*this, prgm, id)) {
-						// TODO(edward.bingham) or convert to HSE
-						printf("error: unable to flatten or decompose chp\n");
+				if (testDecompose) {
+					if (not prgm.varAt(id).meta.has("func.decompose")) {
+						if (not decompose(*this, prgm, id)) {
+							// TODO(edward.bingham) or convert to HSE
+							printf("error: unable to flatten or decompose chp\n");
+						}
+						continue;
 					}
-					continue;
+				} else {
+					printf("error: unable to flatten chp\n");
 				}
 			}
 
