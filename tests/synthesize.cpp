@@ -169,7 +169,7 @@ flow::Func testFuncSynthesisFromCog(flow::Func &expected, bool render=true) {
 
 parse_verilog::module_def synthesizeVerilogFromFunc(const flow::Func &func) {
 	clocked::Module mod = synthesizeModuleFromFunc(func);
-	parse_verilog::module_def mod_v = flow::export_module(mod);
+	parse_verilog::module_def mod_v = parse_verilog::export_module(mod);
 	string verilog = mod_v.to_string();
 	cout << "```verilog" << endl << verilog << endl << "```" << endl;
 
