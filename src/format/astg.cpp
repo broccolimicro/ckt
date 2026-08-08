@@ -27,21 +27,22 @@ void readAstg(weaver::Project &proj, weaver::Source &source, string buffer) {
 	}
 }
 
-void loadAstg(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
+std::vector<weaver::TermId> loadAstg(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
 	string name = source.path.stem().string();
 	chp::graph g;
 	g.name = name;
 	g = chp::import_chp(*(parse_astg::graph*)source.syntax.get(), source.tokens.get());
 
-	weaver::Prototype proto = weaver::Prototype::fromMangled(name);
+	weaver::Prototype proto = weaver::Prototype::fromMangled(name, source.modName);
+	int mod = prgm.getModule(proto.mod);
 
-	weaver::TermId id;
-	id.mod   = prgm.getModule(source.modName);
-	id.index = prgm.modAt(id).createTerm(weaver::Term(proto.name, vector<weaver::Instance>()));
-	id.var   = prgm.termAt(id).createVariant(weaver::Variant("func", g));
+	weaver::TermId id = prgm.getTerm(proto, mod);
+	id.var = prgm.termAt(id).createVariant(weaver::Variant("func", g));
+	prgm.varAt(id).fromSource = true;
+	return {id};
 }
 
-void loadAstgw(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
+std::vector<weaver::TermId> loadAstgw(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
 	string name = source.path.stem().string();
 	hse::graph g;
 	g.name = name;
@@ -50,12 +51,13 @@ void loadAstgw(weaver::Project &proj, weaver::Program &prgm, const weaver::Sourc
 	g.post_process(true, false, false, false);
 	g.check_variables();
 
-	weaver::Prototype proto = weaver::Prototype::fromMangled(name);
+	weaver::Prototype proto = weaver::Prototype::fromMangled(name, source.modName);
+	int mod = prgm.getModule(proto.mod);
 
-	weaver::TermId id;
-	id.mod   = prgm.getModule(source.modName);
-	id.index = prgm.modAt(id).createTerm(weaver::Term(proto.name, vector<weaver::Instance>()));
-	id.var   = prgm.termAt(id).createVariant(weaver::Variant("proto", g));
+	weaver::TermId id = prgm.getTerm(proto, mod);
+	id.var = prgm.termAt(id).createVariant(weaver::Variant("proto", g));
+	prgm.varAt(id).fromSource = true;
+	return {id};
 }
 
 void writeAstg(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, weaver::TermId id) {

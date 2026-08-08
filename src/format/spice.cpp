@@ -1,4 +1,5 @@
 #include "spice.h"
+#include "param.h"
 
 #include <parse/parse.h>
 #include <parse/default/block_comment.h>
@@ -17,41 +18,50 @@
 
 #include <weaver/params.h>
 
-weaver::Decl declFromSubckt(const weaver::Program &prgm, int mod, const sch::Subckt &ckt) {
-	std::map<std::string, std::string> params = weaver::readParams({ckt.comment});
-	auto pos = params.find("decl");
-	if (pos != params.end()) {
-		return prgm.findDecl(weaver::Prototype(pos->second), mod);
+void guessPorts(weaver::Prototype &proto, const sch::Subckt &ckt) {
+	// All of the ports in a cell are wires
+	weaver::Typename wireType("wire");
+	for (int j : ckt.ports) {
+		proto.args.push_back(wireType);
 	}
+	proto.hashArgs();
+}
 
+weaver::Decl declFromSubckt(const weaver::Program &prgm, const sch::Subckt &ckt, std::string name) {
 	weaver::TypeId wireType(prgm.global, prgm.mods[prgm.global].findType("wire"));
+	weaver::Typename wireName("wire");
 
 	weaver::Decl decl;
 	decl.name = ckt.name;
-
-	// All of the ports in a cell are wires
-	vector<weaver::Instance> args;
+	if (not name.empty()) {
+		decl.name = name;
+	}
+	vector<weaver::Typename> args;
 	for (int j : ckt.ports) {
 		decl.args.push_back(weaver::Instance(wireType, ckt.nets[j].name));
+		args.push_back(wireName);
 	}
+	decl.argsHash = weaver::getHash(args);
+	decl.hashed = true;
+	decl.qualified = true;
 	return decl;
 }
 
-weaver::Prototype protoFromInstance(const weaver::Program &prgm, int mod, const sch::Instance &inst, bool qualify) {
+weaver::Prototype protoFromInstance(const weaver::Program &prgm, const sch::Instance &inst, bool qualify) {
 	std::map<std::string, std::string> params = weaver::readParams({inst.comment});
-	auto pos = params.find("proto");
-	if (pos != params.end()) {
-		return weaver::Prototype(pos->second);
+	weaver::Prototype proto = protoFromParam(params);
+	if (not proto.empty()) {
+		return proto;
 	}
-	weaver::Prototype proto; // = weaver::Prototype::fromMangled(inst.type);
-	proto.name = inst.type;
 
-	// TODO(edward.bingham) better to leave unqualified?
+	proto = weaver::Prototype::fromMangled(inst.type);
+
 	if (qualify) {
 		proto.qualified = true;
 		for (int j : inst.ports) {
 			proto.args.push_back(weaver::Typename("wire"));
 		}
+		proto.argsHash = weaver::getHash(proto.args);
 	}
 	return proto;
 }
@@ -72,10 +82,11 @@ void readSpice(weaver::Project &proj, weaver::Source &source, string buffer) {
 	}
 }
 
-void loadSpice(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
+std::vector<weaver::TermId> loadSpice(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
+	std::vector<weaver::TermId> result;
 	phy::Tech *tech = loadASIC(proj);
 	if (not tech) {
-		return;
+		return result;
 	}
 
 	weaver::TypeId wireType(prgm.global, prgm.mods[prgm.global].findType("wire"));
@@ -84,13 +95,36 @@ void loadSpice(weaver::Project &proj, weaver::Program &prgm, const weaver::Sourc
 	sch::import_netlist(*tech, lst, *(parse_spice::netlist*)source.syntax.get(), source.tokens.get());
 
 	for (auto &ckt : lst) {
-		int mod = prgm.getModule(source.modName);
-		weaver::Decl decl = declFromSubckt(prgm, mod, ckt);
-		
-		weaver::TermId id = prgm.getTerm(mod, decl);
+		weaver::Prototype proto = weaver::Prototype::fromMangled(ckt.name);
+		if (proto.mod.empty()) {
+			proto.mod = source.modName;
+		}
+		int mod = prgm.getModule(proto.mod);
+
+		weaver::TermId id;
+
+		// First, check the metadata to see if we can extract the type information
+		std::map<std::string, std::string> params = weaver::readParams({ckt.comment});
+		if (not params.empty()) {
+			weaver::Decl decl = declFromParam(prgm, params, "", mod);
+			if (not decl.name.empty()) {
+				id = prgm.getTerm(mod, decl);
+			}
+		}
+
+		// Then, try to find the prototype in the program
+		if (not id.hasTerm()) {
+			// fall back to the port list if need be
+			//if (not proto.qualified) {
+			//	guessPorts(proto, *macro);
+			//}
+			id = prgm.getTerm(proto, mod);
+		}
+
 		if (prgm.termValid(id)) {
 			auto &term = prgm.termAt(id);
 			id.var   = term.createVariant(weaver::Variant("spice", ckt));
+			prgm.varAt(id).fromSource = true;
 			// Look for the parent
 			for (int i = id.var-1; i >= 0; i--) {
 				if (term.variants[i].meta.dialect == "prs") {
@@ -106,10 +140,12 @@ void loadSpice(weaver::Project &proj, weaver::Program &prgm, const weaver::Sourc
 					term.variants[id.var].derived.push_back(i);
 				}
 			}
+			result.push_back(id);
 		} else {
-			internal("", "term not defined '" + prgm.getPrototype(decl, source.modName).to_string() + "'", __FILE__, __LINE__);
+			internal("", "term not defined '" + proto.to_string() + "'", __FILE__, __LINE__);
 		}
 	}
+	return result;
 }
 
 void writeSpice(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, weaver::TermId id) {
@@ -147,7 +183,7 @@ std::vector<weaver::Prototype> linkSpice(const weaver::Project &proj, const weav
 
 	std::vector<weaver::Prototype> result;
 	for (const sch::Instance &inst : ckt.inst) {
-		result.push_back(protoFromInstance(prgm, id.mod, inst, true));
+		result.push_back(protoFromInstance(prgm, inst, false));
 	}
 	return result;
 }

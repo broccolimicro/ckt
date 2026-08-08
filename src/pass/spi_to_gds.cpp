@@ -3,6 +3,7 @@
 #include "../back/asic.h"
 #include "../format/cell.h"
 #include "../format/spice.h"
+#include "../format/param.h"
 
 #include <sch/Subckt.h>
 #include <sch/Tapeout.h>
@@ -43,16 +44,17 @@ bool mapCells(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 		std::string baseName = "cell_" + encodeBase32(cell.id);
 
 		int mod = prgm.getModule(builder.proj.tech.name);
-		weaver::Decl decl = declFromSubckt(prgm, mod, cell);
-		decl.name = baseName;
-		cell.comment = weaver::writeParams({{"decl", parse_ucs::export_decl(prgm, decl).to_string()}});
+		weaver::Decl decl = declFromSubckt(prgm, cell, baseName);
+		cell.comment = weaver::writeParams(declToParams(prgm, decl));
 
 		// Create the term and schedule it for compilation
 		int step = 0;
 		weaver::TermId cellId;
+		weaver::Prototype proto;
 		while (true) {
 			cellId = prgm.getTerm(mod, decl);
-			cell.name = prgm.getPrototype(cellId).mangle();
+			proto = prgm.getPrototype(cellId);
+			cell.name = proto.mangle();
 			if (prgm.termAt(cellId).variants.empty()) {
 				cellId.var = prgm.termAt(cellId).createVariant(weaver::Variant("spice", cell));
 				prgm.varAt(cellId).meta.set("spi.cell");
@@ -74,7 +76,7 @@ bool mapCells(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 		for (auto i = mapped.inst.begin(); i != mapped.inst.end(); i++) {
 			if (i->type == originalName) {
 				i->type = cell.name;
-				i->comment = weaver::writeParams({{"proto", prgm.getPrototype(cellId).to_string()}});
+				i->comment = weaver::writeParams(protoToParams(proto));
 			}
 		}
 	}
@@ -93,10 +95,11 @@ struct SchLinker : sch::Linker {
 
 	sch::Implementation find(const sch::Instance &inst) override {
 		sch::Implementation result;
-		weaver::Prototype proto = protoFromInstance(prgm, mod, inst, false);
+		weaver::Prototype proto = protoFromInstance(prgm, inst, false);
 		std::vector<weaver::TermId> terms = prgm.findTerms(proto, mod);
 		if (terms.empty() or not prgm.termValid(terms[0])) {
 			error("", "unable to link '" + proto.to_string() + "'", __FILE__, __LINE__);
+			//prgm.print();
 			return result;
 		} else if (terms.size() > 1u) {
 			warning("", "ambiguous instance '" + proto.to_string() + "'", __FILE__, __LINE__);
@@ -122,7 +125,6 @@ struct SchLinker : sch::Linker {
 		}
 		if (result.macro != nullptr) {
 			std::string name = proto.to_string();
-			printf("LOOK %s: %d\n", name.c_str(), result.macro->box.area());
 		}
 		return result;
 	}
@@ -143,7 +145,7 @@ bool spiToGds(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 	sch::Subckt ckt = prgm.varAt(id).as<sch::Subckt>();
 	if (ckt.inst.empty() and not ckt.mos.empty()) {
 		array<int, 2> vars{-1, -1};
-		if (not cell::import_cell(builder.proj.tech.lib, *tech, prgm.termAt(id), &vars, builder.progress, builder.debug)) {
+		if (not cell::import_cell(builder.proj.tech.lib, *tech, prgm, prgm.termAt(id), &vars, builder.progress, builder.debug)) {
 			// We generated a new cell, save this to the cell library
 			if (not filesystem::exists(builder.proj.tech.lib)) {
 				filesystem::create_directory(builder.proj.tech.lib);
@@ -177,6 +179,9 @@ bool spiToGds(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 		sch::Placement prob(placer, 0);
 		prob.solve();
 		prob.save(macro);
+
+		declToParam(macro.properties, prgm, term.decl, "wv.");
+
 		prgm.varAt(id).meta.set("gds.place");
 		builder.push(prgm, id);
 		if (builder.progress) {
@@ -188,7 +193,10 @@ bool spiToGds(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 		weaver::Prototype proto = prgm.getPrototype(term.decl, prgm.mods[id.mod].name);
 		warning("", "found blackbox \"" + proto.to_string() + "\"", __FILE__, __LINE__);
 
-		id.var = term.createVariant(weaver::Variant("layout", phy::Layout(*tech, proto.mangle(true)), id.var));
+		phy::Layout macro(*tech, proto.mangle(true));
+		declToParam(macro.properties, prgm, term.decl, "wv.");
+
+		id.var = term.createVariant(weaver::Variant("layout", macro, id.var));
 		return true;
 	} else {
 		weaver::Term &term = prgm.termAt(id);

@@ -21,7 +21,7 @@ void readCog(weaver::Project &proj, weaver::Source &source, string buffer) {
 	source.tokens->register_token<parse::block_comment>(false);
 	source.tokens->register_token<parse::line_comment>(false);
 	parse_cog::composition::register_syntax(*source.tokens);
-	source.tokens->insert(source.path.string(), buffer, nullptr);
+	source.tokens->insert(source.path.string(), buffer);
 
 	parse_cog::adapter cfg;
 	cfg.type_name.sub.set<parse_ucs::type_name>();
@@ -33,30 +33,30 @@ void readCog(weaver::Project &proj, weaver::Source &source, string buffer) {
 	}
 }
 
-void loadCog(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
+std::vector<weaver::TermId> loadCog(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
 	string name = source.path.stem().string();
 	chp::graph g = std::any_cast<chp::graph>(factoryCog(name, source.syntax.get(), source.tokens.get()));
 
-	weaver::Prototype proto = weaver::Prototype::fromMangled(name);
-	proto.mod = source.modName;
+	weaver::Prototype proto = weaver::Prototype::fromMangled(name, source.modName);
+	int mod = prgm.getModule(proto.mod);
 
-	weaver::TermId id;
-	id.mod   = prgm.getModule(source.modName);
-	id.index = prgm.modAt(id).createTerm(weaver::Term(proto.name, vector<weaver::Instance>()));
-	id.var   = prgm.termAt(id).createVariant(weaver::Variant("func", g));
+	weaver::TermId id = prgm.getTerm(proto, mod);
+	id.var = prgm.termAt(id).createVariant(weaver::Variant("func", g));
+	prgm.varAt(id).fromSource = true;
+	return {id};
 }
 
-void loadCogw(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
+std::vector<weaver::TermId> loadCogw(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
 	string name = source.path.stem().string();
 	hse::graph g = std::any_cast<hse::graph>(factoryCogw(name, source.syntax.get(), source.tokens.get()));
 
-	weaver::Prototype proto = weaver::Prototype::fromMangled(name);
-	proto.mod = source.modName;
+	weaver::Prototype proto = weaver::Prototype::fromMangled(name, source.modName);
+	int mod = prgm.getModule(proto.mod);
 
-	weaver::TermId id;
-	id.mod   = prgm.getModule(proto.mod);
-	id.index = prgm.modAt(id).createTerm(weaver::Term(proto.name, vector<weaver::Instance>()));
+	weaver::TermId id = prgm.getTerm(proto, mod);
 	id.var   = prgm.termAt(id).createVariant(weaver::Variant("proto", g));
+	prgm.varAt(id).fromSource = true;
+	return {id};
 }
 
 std::any factoryCog(string name, const parse::syntax *syntax, tokenizer *tokens) {

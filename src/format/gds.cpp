@@ -1,4 +1,5 @@
 #include "gds.h"
+#include "param.h"
 
 #include <parse/parse.h>
 #include <parse/default/block_comment.h>
@@ -14,10 +15,22 @@
 
 #include "../back/asic.h"
 
-void loadGds(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
+void guessPorts(weaver::Prototype &proto, const phy::Layout &macro) {
+	// All of the ports in a cell are wires
+	weaver::Typename wireType("wire");
+	for (const auto &net : macro.nets) {
+		if (net.isInput or net.isOutput) {
+			proto.args.push_back(wireType);
+		}
+	}
+	proto.hashArgs();
+}
+
+std::vector<weaver::TermId> loadGds(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
+	std::vector<weaver::TermId> result;
 	phy::Tech *tech = loadASIC(proj);
 	if (not tech) {
-		return;
+		return result;
 	}
 
 	string name = source.path.stem().string();
@@ -26,12 +39,33 @@ void loadGds(weaver::Project &proj, weaver::Program &prgm, const weaver::Source 
 
 	for (auto macro = lib.begin(); macro != lib.end(); macro++) {
 		weaver::Prototype proto = weaver::Prototype::fromMangled(macro->name);
-		proto.mod = source.modName;
+		if (proto.mod.empty()) {
+			proto.mod = source.modName;
+		}
+		int mod = prgm.getModule(proto.mod);
 
-		weaver::TermId id = prgm.getTerm(proto);
+		weaver::TermId id;
+
+		// First, check the metadata to see if we can extract the type information
+		weaver::Decl decl = declFromParam(prgm, macro->properties, "wv.", mod);
+		if (not decl.name.empty()) {
+			id = prgm.getTerm(mod, decl);
+		}
+
+		// Then, try to find the prototype in the program
+		if (not id.hasTerm()) {
+			// fall back to the port list if need be
+			//if (not proto.qualified) {
+			//	macro->trace();
+			//	guessPorts(proto, *macro);
+			//}
+			id = prgm.getTerm(proto, mod);
+		}
+
 		if (prgm.termValid(id)) {
 			auto &term = prgm.termAt(id);
 			id.var = term.createVariant(weaver::Variant("layout", *macro));
+			prgm.varAt(id).fromSource = true;
 			// look for the parent
 			for (int i = id.var-1; i >= 0; i--) {
 				if (term.variants[i].meta.dialect == "spice") {
@@ -40,10 +74,13 @@ void loadGds(weaver::Project &proj, weaver::Program &prgm, const weaver::Source 
 					break;
 				}
 			}
+
+			result.push_back(id);
 		} else {
 			internal("", "term not defined '" + proto.to_string() + "'", __FILE__, __LINE__);
 		}
 	}
+	return result;
 }
 
 void writeGds(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, weaver::TermId id) {

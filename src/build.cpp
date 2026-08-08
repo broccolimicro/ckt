@@ -71,6 +71,7 @@ int build_command(int argc, char **argv) {
 	loadAllFormats(proj);
 
 	vector<weaver::Prototype> protos;
+	vector<std::string> files;
 
 	Build builder(proj);
 	
@@ -203,7 +204,11 @@ int build_command(int argc, char **argv) {
 		} else if (arg == "--no-ghosts") {
 			builder.noGhosts = true;
 		} else {
-			protos.push_back(weaver::Prototype(arg));
+			if (arg.rfind("fn:", 0) != string::npos) {
+				protos.push_back(weaver::Prototype(arg.substr(3)));
+			} else {
+				files.push_back(arg);
+			}
 		}
 	}
 
@@ -222,23 +227,37 @@ int build_command(int argc, char **argv) {
 		}
 	}
 
-	if (protos.empty()) {
+	for (auto path : files) {
+		proj.inclFile(path);
+	}
+	for (const auto &proto : protos) {
+		proj.incl(proto.mod);
+	}
+	if (files.empty() and protos.empty()) {
 		proj.incl(proj.modName);
-		proj.load(prgm);
+	}
+	proj.load(prgm);
+	if (files.empty() and protos.empty()) {
 		builder.push(prgm);
-	} else {
-		for (auto i = protos.begin(); i != protos.end(); i++) {
-			proj.incl(i->mod);
+	}
+
+	for (auto path : files) {
+		std::string mod = proj.pathToModule(path);
+		int modId = prgm.findModule(mod);
+		if (modId < 0) {
+			error("", "module not found '" + mod + "'", __FILE__, __LINE__);
+		} else {
+			builder.push(prgm, weaver::TermId(modId));
 		}
-		proj.load(prgm);
-		for (auto i = protos.begin(); i != protos.end(); i++) {
-			vector<weaver::TermId> curr = prgm.findTerms(*i);
-			if (curr.empty()) {
-				error("", "module not found for term '" + i->to_string() + "'", __FILE__, __LINE__);
-			}
-			for (auto j = curr.begin(); j != curr.end(); j++) {
-				builder.push(prgm, *j);
-			}
+	}
+
+	for (const auto &proto : protos) {
+		vector<weaver::TermId> curr = prgm.findTerms(proto);
+		if (curr.empty()) {
+			error("", "module not found for term '" + proto.to_string() + "'", __FILE__, __LINE__);
+		}
+		for (auto term : curr) {
+			builder.push(prgm, term);
 		}
 	}
 

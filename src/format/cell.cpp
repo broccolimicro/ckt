@@ -5,6 +5,8 @@
 
 #include <filesystem>
 
+#include <interpret_wv/export.h>
+
 using namespace std::filesystem;
 
 namespace cell {
@@ -49,7 +51,7 @@ void export_cells(std::string path, const phy::Tech &tech, const weaver::Program
 }
 
 // returns whether the cell was imported
-bool import_cell(std::string path, const phy::Tech &tech, weaver::Term &term, array<int, 2> *idx, bool progress, bool debug) {
+bool import_cell(std::string path, const phy::Tech &tech, const weaver::Program &prgm, weaver::Term &term, array<int, 2> *idx, bool progress, bool debug) {
 	string cellPath = path + "/" + term.decl.name+".gds";
 	if (progress) {
 		printf("  %s...", term.decl.name.c_str());
@@ -144,6 +146,7 @@ bool import_cell(std::string path, const phy::Tech &tech, weaver::Term &term, ar
 
 			genDelay = tmr.since();
 			if (gdsNet.compare(spiNet) == 0) {
+				macro.properties.insert({"!wv decl", parse_ucs::export_decl(prgm, term.decl).to_string()});
 				printf("%sGENERATED %d DBUNIT2 AREA%s]\t(%gs %gs)\n", KGRN, macro.box.area(), KNRM, searchDelay, genDelay);
 				phyIdx = term.createVariant(weaver::Variant("layout", macro, spiIdx));
 			} else {
@@ -161,7 +164,7 @@ bool import_cell(std::string path, const phy::Tech &tech, weaver::Term &term, ar
 	return false;
 }
 
-void update_library(std::string path, const phy::Tech &tech, weaver::Module &mod, bool progress, bool debug) {
+void update_library(std::string path, const phy::Tech &tech, const weaver::Program &prgm, weaver::Module &mod, bool progress, bool debug) {
 	bool libFound = filesystem::exists(path);
 	if (progress) {
 		printf("Load cell layouts:\n");
@@ -171,7 +174,7 @@ void update_library(std::string path, const phy::Tech &tech, weaver::Module &mod
 	for (int i = 0; i < (int)mod.terms.size(); i++) {
 		if (mod.terms[i].decl.name.rfind("cell_", 0) == 0) {
 			
-			if (not import_cell(path, tech, mod.terms[i], nullptr, progress, debug)) {
+			if (not import_cell(path, tech, prgm, mod.terms[i], nullptr, progress, debug)) {
 				// We generated a new cell, save this to the cell library
 				if (not libFound) {
 					filesystem::create_directory(path);

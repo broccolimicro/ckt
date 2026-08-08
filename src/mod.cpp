@@ -29,6 +29,7 @@ int mod_command(int argc, char **argv) {
 	loadAllFormats(proj);
 
 	vector<weaver::Prototype> protos;
+	vector<std::string> files;
 	bool show = false;
 	bool debug = false;
 
@@ -64,7 +65,11 @@ int mod_command(int argc, char **argv) {
 		} else if (arg == "-d" or arg == "--debug") {
 			debug = true;
 		} else if (show) {
-			protos.push_back(weaver::Prototype(arg));
+			if (arg.rfind("fn:", 0) != string::npos) {
+				protos.push_back(weaver::Prototype(arg.substr(3)));
+			} else {
+				files.push_back(arg);
+			}
 		} else {
 			error("", "unrecognized command '" + arg + "'", __FILE__, __LINE__);
 			complete();
@@ -80,12 +85,14 @@ int mod_command(int argc, char **argv) {
 	weaver::Program prgm;
 	loadGlobalTypes(prgm);
 
-	if (protos.empty()) {
+	for (auto path : files) {
+		proj.inclFile(path);
+	}
+	for (const auto &proto : protos) {
+		proj.incl(proto.mod);
+	}
+	if (files.empty() and protos.empty()) {
 		proj.incl(proj.modName);
-	} else {
-		for (auto i = protos.begin(); i != protos.end(); i++) {
-			proj.incl(i->mod);
-		}
 	}
 	proj.load(prgm);
 
@@ -94,7 +101,7 @@ int mod_command(int argc, char **argv) {
 	} else {
 		for (auto i = prgm.begin(); i != prgm.end(); i = prgm.next(i)) {
 			std::string name = prgm.getPrototype(i).to_string();
-			printf("%s\n", name.c_str());
+			printf("fn:%s\n", name.c_str());
 		}
 	}
 

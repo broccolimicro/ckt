@@ -24,18 +24,19 @@ void readPrs(weaver::Project &proj, weaver::Source &source, string buffer) {
 	}
 }
 
-void loadPrs(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
+std::vector<weaver::TermId> loadPrs(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
 	string name = source.path.stem().string();
 	prs::production_rule_set pr;
 	pr.name = name;
 	prs::import_production_rule_set(*(parse_prs::production_rule_set*)source.syntax.get(), pr, -1, -1, prs::attributes(), 0, source.tokens.get(), true);
 
-	weaver::Prototype proto = weaver::Prototype::fromMangled(name);
+	weaver::Prototype proto = weaver::Prototype::fromMangled(name, source.modName);
+	int mod = prgm.getModule(proto.mod);
 
-	weaver::TermId id;
-	id.mod   = prgm.getModule(source.modName);
-	id.index = prgm.modAt(id).createTerm(weaver::Term(proto.name, vector<weaver::Instance>()));
-	id.var   = prgm.termAt(id).createVariant(weaver::Variant("circ", pr));
+	weaver::TermId id = prgm.getTerm(proto, mod);
+	id.var = prgm.termAt(id).createVariant(weaver::Variant("circ", pr));
+	prgm.varAt(id).fromSource = true;
+	return {id};
 }
 
 void writePrs(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, weaver::TermId id) {

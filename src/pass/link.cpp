@@ -13,6 +13,7 @@ bool link(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 		for (const auto &proto : ref->link(builder.proj, prgm, id)) {
 			std::vector<weaver::TermId> ids = prgm.findTerms(proto, id.mod);
 			if (ids.empty()) {
+				//prgm.print();
 				error("", "term not defined '" + proto.to_string() + "'", __FILE__, __LINE__);
 				continue;
 			}

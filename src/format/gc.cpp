@@ -25,18 +25,19 @@ void readGc(weaver::Project &proj, weaver::Source &source, string buffer) {
 	}
 }
 
-void loadGc(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
+std::vector<weaver::TermId> loadGc(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
 	string name = source.path.stem().string();
 	gc::GuardedCommands rules;
 	rules.name = name;
 	gc::import_rule_set(*(parse_gc::rule_set*)source.syntax.get(), rules, 0, source.tokens.get(), true);
 
-	weaver::Prototype proto = weaver::Prototype::fromMangled(name);
+	weaver::Prototype proto = weaver::Prototype::fromMangled(name, source.modName);
+	int mod = prgm.getModule(proto.mod);
 
-	weaver::TermId id;
-	id.mod   = prgm.getModule(source.modName);
-	id.index = prgm.modAt(id).createTerm(weaver::Term(proto.name, vector<weaver::Instance>()));
+	weaver::TermId id = prgm.getTerm(proto, mod);
 	id.var   = prgm.termAt(id).createVariant(weaver::Variant("struct", rules));
+	prgm.varAt(id).fromSource = true;
+	return {id};
 }
 
 void writeGc(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, weaver::TermId id) {
