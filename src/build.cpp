@@ -66,6 +66,9 @@ int build_command(int argc, char **argv) {
 	weaver::Project proj;
 	if (proj.hasMod()) {
 		readMod(proj);
+	} else {
+		// default to skywater 130
+		proj.setTech("sky130");
 	}
 
 	loadAllFormats(proj);
@@ -237,6 +240,10 @@ int build_command(int argc, char **argv) {
 		proj.incl(proj.modName);
 	}
 	proj.load(prgm);
+	if (builder.debug) {
+		prgm.print();
+	}
+
 	if (files.empty() and protos.empty()) {
 		builder.push(prgm);
 	}
@@ -262,7 +269,6 @@ int build_command(int argc, char **argv) {
 	}
 
 	builder.build(prgm);
-
 	if (builder.debug) {
 		prgm.print();
 	}

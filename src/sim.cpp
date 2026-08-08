@@ -1061,6 +1061,9 @@ int sim_command(int argc, char **argv) {
 	weaver::Project proj;
 	if (proj.hasMod()) {
 		readMod(proj);
+	} else {
+		// default to skywater 130
+		proj.setTech("sky130");
 	}
 
 	loadAllFormats(proj);
@@ -1103,14 +1106,17 @@ int sim_command(int argc, char **argv) {
 			proj.incl(proj.modName);
 			proto = weaver::Prototype("top.top");
 		} else {
+			proto = weaver::Prototype::fromMangled(files[0].stem().string());
 			proto.mod = proj.pathToModule(files[0]);
-			proto.name = files[0].stem().string();
 		}
 	} else if (files.empty()) {
 		proj.incl(proto.mod);
 	}
 
 	proj.load(prgm);
+	if (debug) {
+		prgm.print();
+	}
 
 	vector<weaver::TermId> curr = prgm.findTerms(proto);
 	if (curr.empty() or curr[0].mod < 0) {

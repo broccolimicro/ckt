@@ -24,6 +24,9 @@ int unpack_command(int argc, char **argv) {
 	weaver::Project proj;
 	if (proj.hasMod()) {
 		readMod(proj);
+	} else {
+		// default to skywater 130
+		proj.setTech("sky130");
 	}
 
 	loadAllFormats(proj);

@@ -183,8 +183,8 @@ int tech_command(int argc, char **argv) {
 	if (proj.hasMod()) {
 		readMod(proj);
 	} else {
-		printf("please initialize your module with the following.\n\nlm mod init my_module\n");
-		return 1;
+		// default to skywater 130
+		proj.setTech("sky130");
 	}
 
 	for (int i = 0; i < argc; i++) {
@@ -203,6 +203,10 @@ int tech_command(int argc, char **argv) {
 			++i;
 			if (i < argc) {
 				proj.setTech(argv[i]);
+			}
+			if (not proj.hasMod()) {
+				printf("please initialize your module with the following.\n\nlm mod init my_module\n");
+				return 1;
 			}
 			writeMod(proj);
 			return 0;
