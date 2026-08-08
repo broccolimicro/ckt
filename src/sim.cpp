@@ -1066,6 +1066,7 @@ int sim_command(int argc, char **argv) {
 	loadAllFormats(proj);
 
 	weaver::Prototype proto;
+	std::vector<fs::path> files;
 
 	string sfilename = "";
 	bool debug = false;
@@ -1078,19 +1079,14 @@ int sim_command(int argc, char **argv) {
 		} else if (arg == "--debug" or arg == "-d") {
 			set_debug(true);
 			debug = true;
-		} else if (proto.empty()) {
-			proto = weaver::Prototype(arg);
+		} else if (arg.rfind("fn:", 0) != string::npos and proto.empty()) {
+			proto = weaver::Prototype(arg.substr(3));
 		} else {
-			sfilename = arg;
-			size_t dot = sfilename.find_last_of(".");
-			if (dot == string::npos) {
-				printf("unrecognized file format\n");
-				return 0;
-			}
-			string sformat = sfilename.substr(dot+1);
-			if (sformat != "sim") {
-				printf("unrecognized file format '%s'\n", sformat.c_str());
-				return 0;
+			string ext = fs::path(arg).extension();
+			if (ext == "sim") {
+				sfilename = arg;
+			} else {
+				files.push_back(fs::path(arg));
 			}
 		}
 	}
@@ -1098,10 +1094,19 @@ int sim_command(int argc, char **argv) {
 	weaver::Program prgm;
 	loadGlobalTypes(prgm);
 
+	for (auto path : files) {
+		proj.inclFile(path);
+	}
+
 	if (proto.empty()) {
-		proj.incl(proj.modName);
-		proto = weaver::Prototype("top.top");
-	} else {
+		if (files.empty()) {
+			proj.incl(proj.modName);
+			proto = weaver::Prototype("top.top");
+		} else {
+			proto.mod = proj.pathToModule(files[0]);
+			proto.name = files[0].stem().string();
+		}
+	} else if (files.empty()) {
 		proj.incl(proto.mod);
 	}
 
@@ -1109,7 +1114,7 @@ int sim_command(int argc, char **argv) {
 
 	vector<weaver::TermId> curr = prgm.findTerms(proto);
 	if (curr.empty() or curr[0].mod < 0) {
-		error("", "module not found for term '" + proto.to_string() + "'", __FILE__, __LINE__);
+		error("", "module '" + proto.mod + "' not found for term '" + proto.name + "'", __FILE__, __LINE__);
 		complete();
 		return 1;
 	}
