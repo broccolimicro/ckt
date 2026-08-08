@@ -15,7 +15,7 @@ void readPrs(weaver::Project &proj, weaver::Source &source, string buffer) {
 	source.tokens->register_token<parse::block_comment>(false);
 	source.tokens->register_token<parse::line_comment>(false);
 	parse_prs::production_rule_set::register_syntax(*source.tokens);
-	source.tokens->insert(source.path, buffer, nullptr);
+	source.tokens->insert(source.path.string(), buffer, nullptr);
 	
 	source.tokens->increment(false);
 	source.tokens->expect<parse_prs::production_rule_set>();
