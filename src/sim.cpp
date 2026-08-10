@@ -22,7 +22,7 @@
 #include <interpret_chp/import_cog.h>
 
 #include <interpret_hse/export_cog.h>
-#include <interpret_chp/export_cog.h>
+#include <interpret_flow/export_cog.h>
 
 #include <interpret_hse/export_cli.h>
 #include <interpret_chp/export_cli.h>
