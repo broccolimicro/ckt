@@ -5,7 +5,7 @@
 #include <parse/default/line_comment.h>
 #include <parse/default/new_line.h>
 
-#include <interpret_flow/export_verilog.h>
+#include <interpret_verilog/export_verilog.h>
 
 void writeVerilog(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, weaver::TermId id) {
 	string pathstr = path.string();

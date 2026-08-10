@@ -14,7 +14,7 @@
 
 #include <interpret_chp/export_dot.h>
 #include <interpret_flow/export_dot.h>
-#include <interpret_flow/export_verilog.h>
+#include <interpret_verilog/export_verilog.h>
 #include <interpret_phy/import.h>
 #include <interpret_phy/export.h>
 #include <interpret_prs/export.h>

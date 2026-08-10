@@ -1,5 +1,5 @@
 NAME          = lm
-DEPEND        = interpret_sch interpret_prs interpret_hse interpret_chp interpret_wv weaver chp interpret_gc gc interpret_flow interpret_arithmetic interpret_boolean hse prs sch interpret_phy flow phy petri arithmetic boolean parse_verilog parse_prs parse_cog parse_gc parse_chp parse_astg parse_spice parse_dot parse_expression parse_ucs parse common
+DEPEND        = interpret_sch interpret_prs interpret_hse interpret_chp interpret_wv weaver chp interpret_gc gc interpret_flow interpret_verilog interpret_arithmetic interpret_boolean hse prs sch interpret_phy flow verilog phy petri arithmetic boolean parse_verilog parse_prs parse_cog parse_gc parse_chp parse_astg parse_spice parse_dot parse_expression parse_ucs parse common
 TEST_DEPEND   = petri arithmetic interpret_arithmetic chp interpret_chp flow interpret_flow parse_chp parse_dot parse_expression parse_ucs parse_verilog parse common
 
 COVERAGE ?= 0
