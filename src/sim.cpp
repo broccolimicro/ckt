@@ -10,6 +10,7 @@
 #include <hse/simulator.h>
 #include <prs/production_rule.h>
 #include <prs/simulator.h>
+#include <petri/reachability.h>
 
 #include "format.h"
 
@@ -112,6 +113,9 @@ void chpsim(chp::graph &g, vector<chp::term_index> steps = vector<chp::term_inde
 	chp::simulator sim;
 	sim.base = &g;
 
+	petri::Adjacency adj = g.adjacency();
+	petri::ReachabilityAnalysis reach(adj);
+
 	vcd dump;
 	dump.create(g.name, g);
 
@@ -131,14 +135,14 @@ void chpsim(chp::graph &g, vector<chp::term_index> steps = vector<chp::term_inde
 	char command[256];
 	bool done = false;
 	FILE *script = stdin;
-	while (!done)
+	while (not done)
 	{
 		if (script == stdin)
 		{
 			printf("(chpsim)");
 			fflush(stdout);
 		}
-		if (fgets(command, 255, script) == NULL && script != stdin)
+		if (fgets(command, 255, script) == NULL and script != stdin)
 		{
 			fclose(script);
 			script = stdin;
@@ -151,9 +155,9 @@ void chpsim(chp::graph &g, vector<chp::term_index> steps = vector<chp::term_inde
 		command[length-1] = '\0';
 		length--;
 
-		if ((strncmp(command, "help", 4) == 0 && length == 4) || (strncmp(command, "h", 1) == 0 && length == 1))
+		if ((strncmp(command, "help", 4) == 0 and length == 4) or (strncmp(command, "h", 1) == 0 and length == 1))
 			print_chpsim_help();
-		else if ((strncmp(command, "quit", 4) == 0 && length == 4) || (strncmp(command, "q", 1) == 0 && length == 1))
+		else if ((strncmp(command, "quit", 4) == 0 and length == 4) or (strncmp(command, "q", 1) == 0 and length == 1))
 			done = true;
 		else if (strncmp(command, "seed", 4) == 0)
 		{
@@ -165,9 +169,9 @@ void chpsim(chp::graph &g, vector<chp::term_index> steps = vector<chp::term_inde
 			else
 				printf("error: expected seed value\n");
 		}
-		else if ((strncmp(command, "clear", 5) == 0 && length == 5) || (strncmp(command, "c", 1) == 0 && length == 1))
+		else if ((strncmp(command, "clear", 5) == 0 and length == 5) or (strncmp(command, "c", 1) == 0 and length == 1))
 			steps.resize(step);
-		else if (strncmp(command, "source", 6) == 0 && length > 7)
+		else if (strncmp(command, "source", 6) == 0 and length > 7)
 		{
 			script = fopen(&command[7], "r");
 			if (script == NULL)
@@ -176,7 +180,7 @@ void chpsim(chp::graph &g, vector<chp::term_index> steps = vector<chp::term_inde
 				script = stdin;
 			}
 		}
-		else if (strncmp(command, "load", 4) == 0 && length > 5)
+		else if (strncmp(command, "load", 4) == 0 and length > 5)
 		{
 			FILE *seq = fopen(&command[5], "r");
 			if (seq != NULL)
@@ -191,7 +195,7 @@ void chpsim(chp::graph &g, vector<chp::term_index> steps = vector<chp::term_inde
 			else
 				printf("error: file not found '%s'\n", &command[5]);
 		}
-		else if (strncmp(command, "save", 4) == 0 && length > 5)
+		else if (strncmp(command, "save", 4) == 0 and length > 5)
 		{
 			FILE *seq = fopen(&command[5], "w");
 			if (seq != NULL)
@@ -201,9 +205,9 @@ void chpsim(chp::graph &g, vector<chp::term_index> steps = vector<chp::term_inde
 				fclose(seq);
 			}
 		}
-		else if (strncmp(command, "reset", 5) == 0 || strncmp(command, "r", 1) == 0)
+		else if (strncmp(command, "reset", 5) == 0 or strncmp(command, "r", 1) == 0)
 		{
-			if (sscanf(command, "reset %d", &n) == 1 || sscanf(command, "r%d", &n) == 1)
+			if (sscanf(command, "reset %d", &n) == 1 or sscanf(command, "r%d", &n) == 1)
 			{
 				sim = chp::simulator(&g, g.reset[n]);
 				uptodate = false;
@@ -214,21 +218,22 @@ void chpsim(chp::graph &g, vector<chp::term_index> steps = vector<chp::term_inde
 				for (int i = 0; i < (int)g.reset.size(); i++)
 					printf("(%d) %s\n", i, g.reset[i].to_string(g).c_str());
 		}
-		else if ((strncmp(command, "tokens", 6) == 0 && length == 6) || (strncmp(command, "t", 1) == 0 && length == 1))
-		{
+		else if ((strncmp(command, "tokens", 6) == 0 and length == 6) or (strncmp(command, "t", 1) == 0 and length == 1)) {
+			// cluster the tokens by process
 			vector<vector<int> > tokens;
-			for (int i = 0; i < (int)sim.tokens.size(); i++)
-			{
+			for (int i = 0; i < (int)sim.tokens.size(); i++) {
 				bool found = false;
-				for (int j = 0; j < (int)tokens.size() && !found; j++)
-					if (g.is_reachable(petri::iterator(chp::place::type, sim.tokens[i].index), petri::iterator(chp::place::type, sim.tokens[tokens[j][0]].index)))
-					{
+				for (int j = 0; j < (int)tokens.size(); j++) {
+					if (reach.isReachable(petri::iterator(chp::place::type, sim.tokens[i].index), petri::iterator(chp::place::type, sim.tokens[tokens[j][0]].index))) {
 						tokens[j].push_back(i);
 						found = true;
+						break;
 					}
+				}
 
-				if (!found)
+				if (not found) {
 					tokens.push_back(vector<int>(1, i));
+				}
 			}
 
 			for (int i = 0; i < (int)tokens.size(); i++) {
@@ -252,9 +257,9 @@ void chpsim(chp::graph &g, vector<chp::term_index> steps = vector<chp::term_inde
 				printf("}\n");
 			}
 		}
-		else if ((strncmp(command, "enabled", 7) == 0 && length == 7) || (strncmp(command, "e", 1) == 0 && length == 1))
+		else if ((strncmp(command, "enabled", 7) == 0 and length == 7) or (strncmp(command, "e", 1) == 0 and length == 1))
 		{
-			if (!uptodate)
+			if (not uptodate)
 			{
 				enabled = sim.enabled();
 				uptodate = true;
@@ -273,16 +278,16 @@ void chpsim(chp::graph &g, vector<chp::term_index> steps = vector<chp::term_inde
 				if (sim.loaded[sim.ready[i].first].vacuous) {
 					printf("\tvacuous");
 				}
-				if (!sim.loaded[sim.ready[i].first].stable) {
+				if (not sim.loaded[sim.ready[i].first].stable) {
 					printf("\tunstable");
 				}
 				printf("\n");
 			}
 			printf("\n");
 		}
-		else if ((strncmp(command, "disabled", 7) == 0 && length == 7) || (strncmp(command, "d", 1) == 0 && length == 1))
+		else if ((strncmp(command, "disabled", 7) == 0 and length == 7) or (strncmp(command, "d", 1) == 0 and length == 1))
 		{
-			if (!uptodate)
+			if (not uptodate)
 			{
 				enabled = sim.enabled();
 				uptodate = true;
@@ -295,7 +300,7 @@ void chpsim(chp::graph &g, vector<chp::term_index> steps = vector<chp::term_inde
 				if (sim.loaded[i].vacuous) {
 					printf("\tvacuous");
 				}
-				if (!sim.loaded[i].stable) {
+				if (not sim.loaded[i].stable) {
 					printf("\tunstable");
 				}
 				printf("\n");
@@ -314,7 +319,7 @@ void chpsim(chp::graph &g, vector<chp::term_index> steps = vector<chp::term_inde
 			else
 			{
 				i = 5;
-				while (i < length && command[i-1] != ' ')
+				while (i < length and command[i-1] != ' ')
 					i++;
 			}
 
@@ -357,14 +362,14 @@ void chpsim(chp::graph &g, vector<chp::term_index> steps = vector<chp::term_inde
 				uptodate = false;
 			}
 		}
-		else if (strncmp(command, "step", 4) == 0 || strncmp(command, "s", 1) == 0)
+		else if (strncmp(command, "step", 4) == 0 or strncmp(command, "s", 1) == 0)
 		{
-			if (sscanf(command, "step %d", &n) != 1 && sscanf(command, "s%d", &n) != 1)
+			if (sscanf(command, "step %d", &n) != 1 and sscanf(command, "s%d", &n) != 1)
 				n = 1;
 
-			for (int i = 0; i < n && (enabled != 0 || !uptodate); i++)
+			for (int i = 0; i < n and (enabled != 0 or not uptodate); i++)
 			{
-				if (!uptodate)
+				if (not uptodate)
 				{
 					enabled = sim.enabled();
 					uptodate = true;
@@ -376,8 +381,8 @@ void chpsim(chp::graph &g, vector<chp::term_index> steps = vector<chp::term_inde
 					bool vacuous = false;
 					if (step < (int)steps.size())
 					{
-						for (firing = 0; firing < (int)sim.ready.size() &&
-						(sim.loaded[sim.ready[firing].first].index != steps[step].index || sim.ready[firing].second != steps[step].term); firing++);
+						for (firing = 0; firing < (int)sim.ready.size() and
+						(sim.loaded[sim.ready[firing].first].index != steps[step].index or sim.ready[firing].second != steps[step].term); firing++);
 
 						if (firing == (int)sim.ready.size())
 						{
@@ -425,11 +430,11 @@ void chpsim(chp::graph &g, vector<chp::term_index> steps = vector<chp::term_inde
 				}
 			}
 		}
-		else if (strncmp(command, "fire", 4) == 0 || strncmp(command, "f", 1) == 0)
+		else if (strncmp(command, "fire", 4) == 0 or strncmp(command, "f", 1) == 0)
 		{
-			if (sscanf(command, "fire %d", &n) == 1 || sscanf(command, "f%d", &n) == 1)
+			if (sscanf(command, "fire %d", &n) == 1 or sscanf(command, "f%d", &n) == 1)
 			{
-				if (!uptodate)
+				if (not uptodate)
 				{
 					enabled = sim.enabled();
 					uptodate = true;
@@ -502,14 +507,14 @@ void hsesim(hse::graph &g, vector<hse::term_index> steps = vector<hse::term_inde
 	char command[256];
 	bool done = false;
 	FILE *script = stdin;
-	while (!done)
+	while (not done)
 	{
 		if (script == stdin)
 		{
 			printf("(hsesim)");
 			fflush(stdout);
 		}
-		if (fgets(command, 255, script) == NULL && script != stdin)
+		if (fgets(command, 255, script) == NULL and script != stdin)
 		{
 			fclose(script);
 			script = stdin;
@@ -522,9 +527,9 @@ void hsesim(hse::graph &g, vector<hse::term_index> steps = vector<hse::term_inde
 		command[length-1] = '\0';
 		length--;
 
-		if ((strncmp(command, "help", 4) == 0 && length == 4) || (strncmp(command, "h", 1) == 0 && length == 1))
+		if ((strncmp(command, "help", 4) == 0 and length == 4) or (strncmp(command, "h", 1) == 0 and length == 1))
 			print_hsesim_help();
-		else if ((strncmp(command, "quit", 4) == 0 && length == 4) || (strncmp(command, "q", 1) == 0 && length == 1))
+		else if ((strncmp(command, "quit", 4) == 0 and length == 4) or (strncmp(command, "q", 1) == 0 and length == 1))
 			done = true;
 		else if (strncmp(command, "seed", 4) == 0)
 		{
@@ -536,9 +541,9 @@ void hsesim(hse::graph &g, vector<hse::term_index> steps = vector<hse::term_inde
 			else
 				printf("error: expected seed value\n");
 		}
-		else if ((strncmp(command, "clear", 5) == 0 && length == 5) || (strncmp(command, "c", 1) == 0 && length == 1))
+		else if ((strncmp(command, "clear", 5) == 0 and length == 5) or (strncmp(command, "c", 1) == 0 and length == 1))
 			steps.resize(step);
-		else if (strncmp(command, "source", 6) == 0 && length > 7)
+		else if (strncmp(command, "source", 6) == 0 and length > 7)
 		{
 			script = fopen(&command[7], "r");
 			if (script == NULL)
@@ -547,7 +552,7 @@ void hsesim(hse::graph &g, vector<hse::term_index> steps = vector<hse::term_inde
 				script = stdin;
 			}
 		}
-		else if (strncmp(command, "load", 4) == 0 && length > 5)
+		else if (strncmp(command, "load", 4) == 0 and length > 5)
 		{
 			FILE *seq = fopen(&command[5], "r");
 			if (seq != NULL)
@@ -562,7 +567,7 @@ void hsesim(hse::graph &g, vector<hse::term_index> steps = vector<hse::term_inde
 			else
 				printf("error: file not found '%s'\n", &command[5]);
 		}
-		else if (strncmp(command, "save", 4) == 0 && length > 5)
+		else if (strncmp(command, "save", 4) == 0 and length > 5)
 		{
 			FILE *seq = fopen(&command[5], "w");
 			if (seq != NULL)
@@ -572,9 +577,9 @@ void hsesim(hse::graph &g, vector<hse::term_index> steps = vector<hse::term_inde
 				fclose(seq);
 			}
 		}
-		else if (strncmp(command, "reset", 5) == 0 || strncmp(command, "r", 1) == 0)
+		else if (strncmp(command, "reset", 5) == 0 or strncmp(command, "r", 1) == 0)
 		{
-			if (sscanf(command, "reset %d", &n) == 1 || sscanf(command, "r%d", &n) == 1)
+			if (sscanf(command, "reset %d", &n) == 1 or sscanf(command, "r%d", &n) == 1)
 			{
 				sim = hse::simulator(&g, g.reset[n]);
 				uptodate = false;
@@ -585,20 +590,20 @@ void hsesim(hse::graph &g, vector<hse::term_index> steps = vector<hse::term_inde
 				for (int i = 0; i < (int)g.reset.size(); i++)
 					printf("(%d) %s\n", i, g.reset[i].to_string(g).c_str());
 		}
-		else if ((strncmp(command, "tokens", 6) == 0 && length == 6) || (strncmp(command, "t", 1) == 0 && length == 1))
+		else if ((strncmp(command, "tokens", 6) == 0 and length == 6) or (strncmp(command, "t", 1) == 0 and length == 1))
 		{
 			vector<vector<int> > tokens;
 			for (int i = 0; i < (int)sim.tokens.size(); i++)
 			{
 				bool found = false;
-				for (int j = 0; j < (int)tokens.size() && !found; j++)
+				for (int j = 0; j < (int)tokens.size() and not found; j++)
 					if (g.places[sim.tokens[i].index].mask == g.places[sim.tokens[tokens[j][0]].index].mask)
 					{
 						tokens[j].push_back(i);
 						found = true;
 					}
 
-				if (!found)
+				if (not found)
 					tokens.push_back(vector<int>(1, i));
 			}
 
@@ -624,9 +629,9 @@ void hsesim(hse::graph &g, vector<hse::term_index> steps = vector<hse::term_inde
 				printf("}\n");
 			}
 		}
-		else if ((strncmp(command, "enabled", 7) == 0 && length == 7) || (strncmp(command, "e", 1) == 0 && length == 1))
+		else if ((strncmp(command, "enabled", 7) == 0 and length == 7) or (strncmp(command, "e", 1) == 0 and length == 1))
 		{
-			if (!uptodate)
+			if (not uptodate)
 			{
 				enabled = sim.enabled();
 				uptodate = true;
@@ -639,7 +644,7 @@ void hsesim(hse::graph &g, vector<hse::term_index> steps = vector<hse::term_inde
 				if (sim.loaded[sim.ready[i].first].vacuous) {
 					printf("\tvacuous");
 				}
-				if (!sim.loaded[sim.ready[i].first].stable) {
+				if (not sim.loaded[sim.ready[i].first].stable) {
 					printf("\tunstable");
 				}
 				printf("\n");
@@ -657,7 +662,7 @@ void hsesim(hse::graph &g, vector<hse::term_index> steps = vector<hse::term_inde
 			else
 			{
 				i = 5;
-				while (i < length && command[i-1] != ' ')
+				while (i < length and command[i-1] != ' ')
 					i++;
 			}
 
@@ -697,14 +702,14 @@ void hsesim(hse::graph &g, vector<hse::term_index> steps = vector<hse::term_inde
 				dump.append(sim.now, sim.stripped_encoding());
 			}
 		}
-		else if (strncmp(command, "step", 4) == 0 || strncmp(command, "s", 1) == 0)
+		else if (strncmp(command, "step", 4) == 0 or strncmp(command, "s", 1) == 0)
 		{
-			if (sscanf(command, "step %d", &n) != 1 && sscanf(command, "s%d", &n) != 1)
+			if (sscanf(command, "step %d", &n) != 1 and sscanf(command, "s%d", &n) != 1)
 				n = 1;
 
-			for (int i = 0; i < n && (enabled != 0 || !uptodate); i++)
+			for (int i = 0; i < n and (enabled != 0 or not uptodate); i++)
 			{
-				if (!uptodate)
+				if (not uptodate)
 				{
 					enabled = sim.enabled();
 					uptodate = true;
@@ -725,8 +730,8 @@ void hsesim(hse::graph &g, vector<hse::term_index> steps = vector<hse::term_inde
 					bool vacuous = false;
 					if (step < (int)steps.size())
 					{
-						for (firing = 0; firing < (int)sim.ready.size() &&
-						(sim.loaded[sim.ready[firing].first].index != steps[step].index || sim.ready[firing].second != steps[step].term); firing++);
+						for (firing = 0; firing < (int)sim.ready.size() and
+						(sim.loaded[sim.ready[firing].first].index != steps[step].index or sim.ready[firing].second != steps[step].term); firing++);
 
 						if (firing == (int)sim.ready.size())
 						{
@@ -771,11 +776,11 @@ void hsesim(hse::graph &g, vector<hse::term_index> steps = vector<hse::term_inde
 				}
 			}
 		}
-		else if (strncmp(command, "fire", 4) == 0 || strncmp(command, "f", 1) == 0)
+		else if (strncmp(command, "fire", 4) == 0 or strncmp(command, "f", 1) == 0)
 		{
-			if (sscanf(command, "fire %d", &n) == 1 || sscanf(command, "f%d", &n) == 1)
+			if (sscanf(command, "fire %d", &n) == 1 or sscanf(command, "f%d", &n) == 1)
 			{
-				if (!uptodate)
+				if (not uptodate)
 				{
 					enabled = sim.enabled();
 					uptodate = true;
@@ -844,14 +849,14 @@ void prsim(prs::production_rule_set &pr, bool debug) {//, vector<prs::term_index
 	char command[256];
 	bool done = false;
 	FILE *script = stdin;
-	while (!done)
+	while (not done)
 	{
 		if (script == stdin)
 		{
 			printf("(prsim)");
 			fflush(stdout);
 		}
-		if (fgets(command, 255, script) == NULL && script != stdin)
+		if (fgets(command, 255, script) == NULL and script != stdin)
 		{
 			fclose(script);
 			script = stdin;
@@ -864,9 +869,9 @@ void prsim(prs::production_rule_set &pr, bool debug) {//, vector<prs::term_index
 		command[length-1] = '\0';
 		length--;
 
-		if ((strncmp(command, "help", 4) == 0 && length == 4) || (strncmp(command, "h", 1) == 0 && length == 1))
+		if ((strncmp(command, "help", 4) == 0 and length == 4) or (strncmp(command, "h", 1) == 0 and length == 1))
 			print_prsim_help();
-		else if ((strncmp(command, "quit", 4) == 0 && length == 4) || (strncmp(command, "q", 1) == 0 && length == 1))
+		else if ((strncmp(command, "quit", 4) == 0 and length == 4) or (strncmp(command, "q", 1) == 0 and length == 1))
 			done = true;
 		else if (strncmp(command, "seed", 4) == 0)
 		{
@@ -878,9 +883,9 @@ void prsim(prs::production_rule_set &pr, bool debug) {//, vector<prs::term_index
 			else
 				printf("error: expected seed value\n");
 		}
-		//else if ((strncmp(command, "clear", 5) == 0 && length == 5) || (strncmp(command, "c", 1) == 0 && length == 1))
+		//else if ((strncmp(command, "clear", 5) == 0 and length == 5) or (strncmp(command, "c", 1) == 0 and length == 1))
 		//	steps.resize(step);
-		else if (strncmp(command, "source", 6) == 0 && length > 7)
+		else if (strncmp(command, "source", 6) == 0 and length > 7)
 		{
 			script = fopen(&command[7], "r");
 			if (script == NULL)
@@ -889,7 +894,7 @@ void prsim(prs::production_rule_set &pr, bool debug) {//, vector<prs::term_index
 				script = stdin;
 			}
 		}
-		/*else if (strncmp(command, "load", 4) == 0 && length > 5)
+		/*else if (strncmp(command, "load", 4) == 0 and length > 5)
 		{
 			FILE *seq = fopen(&command[5], "r");
 			if (seq != NULL)
@@ -904,7 +909,7 @@ void prsim(prs::production_rule_set &pr, bool debug) {//, vector<prs::term_index
 			else
 				printf("error: file not found '%s'\n", &command[5]);
 		}
-		else if (strncmp(command, "save", 4) == 0 && length > 5)
+		else if (strncmp(command, "save", 4) == 0 and length > 5)
 		{
 			FILE *seq = fopen(&command[5], "w");
 			if (seq != NULL)
@@ -914,18 +919,18 @@ void prsim(prs::production_rule_set &pr, bool debug) {//, vector<prs::term_index
 				fclose(seq);
 			}
 		}*/
-		else if (strncmp(command, "run", 3) == 0 || strncmp(command, "g", 1) == 0) {
+		else if (strncmp(command, "run", 3) == 0 or strncmp(command, "g", 1) == 0) {
 			sim.run();
-		} else if (strncmp(command, "reset", 5) == 0 || strncmp(command, "r", 1) == 0) {
+		} else if (strncmp(command, "reset", 5) == 0 or strncmp(command, "r", 1) == 0) {
 			sim.reset();
 			//step = 0;
 			srand(seed);
-		} else if (strncmp(command, "wait", 4) == 0 || strncmp(command, "w", 1) == 0) {
+		} else if (strncmp(command, "wait", 4) == 0 or strncmp(command, "w", 1) == 0) {
 			sim.wait();
-		} else if ((strncmp(command, "tokens", 6) == 0 && length == 6) || (strncmp(command, "t", 1) == 0 && length == 1)) {
+		} else if ((strncmp(command, "tokens", 6) == 0 and length == 6) or (strncmp(command, "t", 1) == 0 and length == 1)) {
 			std::string encodingStr = parse_prs::export_composition(sim.encoding, pr).to_string("");
 			printf("%s\n", encodingStr.c_str());
-		} else if ((strncmp(command, "enabled", 7) == 0 && length == 7) || (strncmp(command, "e", 1) == 0 && length == 1)) {
+		} else if ((strncmp(command, "enabled", 7) == 0 and length == 7) or (strncmp(command, "e", 1) == 0 and length == 1)) {
 			for (int i = 0; i < (int)sim.nets.size(); i++) {
 				if (sim.nets[i] != nullptr) {
 					printf("(%d) %s\n", i, sim.nets[i]->value.to_string(&pr).c_str());
@@ -938,7 +943,7 @@ void prsim(prs::production_rule_set &pr, bool debug) {//, vector<prs::term_index
 				i = 4;
 			} else {
 				i = 5;
-				while (i < length && command[i-1] != ' ') {
+				while (i < length and command[i-1] != ' ') {
 					i++;
 				}
 			}
@@ -969,8 +974,8 @@ void prsim(prs::production_rule_set &pr, bool debug) {//, vector<prs::term_index
 				
 				assignment_parser.reset();
 			}
-		} else if (strncmp(command, "step", 4) == 0 || strncmp(command, "s", 1) == 0) {
-			if (sscanf(command, "step %d", &n) != 1 && sscanf(command, "s%d", &n) != 1) {
+		} else if (strncmp(command, "step", 4) == 0 or strncmp(command, "s", 1) == 0) {
+			if (sscanf(command, "step %d", &n) != 1 and sscanf(command, "s%d", &n) != 1) {
 				n = 1;
 			}
 
@@ -994,8 +999,8 @@ void prsim(prs::production_rule_set &pr, bool debug) {//, vector<prs::term_index
 
 				/*if (step < (int)steps.size())
 				{
-					for (firing = 0; firing < (int)sim.ready.size() &&
-					(sim.loaded[sim.ready[firing].first].index != steps[step].index || sim.ready[firing].second != steps[step].term); firing++);
+					for (firing = 0; firing < (int)sim.ready.size() and
+					(sim.loaded[sim.ready[firing].first].index != steps[step].index or sim.ready[firing].second != steps[step].term); firing++);
 
 					if (firing == (int)sim.ready.size())
 					{
@@ -1020,8 +1025,8 @@ void prsim(prs::production_rule_set &pr, bool debug) {//, vector<prs::term_index
 				//sim.mutex_errors.clear();
 				//step++;
 			}
-		} else if (strncmp(command, "fire", 4) == 0 || strncmp(command, "f", 1) == 0) {
-			if (sscanf(command, "fire %d", &n) == 1 || sscanf(command, "f%d", &n) == 1) {
+		} else if (strncmp(command, "fire", 4) == 0 or strncmp(command, "f", 1) == 0) {
+			if (sscanf(command, "fire %d", &n) == 1 or sscanf(command, "f%d", &n) == 1) {
 				if (n >= 0 and n < (int)sim.nets.size() and sim.at(n) != nullptr) {
 					/*if (step < (int)steps.size())
 						printf("error: deviating from loaded simulation, please clear the simulation to continue\n");
