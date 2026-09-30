@@ -50,6 +50,12 @@ int mod_command(int argc, char **argv) {
 			proj.modName = argv[i];
 			proj.setTech("sky130");
 			writeMod(proj);
+			std::filesystem::path srcPath = proj.pathFromModule(proj.modName);
+			std::filesystem::create_directories(srcPath);
+			std::string topPath = (srcPath / "top.wv").string();
+			FILE *fptr = fopen(topPath.c_str(), "w");
+			fprintf(fptr, "func top() {\n}\n");
+			fclose(fptr);
 			return 0;
 		} else if (arg == "vendor") {
 			if (not proj.hasMod()) {
