@@ -123,9 +123,6 @@ struct SchLinker : sch::Linker {
 		if (result.ckt != nullptr and result.macro != nullptr) {
 			result.cktToMacro = result.ckt->mapToLayout(*result.macro);
 		}
-		if (result.macro != nullptr) {
-			std::string name = proto.to_string();
-		}
 		return result;
 	}
 };
