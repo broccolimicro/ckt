@@ -121,6 +121,7 @@ int show_command(int argc, char **argv) {
 	loadAllFormats(proj);
 
 	vector<weaver::Prototype> protos;
+	vector<std::string> files;
 
 	ShowOptions opts;
 
@@ -149,7 +150,11 @@ int show_command(int argc, char **argv) {
 		} else if (arg == "-pn" or arg == "--petri") {
 			opts.petri = true;
 		} else {
-			protos.push_back(weaver::Prototype(arg));
+			if (arg.rfind("fn:", 0) != string::npos) {
+				protos.push_back(weaver::Prototype(arg.substr(3)));
+			} else {
+				files.push_back(arg);
+			}
 		}
 	}
 
@@ -161,12 +166,14 @@ int show_command(int argc, char **argv) {
 	weaver::Program prgm;
 	loadGlobalTypes(prgm);
 
-	if (protos.empty()) {
+	for (auto path : files) {
+		proj.inclFile(path);
+	}
+	for (const auto &proto : protos) {
+		proj.incl(proto.mod);
+	}
+	if (files.empty() and protos.empty()) {
 		proj.incl(proj.modName);
-	} else {
-		for (auto j = protos.begin(); j != protos.end(); j++) {
-			proj.incl(j->mod);
-		}
 	}
 
 	proj.load(prgm);
@@ -181,6 +188,7 @@ int show_command(int argc, char **argv) {
 				show(opts, *j, (emitDir / filename).string());
 			}
 		}
+		cout << "See " << debugDir << endl;
 	} else {
 		for (auto i = protos.begin(); i != protos.end(); i++) {
 			vector<weaver::TermId> curr = prgm.findTerms(*i);
