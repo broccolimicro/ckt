@@ -98,7 +98,6 @@ bool import_cell(std::string path, const phy::Tech &tech, const weaver::Program 
 		bool imported = import_layout(macro, cellPath, spiNet.name);
 		if (progress) {
 			if (imported) {
-				macro.trace();
 				sch::Subckt gdsNet(true);
 				extract(gdsNet, macro, true);
 				gdsNet.cleanDangling(true);
@@ -117,6 +116,7 @@ bool import_cell(std::string path, const phy::Tech &tech, const weaver::Program 
 			}
 		}
 		if (imported) {
+			macro.trace();
 			phyIdx = term.createVariant(weaver::Variant("layout", macro, spiIdx));
 			if (idx != nullptr) {
 				*idx = {spiIdx, phyIdx};
