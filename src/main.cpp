@@ -12,8 +12,8 @@
 #include "mod.h"
 
 void print_help() {
-	printf("Loom is a circuit synthesis and simulation engine.\n");
-	printf("\nUsage: lm <command> [arguments]\n");
+	printf("Bok is a circuit synthesis and simulation engine.\n");
+	printf("\nUsage: bok <command> [arguments]\n");
 	printf("Execute a sub-command:\n");
 	printf("  build         compile the behavioral specification\n");
 	printf("  unpack        decompile the structural specification\n");
@@ -28,11 +28,11 @@ void print_help() {
 	printf("  help          display this help text or more information about a command\n");
 	printf("  version       display version information\n");
 	
-	printf("\nUse \"lm help <command>\" for more information about a command.\n");
+	printf("\nUse \"bok help <command>\" for more information about a command.\n");
 }
 
 void print_version() {
-	printf("Loom %s\n", version);
+	printf("Bok %s\n", version);
 	printf("Copyright (C) 2024 Broccoli, LLC.\n");
 	printf("There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n");
 	printf("\n");

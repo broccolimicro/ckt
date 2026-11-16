@@ -17,10 +17,10 @@ void readMod(weaver::Project &proj) {
 	parse_ucs::modfile::register_syntax(tokens);
 
 	ifstream fin;
-	string pathstr = (proj.rootDir / "lm.mod").string();
+	string pathstr = (proj.rootDir / "bok.mod").string();
 	fin.open(pathstr.c_str(), ios::binary | ios::in);
 	if (!fin.is_open()) {
-		tokens.error("file not found '" + (proj.rootDir / "lm.mod").string() + "'", __FILE__, __LINE__);
+		tokens.error("file not found '" + (proj.rootDir / "bok.mod").string() + "'", __FILE__, __LINE__);
 	} else {
 		fin.seekg(0, ios::end);
 		int size = (int)fin.tellg();
@@ -45,7 +45,7 @@ void writeMod(const weaver::Project &proj) {
 	parse_ucs::modfile result = parse_ucs::export_modfile(proj);
 
 	ofstream fout;
-	string pathstr = (proj.rootDir / "lm.mod").string();
+	string pathstr = (proj.rootDir / "bok.mod").string();
 	fout.open(pathstr.c_str(), ios::out);
 	string buf = result.to_string("");
 	fout.write(buf.c_str(), buf.size());

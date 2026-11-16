@@ -7,7 +7,7 @@
 #include "format.h"
 
 void mod_help() {
-	printf("Usage: lm mod <command> [arguments]\n");
+	printf("Usage: bok mod <command> [arguments]\n");
 	printf("Manage the module. Sub-commands are:\n");
 	printf("  init <name>     initialize a new module in this directory\n");
 	printf("  vendor          download dependencies into the vendor directory\n");
@@ -43,7 +43,7 @@ int mod_command(int argc, char **argv) {
 			++i;
 			if (i >= argc) {
 				printf("error: expected module name\n");
-				printf("$ lm mod init my_module\n");
+				printf("$ bok mod init my_module\n");
 				return 1;
 			}
 			proj.rootDir = proj.workDir;
@@ -59,7 +59,7 @@ int mod_command(int argc, char **argv) {
 			return 0;
 		} else if (arg == "vendor") {
 			if (not proj.hasMod()) {
-				printf("please initialize your module with the following.\n\n$ lm mod init my_module\n");
+				printf("please initialize your module with the following.\n\n$ bok mod init my_module\n");
 				return 1;
 			}
 			readMod(proj);

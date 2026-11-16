@@ -46,7 +46,7 @@ struct ShowOptions {
 };
 
 void show_help() {
-	printf("Usage: lm show [options] file...\n");
+	printf("Usage: bok show [options] file...\n");
 	printf("Create visual representations of the circuit or behavior.\n");
 	printf("\nOptions:\n");
 	printf(" -o              Specify the output file name, formats other than 'dot'\n");
@@ -159,7 +159,7 @@ int show_command(int argc, char **argv) {
 	}
 
 	if (protos.empty() and not proj.hasMod()) {
-		printf("please initialize your module with the following.\n\nlm mod init my_module\n");
+		printf("please initialize your module with the following.\n\nbok mod init my_module\n");
 		return 1;
 	}
 

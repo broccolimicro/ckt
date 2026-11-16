@@ -30,7 +30,7 @@
 #include <interpret_prs/export.h>
 
 void sim_help() {
-	printf("Usage: lm sim [options] <ckt-file> [sim-file]\n");
+	printf("Usage: bok sim [options] <ckt-file> [sim-file]\n");
 	printf("A simulation environment for various behavioral descriptions.\n");
 
 	printf("\nSupported file formats:\n");

@@ -52,7 +52,7 @@ using namespace std::chrono;
 //const bool debug = false;
 
 void tech_help() {
-	printf("Usage: lm tech <command> [arguments]\n");
+	printf("Usage: bok tech <command> [arguments]\n");
 	printf("Manage the technology node and cell library. Sub-commands are:\n");
 	printf("  list                display a list of available technology nodes\n");
 	printf("  get                 print the current technology node\n");
@@ -205,7 +205,7 @@ int tech_command(int argc, char **argv) {
 				proj.setTech(argv[i]);
 			}
 			if (not proj.hasMod()) {
-				printf("please initialize your module with the following.\n\nlm mod init my_module\n");
+				printf("please initialize your module with the following.\n\nbok mod init my_module\n");
 				return 1;
 			}
 			writeMod(proj);

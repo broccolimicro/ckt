@@ -8,7 +8,7 @@
 #include "format.h"
 
 void unpack_help() {
-	printf("Usage: lm unpack [options] <file>\n");
+	printf("Usage: bok unpack [options] <file>\n");
 	printf("Reverse the synthesis process.\n");
 	printf("\nOptions:\n");
 	printf(" --all          save all intermediate stages\n");

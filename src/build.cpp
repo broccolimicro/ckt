@@ -9,7 +9,7 @@
 
 void build_help() {
 	printf("\n");
-	printf("Usage: lm build [options] <file>\n");
+	printf("Usage: bok build [options] <file>\n");
 	printf("Synthesize the production rules that implement the behavioral description.\n");
 	printf("\n");
 

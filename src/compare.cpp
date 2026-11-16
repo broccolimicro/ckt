@@ -17,7 +17,7 @@
 const bool debug = false;
 
 void compare_help() {
-	printf("Usage: lm compare [options] [<module|term>[=<module|term>...]...]\n");
+	printf("Usage: bok compare [options] [<module|term>[=<module|term>...]...]\n");
 	printf("Verify that the two circuit files are the same.\n");
 
 	printf("Options:\n");
@@ -271,7 +271,7 @@ int compare_command(int argc, char **argv) {
 	}
 
 	if (groups.empty() and not proj.hasMod()) {
-		printf("please initialize your module with the following.\n\nlm mod init my_module\n");
+		printf("please initialize your module with the following.\n\nbok mod init my_module\n");
 		return 1;
 	}
 
