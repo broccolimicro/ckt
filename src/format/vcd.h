@@ -19,7 +19,7 @@ struct vcd {
 
 	string &at(int net);
 
-	void create(string prefix, choy::ConstNetlist nets);
+	void create(string prefix, ucs::ConstNetlist nets);
 	void append(uint64_t t, boolean::cube encoding, string error="");
 	void append(uint64_t t, boolean::cube encoding, boolean::cube strength, string error="");
 	void append(uint64_t t, arithmetic::State encoding, string error="");
