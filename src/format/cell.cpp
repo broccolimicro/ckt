@@ -146,7 +146,7 @@ bool import_cell(std::string path, const phy::Tech &tech, const choy::Program &p
 
 			genDelay = tmr.since();
 			if (gdsNet.compare(spiNet) == 0) {
-				macro.properties.insert({"!choy decl", parse_ucs::export_decl(prgm, term.decl).to_string()});
+				macro.properties.insert({"!choy decl", parse_choy::export_decl(prgm, term.decl).to_string()});
 				printf("%sGENERATED %d DBUNIT2 AREA%s]\t(%gs %gs)\n", KGRN, macro.box.area(), KNRM, searchDelay, genDelay);
 				phyIdx = term.createVariant(choy::Variant("layout", macro, spiIdx));
 			} else {

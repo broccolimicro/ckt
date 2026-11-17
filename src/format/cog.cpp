@@ -12,7 +12,7 @@
 #include <chp/graph.h>
 #include <hse/graph.h>
 
-#include <parse_ucs/type_name.h>
+#include <parse_choy/type_name.h>
 
 #include <interpret_chp/import.h>
 #include <interpret_hse/import.h>
@@ -24,7 +24,7 @@ void readCog(choy::Project &proj, choy::Source &source, string buffer) {
 	source.tokens->insert(source.path.string(), buffer);
 
 	parse_cog::adapter cfg;
-	cfg.type_name.sub.set<parse_ucs::type_name>();
+	cfg.type_name.sub.set<parse_choy::type_name>();
 
 	source.tokens->increment(false);
 	source.tokens->expect<parse_cog::composition>((const parse_cog::adapter*)&cfg);

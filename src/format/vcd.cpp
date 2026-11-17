@@ -18,7 +18,7 @@ string &vcd::at(int net) {
 	return nets[net];
 }
 
-void vcd::create(string prefix, ucs::ConstNetlist v) {
+void vcd::create(string prefix, choy::ConstNetlist v) {
 	time_t rawtime;
 	tm *timeinfo;
 	char buffer[1024];

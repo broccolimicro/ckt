@@ -5,7 +5,7 @@
 #include <parse/default/line_comment.h>
 #include <parse/default/new_line.h>
 
-#include <parse_ucs/modfile.h>
+#include <parse_choy/modfile.h>
 
 #include <interpret_choy/import.h>
 #include <interpret_choy/export.h>
@@ -14,7 +14,7 @@ void readMod(choy::Project &proj) {
 	tokenizer tokens;
 	tokens.register_token<parse::block_comment>(false);
 	tokens.register_token<parse::line_comment>(false);
-	parse_ucs::modfile::register_syntax(tokens);
+	parse_choy::modfile::register_syntax(tokens);
 
 	ifstream fin;
 	string pathstr = (proj.rootDir / "bok.mod").string();
@@ -32,17 +32,17 @@ void readMod(choy::Project &proj) {
 	}
 
 	tokens.increment(true);
-	tokens.expect<parse_ucs::modfile>();
+	tokens.expect<parse_choy::modfile>();
 
 	if (tokens.decrement(__FILE__, __LINE__)) {
-		parse_ucs::modfile syntax(tokens);
+		parse_choy::modfile syntax(tokens);
 
 		import_modfile(proj, syntax, &tokens);
 	}
 }
 
 void writeMod(const choy::Project &proj) {
-	parse_ucs::modfile result = parse_ucs::export_modfile(proj);
+	parse_choy::modfile result = parse_choy::export_modfile(proj);
 
 	ofstream fout;
 	string pathstr = (proj.rootDir / "bok.mod").string();

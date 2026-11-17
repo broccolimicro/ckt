@@ -5,7 +5,7 @@
 #include <parse/default/line_comment.h>
 #include <parse/default/new_line.h>
 
-#include <parse_ucs/source.h>
+#include <parse_choy/source.h>
 #include <parse_astg/factory.h>
 #include <parse_cog/factory.h>
 #include <parse_gc/factory.h>
@@ -29,7 +29,7 @@
 parse_cog::adapter parseCogAdapter;
 
 void loadAllFormats(choy::Project &proj) {
-	parseCogAdapter.type_name.sub.set<parse_ucs::type_name>();
+	parseCogAdapter.type_name.sub.set<parse_choy::type_name>();
 
 	proj.pushDialect("func", parse_cog::factory, factoryCog, nullptr, (const parse_cog::adapter*)&parseCogAdapter);
 	proj.pushDialect("struct", parse_gc::factory, factoryGc, nullptr);
