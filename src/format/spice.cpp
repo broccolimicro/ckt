@@ -16,57 +16,57 @@
 
 #include "../back/asic.h"
 
-#include <weaver/params.h>
+#include <choy/params.h>
 
-void guessPorts(weaver::Prototype &proto, const sch::Subckt &ckt) {
+void guessPorts(choy::Prototype &proto, const sch::Subckt &ckt) {
 	// All of the ports in a cell are wires
-	weaver::Typename wireType("wire");
+	choy::Typename wireType("wire");
 	for (int j : ckt.ports) {
 		proto.args.push_back(wireType);
 	}
 	proto.hashArgs();
 }
 
-weaver::Decl declFromSubckt(const weaver::Program &prgm, const sch::Subckt &ckt, std::string name) {
-	weaver::TypeId wireType(prgm.global, prgm.mods[prgm.global].findType("wire"));
-	weaver::Typename wireName("wire");
+choy::Decl declFromSubckt(const choy::Program &prgm, const sch::Subckt &ckt, std::string name) {
+	choy::TypeId wireType(prgm.global, prgm.mods[prgm.global].findType("wire"));
+	choy::Typename wireName("wire");
 
-	weaver::Decl decl;
+	choy::Decl decl;
 	decl.name = ckt.name;
 	if (not name.empty()) {
 		decl.name = name;
 	}
-	vector<weaver::Typename> args;
+	vector<choy::Typename> args;
 	for (int j : ckt.ports) {
-		decl.args.push_back(weaver::Instance(wireType, ckt.nets[j].name));
+		decl.args.push_back(choy::Instance(wireType, ckt.nets[j].name));
 		args.push_back(wireName);
 	}
-	decl.argsHash = weaver::getHash(args);
+	decl.argsHash = choy::getHash(args);
 	decl.hashed = true;
 	decl.qualified = true;
 	return decl;
 }
 
-weaver::Prototype protoFromInstance(const weaver::Program &prgm, const sch::Instance &inst, bool qualify) {
-	std::map<std::string, std::string> params = weaver::readParams({inst.comment});
-	weaver::Prototype proto = protoFromParam(params);
+choy::Prototype protoFromInstance(const choy::Program &prgm, const sch::Instance &inst, bool qualify) {
+	std::map<std::string, std::string> params = choy::readParams({inst.comment});
+	choy::Prototype proto = protoFromParam(params);
 	if (not proto.empty()) {
 		return proto;
 	}
 
-	proto = weaver::Prototype::fromMangled(inst.type);
+	proto = choy::Prototype::fromMangled(inst.type);
 
 	if (qualify) {
 		proto.qualified = true;
 		for (int j : inst.ports) {
-			proto.args.push_back(weaver::Typename("wire"));
+			proto.args.push_back(choy::Typename("wire"));
 		}
-		proto.argsHash = weaver::getHash(proto.args);
+		proto.argsHash = choy::getHash(proto.args);
 	}
 	return proto;
 }
 
-void readSpice(weaver::Project &proj, weaver::Source &source, string buffer) {
+void readSpice(choy::Project &proj, choy::Source &source, string buffer) {
 	phy::Tech *tech = loadASIC(proj);
 	if (not tech) {
 		return;
@@ -82,31 +82,31 @@ void readSpice(weaver::Project &proj, weaver::Source &source, string buffer) {
 	}
 }
 
-std::vector<weaver::TermId> loadSpice(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
-	std::vector<weaver::TermId> result;
+std::vector<choy::TermId> loadSpice(choy::Project &proj, choy::Program &prgm, const choy::Source &source) {
+	std::vector<choy::TermId> result;
 	phy::Tech *tech = loadASIC(proj);
 	if (not tech) {
 		return result;
 	}
 
-	weaver::TypeId wireType(prgm.global, prgm.mods[prgm.global].findType("wire"));
+	choy::TypeId wireType(prgm.global, prgm.mods[prgm.global].findType("wire"));
 
 	std::vector<sch::Subckt> lst;
 	sch::import_netlist(*tech, lst, *(parse_spice::netlist*)source.syntax.get(), source.tokens.get());
 
 	for (auto &ckt : lst) {
-		weaver::Prototype proto = weaver::Prototype::fromMangled(ckt.name);
+		choy::Prototype proto = choy::Prototype::fromMangled(ckt.name);
 		if (proto.mod.empty()) {
 			proto.mod = source.modName;
 		}
 		int mod = prgm.getModule(proto.mod);
 
-		weaver::TermId id;
+		choy::TermId id;
 
 		// First, check the metadata to see if we can extract the type information
-		std::map<std::string, std::string> params = weaver::readParams({ckt.comment});
+		std::map<std::string, std::string> params = choy::readParams({ckt.comment});
 		if (not params.empty()) {
-			weaver::Decl decl = declFromParam(prgm, params, "", mod);
+			choy::Decl decl = declFromParam(prgm, params, "", mod);
 			if (not decl.name.empty()) {
 				id = prgm.getTerm(mod, decl);
 			}
@@ -123,7 +123,7 @@ std::vector<weaver::TermId> loadSpice(weaver::Project &proj, weaver::Program &pr
 
 		if (prgm.termValid(id)) {
 			auto &term = prgm.termAt(id);
-			id.var   = term.createVariant(weaver::Variant("spice", ckt));
+			id.var   = term.createVariant(choy::Variant("spice", ckt));
 			prgm.varAt(id).fromSource = true;
 			// Look for the parent
 			for (int i = id.var-1; i >= 0; i--) {
@@ -148,7 +148,7 @@ std::vector<weaver::TermId> loadSpice(weaver::Project &proj, weaver::Program &pr
 	return result;
 }
 
-void writeSpice(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, weaver::TermId id) {
+void writeSpice(fs::path path, choy::Project &proj, const choy::Filetype &lang, const choy::Program &prgm, choy::TermId id) {
 	static std::set<std::string> prev;
 
 	phy::Tech *tech = loadASIC(proj);
@@ -178,10 +178,10 @@ void writeSpice(fs::path path, weaver::Project &proj, const weaver::Filetype &la
 	fclose(fptr);
 }
 
-std::vector<weaver::Prototype> linkSpice(const weaver::Project &proj, const weaver::Program &prgm, weaver::TermId id) {
+std::vector<choy::Prototype> linkSpice(const choy::Project &proj, const choy::Program &prgm, choy::TermId id) {
 	sch::Subckt ckt = prgm.varAt(id).as<sch::Subckt>();
 
-	std::vector<weaver::Prototype> result;
+	std::vector<choy::Prototype> result;
 	for (const sch::Instance &inst : ckt.inst) {
 		result.push_back(protoFromInstance(prgm, inst, false));
 	}

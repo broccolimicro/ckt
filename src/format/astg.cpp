@@ -16,7 +16,7 @@
 #include <interpret_chp/export.h>
 #include <interpret_hse/export.h>
 
-void readAstg(weaver::Project &proj, weaver::Source &source, string buffer) {
+void readAstg(choy::Project &proj, choy::Source &source, string buffer) {
 	parse_astg::graph::register_syntax(*source.tokens);
 	source.tokens->insert(source.path.string(), buffer, nullptr);
 
@@ -27,22 +27,22 @@ void readAstg(weaver::Project &proj, weaver::Source &source, string buffer) {
 	}
 }
 
-std::vector<weaver::TermId> loadAstg(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
+std::vector<choy::TermId> loadAstg(choy::Project &proj, choy::Program &prgm, const choy::Source &source) {
 	string name = source.path.stem().string();
 	chp::graph g;
 	g.name = name;
 	g = chp::import_chp(*(parse_astg::graph*)source.syntax.get(), source.tokens.get());
 
-	weaver::Prototype proto = weaver::Prototype::fromMangled(name, source.modName);
+	choy::Prototype proto = choy::Prototype::fromMangled(name, source.modName);
 	int mod = prgm.getModule(proto.mod);
 
-	weaver::TermId id = prgm.getTerm(proto, mod);
-	id.var = prgm.termAt(id).createVariant(weaver::Variant("func", g));
+	choy::TermId id = prgm.getTerm(proto, mod);
+	id.var = prgm.termAt(id).createVariant(choy::Variant("func", g));
 	prgm.varAt(id).fromSource = true;
 	return {id};
 }
 
-std::vector<weaver::TermId> loadAstgw(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
+std::vector<choy::TermId> loadAstgw(choy::Project &proj, choy::Program &prgm, const choy::Source &source) {
 	string name = source.path.stem().string();
 	hse::graph g;
 	g.name = name;
@@ -51,16 +51,16 @@ std::vector<weaver::TermId> loadAstgw(weaver::Project &proj, weaver::Program &pr
 	g.post_process(true, false, false, false);
 	g.check_variables();
 
-	weaver::Prototype proto = weaver::Prototype::fromMangled(name, source.modName);
+	choy::Prototype proto = choy::Prototype::fromMangled(name, source.modName);
 	int mod = prgm.getModule(proto.mod);
 
-	weaver::TermId id = prgm.getTerm(proto, mod);
-	id.var = prgm.termAt(id).createVariant(weaver::Variant("proto", g));
+	choy::TermId id = prgm.getTerm(proto, mod);
+	id.var = prgm.termAt(id).createVariant(choy::Variant("proto", g));
 	prgm.varAt(id).fromSource = true;
 	return {id};
 }
 
-void writeAstg(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, weaver::TermId id) {
+void writeAstg(fs::path path, choy::Project &proj, const choy::Filetype &lang, const choy::Program &prgm, choy::TermId id) {
 	string pathstr = path.string();
 	ofstream fout(pathstr.c_str(), ios::out);
 	if (not fout.is_open()) {
@@ -74,7 +74,7 @@ void writeAstg(fs::path path, weaver::Project &proj, const weaver::Filetype &lan
 	fout.close();
 }
 
-void writeAstgw(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, weaver::TermId id) {
+void writeAstgw(fs::path path, choy::Project &proj, const choy::Filetype &lang, const choy::Program &prgm, choy::TermId id) {
 	string pathstr = path.string();
 	ofstream fout(pathstr.c_str(), ios::out);
 	if (not fout.is_open()) {

@@ -15,7 +15,7 @@
 
 #include <parse_cog/adapter.h>
 
-#include <interpret_wv/import.h>
+#include <interpret_choy/import.h>
 
 #include "format/cog.h"
 #include "format/gc.h"
@@ -23,12 +23,12 @@
 #include "format/gds.h"
 #include "format/verilog.h"
 #include "format/prs.h"
-#include "format/wv.h"
+#include "format/choy.h"
 #include "format/astg.h"
 
 parse_cog::adapter parseCogAdapter;
 
-void loadAllFormats(weaver::Project &proj) {
+void loadAllFormats(choy::Project &proj) {
 	parseCogAdapter.type_name.sub.set<parse_ucs::type_name>();
 
 	proj.pushDialect("func", parse_cog::factory, factoryCog, nullptr, (const parse_cog::adapter*)&parseCogAdapter);
@@ -41,14 +41,14 @@ void loadAllFormats(weaver::Project &proj) {
 	proj.pushDialect("func", parse::factory(), nullptr, nullptr);
 	proj.pushDialect("proto", parse::factory(), nullptr, nullptr);
 
-	proj.pushFiletype("", "wv", readWv, loadWv, nullptr, weaver::Filetype::MODULE);
+	proj.pushFiletype("", "ch", readWv, loadWv, nullptr, choy::Filetype::MODULE);
 	proj.pushFiletype("func", "cog", readCog, loadCog);
 	proj.pushFiletype("struct", "gc", readGc, loadGc, writeGc);
 	proj.pushFiletype("proto", "cogw", readCog, loadCogw);
 	proj.pushFiletype("circ", "prs", readPrs, loadPrs, writePrs);
-	proj.pushFiletype("spice", "spi", readSpice, loadSpice, writeSpice, weaver::Filetype::MODULE);
+	proj.pushFiletype("spice", "spi", readSpice, loadSpice, writeSpice, choy::Filetype::MODULE);
 	proj.pushFiletype("verilog", "v", nullptr, nullptr, writeVerilog);
-	proj.pushFiletype("layout", "gds", nullptr, loadGds, writeGds, weaver::Filetype::PROJECT);
+	proj.pushFiletype("layout", "gds", nullptr, loadGds, writeGds, choy::Filetype::PROJECT);
 	proj.pushFiletype("func", "astg", readAstg, loadAstg, writeAstg);
 	proj.pushFiletype("proto", "astgw", readAstg, loadAstgw, writeAstgw);
 }

@@ -1063,7 +1063,7 @@ void prsim(prs::production_rule_set &pr, bool debug) {//, vector<prs::term_index
 }
 
 int sim_command(int argc, char **argv) {
-	weaver::Project proj;
+	choy::Project proj;
 	if (proj.hasMod()) {
 		readMod(proj);
 	} else {
@@ -1073,7 +1073,7 @@ int sim_command(int argc, char **argv) {
 
 	loadAllFormats(proj);
 
-	weaver::Prototype proto;
+	choy::Prototype proto;
 	std::vector<fs::path> files;
 
 	string sfilename = "";
@@ -1088,7 +1088,7 @@ int sim_command(int argc, char **argv) {
 			set_debug(true);
 			debug = true;
 		} else if (arg.rfind("fn:", 0) != string::npos and proto.empty()) {
-			proto = weaver::Prototype(arg.substr(3));
+			proto = choy::Prototype(arg.substr(3));
 		} else {
 			string ext = fs::path(arg).extension();
 			if (ext == "sim") {
@@ -1099,7 +1099,7 @@ int sim_command(int argc, char **argv) {
 		}
 	}
 
-	weaver::Program prgm;
+	choy::Program prgm;
 	loadGlobalTypes(prgm);
 
 	for (auto path : files) {
@@ -1109,9 +1109,9 @@ int sim_command(int argc, char **argv) {
 	if (proto.empty()) {
 		if (files.empty()) {
 			proj.incl(proj.modName);
-			proto = weaver::Prototype("top.top");
+			proto = choy::Prototype("top.top");
 		} else {
-			proto = weaver::Prototype::fromMangled(files[0].stem().string());
+			proto = choy::Prototype::fromMangled(files[0].stem().string());
 			proto.mod = proj.pathToModule(files[0]);
 		}
 	} else if (files.empty()) {
@@ -1123,7 +1123,7 @@ int sim_command(int argc, char **argv) {
 		prgm.print();
 	}
 
-	vector<weaver::TermId> curr = prgm.findTerms(proto);
+	vector<choy::TermId> curr = prgm.findTerms(proto);
 	if (curr.empty() or curr[0].mod < 0) {
 		error("", "module '" + proto.mod + "' not found for term '" + proto.name + "'", __FILE__, __LINE__);
 		complete();
@@ -1144,14 +1144,14 @@ int sim_command(int argc, char **argv) {
 		proto.variant = 0;
 	}
 
-	const weaver::Term &fn = prgm.termAt(curr[0]);
+	const choy::Term &fn = prgm.termAt(curr[0]);
 	if (proto.variant >= (int)fn.variants.size()) {
 		error("", "variant '" + std::to_string(proto.variant) + "' not defined for term '" + proto.to_string() + "'", __FILE__, __LINE__);
 		complete();
 		return 1;
 	}
 
-	const weaver::Variant &var = fn.variants[proto.variant];
+	const choy::Variant &var = fn.variants[proto.variant];
 
 	if (var.meta.dialect == "func") {
 		vector<chp::term_index> steps;

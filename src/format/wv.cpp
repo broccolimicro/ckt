@@ -1,4 +1,4 @@
-#include "wv.h"
+#include "choy.h"
 
 #include <parse/parse.h>
 #include <parse/default/block_comment.h>
@@ -7,9 +7,9 @@
 
 #include <parse_ucs/source.h>
 
-#include <interpret_wv/import.h>
+#include <interpret_choy/import.h>
 
-void readWv(weaver::Project &proj, weaver::Source &source, string buffer) {
+void readWv(choy::Project &proj, choy::Source &source, string buffer) {
 	source.tokens->register_token<parse::block_comment>(false);
 	source.tokens->register_token<parse::line_comment>(false);
 	parse_ucs::source::register_syntax(*source.tokens, &proj);
@@ -32,7 +32,7 @@ void readWv(weaver::Project &proj, weaver::Source &source, string buffer) {
 	}
 }
 
-std::vector<weaver::TermId> loadWv(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
+std::vector<choy::TermId> loadWv(choy::Project &proj, choy::Program &prgm, const choy::Source &source) {
 	int index = prgm.getModule(source.modName);
 	// load symbols to break dependency chains
 	import_symbols(prgm, index, *(parse_ucs::source*)source.syntax.get(), source.tokens.get());

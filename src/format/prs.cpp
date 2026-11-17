@@ -11,7 +11,7 @@
 #include <interpret_prs/import.h>
 #include <interpret_prs/export.h>
 
-void readPrs(weaver::Project &proj, weaver::Source &source, string buffer) {
+void readPrs(choy::Project &proj, choy::Source &source, string buffer) {
 	source.tokens->register_token<parse::block_comment>(false);
 	source.tokens->register_token<parse::line_comment>(false);
 	parse_prs::production_rule_set::register_syntax(*source.tokens);
@@ -24,22 +24,22 @@ void readPrs(weaver::Project &proj, weaver::Source &source, string buffer) {
 	}
 }
 
-std::vector<weaver::TermId> loadPrs(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
+std::vector<choy::TermId> loadPrs(choy::Project &proj, choy::Program &prgm, const choy::Source &source) {
 	string name = source.path.stem().string();
 	prs::production_rule_set pr;
 	pr.name = name;
 	prs::import_production_rule_set(*(parse_prs::production_rule_set*)source.syntax.get(), pr, -1, -1, prs::attributes(), 0, source.tokens.get(), true);
 
-	weaver::Prototype proto = weaver::Prototype::fromMangled(name, source.modName);
+	choy::Prototype proto = choy::Prototype::fromMangled(name, source.modName);
 	int mod = prgm.getModule(proto.mod);
 
-	weaver::TermId id = prgm.getTerm(proto, mod);
-	id.var = prgm.termAt(id).createVariant(weaver::Variant("circ", pr));
+	choy::TermId id = prgm.getTerm(proto, mod);
+	id.var = prgm.termAt(id).createVariant(choy::Variant("circ", pr));
 	prgm.varAt(id).fromSource = true;
 	return {id};
 }
 
-void writePrs(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, weaver::TermId id) {
+void writePrs(fs::path path, choy::Project &proj, const choy::Filetype &lang, const choy::Program &prgm, choy::TermId id) {
 	string pathstr = path.string();
 	ofstream fout(pathstr.c_str(), ios::out);
 	if (not fout.is_open()) {

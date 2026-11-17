@@ -4,7 +4,7 @@
 #include <common/timer.h>
 #include <common/text.h>
 
-#include "weaver/builder.h"
+#include "choy/builder.h"
 #include "format.h"
 
 void build_help() {
@@ -55,7 +55,7 @@ void build_help() {
 	printf("\n");
 
 	printf("Supported file formats:\n");
-	printf(" *.wv           a Go-like programming language called Weaver\n");
+	printf(" *.ch           a Go-like programming language called Choy\n");
 	printf(" *.chp          a data-level process calculi called Communicating Hardware Processes\n");
 	printf(" *.hse          a wire-level process calculi called Hand-Shaking Expansions\n");
 	printf(" *.prs          production rules\n");
@@ -63,7 +63,7 @@ void build_help() {
 }
 
 int build_command(int argc, char **argv) {
-	weaver::Project proj;
+	choy::Project proj;
 	if (proj.hasMod()) {
 		readMod(proj);
 	} else {
@@ -73,7 +73,7 @@ int build_command(int argc, char **argv) {
 
 	loadAllFormats(proj);
 
-	vector<weaver::Prototype> protos;
+	vector<choy::Prototype> protos;
 	vector<std::string> files;
 
 	Build builder(proj);
@@ -208,7 +208,7 @@ int build_command(int argc, char **argv) {
 			builder.noGhosts = true;
 		} else {
 			if (arg.rfind("fn:", 0) != string::npos) {
-				protos.push_back(weaver::Prototype(arg.substr(3)));
+				protos.push_back(choy::Prototype(arg.substr(3)));
 			} else {
 				files.push_back(arg);
 			}
@@ -217,7 +217,7 @@ int build_command(int argc, char **argv) {
 
 	Timer totalTime;
 
-	weaver::Program prgm;
+	choy::Program prgm;
 	loadGlobalTypes(prgm);
 
 	// Create debug dir if it does not already exist
@@ -254,12 +254,12 @@ int build_command(int argc, char **argv) {
 		if (modId < 0) {
 			error("", "module not found '" + mod + "'", __FILE__, __LINE__);
 		} else {
-			builder.push(prgm, weaver::TermId(modId));
+			builder.push(prgm, choy::TermId(modId));
 		}
 	}
 
 	for (const auto &proto : protos) {
-		vector<weaver::TermId> curr = prgm.findTerms(proto);
+		vector<choy::TermId> curr = prgm.findTerms(proto);
 		if (curr.empty()) {
 			error("", "module not found for term '" + proto.to_string() + "'", __FILE__, __LINE__);
 		}

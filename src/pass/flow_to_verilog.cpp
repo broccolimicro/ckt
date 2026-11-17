@@ -6,18 +6,18 @@
 #include "../format/param.h"
 
 struct FlowLinker : flow::Linker {
-	weaver::Program &prgm;
+	choy::Program &prgm;
 	int mod;
 
-	FlowLinker(weaver::Program &prgm, int mod) : prgm(prgm) {
+	FlowLinker(choy::Program &prgm, int mod) : prgm(prgm) {
 		this->mod = mod;
 	}
 	~FlowLinker() {}
 
 	flow::Implementation find(const flow::Instance &inst) override {
 		flow::Implementation result;
-		weaver::Prototype proto = protoFromInstance(prgm, inst, false);
-		std::vector<weaver::TermId> terms = prgm.findTerms(proto, mod);
+		choy::Prototype proto = protoFromInstance(prgm, inst, false);
+		std::vector<choy::TermId> terms = prgm.findTerms(proto, mod);
 		if (terms.empty() or not prgm.termValid(terms[0])) {
 			error("", "unable to link '" + proto.to_string() + "'", __FILE__, __LINE__);
 			//prgm.print();
@@ -26,14 +26,14 @@ struct FlowLinker : flow::Linker {
 			warning("", "ambiguous instance '" + proto.to_string() + "'", __FILE__, __LINE__);
 		}
 
-		weaver::Term &term = prgm.termAt(terms[0]);
+		choy::Term &term = prgm.termAt(terms[0]);
 		proto = prgm.getPrototype(term.decl, prgm.mods[mod].name);
 
 		int i = term.rfindVariant("flow");
 		int j = term.rfindVariant("verilog");
 
 		if (j < 0 or j >= (int)term.variants.size()) {
-			j = term.createVariant(weaver::Variant("verilog", clocked::Module(proto.mangle(true)), i));
+			j = term.createVariant(choy::Variant("verilog", clocked::Module(proto.mangle(true)), i));
 		}
 
 		if (i >= 0 and i < (int)term.variants.size()) {
@@ -48,7 +48,7 @@ struct FlowLinker : flow::Linker {
 	}
 };
 
-bool flowToVerilog(Build &builder, weaver::Program &prgm, weaver::TermId id) {
+bool flowToVerilog(Build &builder, choy::Program &prgm, choy::TermId id) {
 	if (builder.timing != Build::TIMING_CLOCKED
 		and builder.timing != Build::TIMING_MIXED) {
 		return false;
@@ -63,7 +63,7 @@ bool flowToVerilog(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 	flow::Func &fn = prgm.varAt(id).as<flow::Func>();
 	clocked::Module rtl = flow::synthesizeModuleFromFunc(fn, &linker);
 
-	id.var = prgm.termAt(id).createVariant(weaver::Variant("verilog", rtl, id.var));
+	id.var = prgm.termAt(id).createVariant(choy::Variant("verilog", rtl, id.var));
 	builder.todo.push_back(id);
 	return true;
 }

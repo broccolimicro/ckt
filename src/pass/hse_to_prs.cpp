@@ -6,7 +6,7 @@
 #include <interpret_hse/export_cli.h>
 #include <interpret_hse/export.h>
 
-bool elaborate(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
+bool elaborate(const Build &builder, choy::Program &prgm, choy::TermId id) {
 	if (not id.hasVar() or prgm.varAt(id).meta.dialect != "proto") {
 		return false;
 	}
@@ -30,7 +30,7 @@ bool elaborate(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
 	return true;
 }
 
-bool conflicts(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
+bool conflicts(const Build &builder, choy::Program &prgm, choy::TermId id) {
 	if (not id.hasVar() or prgm.varAt(id).meta.dialect != "proto"
 		or not prgm.varAt(id).meta.has("proto.states")) {
 		return false;
@@ -50,7 +50,7 @@ bool conflicts(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
 	return true;
 }
 
-bool encode(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
+bool encode(const Build &builder, choy::Program &prgm, choy::TermId id) {
 	if (not id.hasVar() or prgm.varAt(id).meta.dialect != "proto"
 		or not prgm.varAt(id).meta.has("proto.states")
 		or not prgm.varAt(id).meta.has("proto.conflicts")) {
@@ -67,7 +67,7 @@ bool encode(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
 	return true;
 }
 
-bool hseToPrs(Build &builder, weaver::Program &prgm, weaver::TermId id) {
+bool hseToPrs(Build &builder, choy::Program &prgm, choy::TermId id) {
 	if (not id.hasVar() or prgm.varAt(id).meta.dialect != "proto"
 		or not prgm.varAt(id).meta.has("proto.states")
 		or not prgm.varAt(id).meta.has("proto.conflicts")) {
@@ -83,7 +83,7 @@ bool hseToPrs(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 	prs::production_rule_set pr;
 	hse::synthesize_rules(&pr, &g, builder.logic != Build::LOGIC_CMOS, builder.progress);
 
-	id.var = prgm.termAt(id).createVariant(weaver::Variant("circ", pr, id.var));
+	id.var = prgm.termAt(id).createVariant(choy::Variant("circ", pr, id.var));
 	builder.todo.push_back(id);
 	return true;
 }

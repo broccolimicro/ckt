@@ -4,7 +4,7 @@
 #include <common/timer.h>
 #include <common/text.h>
 
-#include "weaver/unpacker.h"
+#include "choy/unpacker.h"
 #include "format.h"
 
 void unpack_help() {
@@ -21,7 +21,7 @@ void unpack_help() {
 }
 
 int unpack_command(int argc, char **argv) {
-	weaver::Project proj;
+	choy::Project proj;
 	if (proj.hasMod()) {
 		readMod(proj);
 	} else {
@@ -31,7 +31,7 @@ int unpack_command(int argc, char **argv) {
 
 	loadAllFormats(proj);
 
-	vector<weaver::Prototype> protos;
+	vector<choy::Prototype> protos;
 
 	Unpack unpacker(proj);
 
@@ -53,11 +53,11 @@ int unpack_command(int argc, char **argv) {
 		} else if (arg == "-s" or arg == "--size") {
 			unpacker.set(Unpack::SIZED);
 		} else {
-			protos.push_back(weaver::Prototype(arg));
+			protos.push_back(choy::Prototype(arg));
 		}
 	}
 
-	weaver::Program prgm;
+	choy::Program prgm;
 	loadGlobalTypes(prgm);
 
 	/*if (protos.empty()) {
@@ -70,7 +70,7 @@ int unpack_command(int argc, char **argv) {
 		}
 		proj.load(prgm);
 		for (auto i = protos.begin(); i != protos.end(); i++) {
-			vector<weaver::TermId> curr = prgm.findTerms(*i);
+			vector<choy::TermId> curr = prgm.findTerms(*i);
 			if (curr.empty()) {
 				error("", "module not found for term '" + i->to_string() + "'", __FILE__, __LINE__);
 			}

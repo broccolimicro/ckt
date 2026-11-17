@@ -4,7 +4,7 @@
 #include <common/timer.h>
 #include <common/text.h>
 
-#include "weaver/builder.h"
+#include "choy/builder.h"
 #include "format.h"
 
 #include <sch/Subckt.h>
@@ -37,7 +37,7 @@ void compare_help() {
 }
 
 struct Group {
-	vector<weaver::Prototype> terms;
+	vector<choy::Prototype> terms;
 };
 
 void cleanup(sch::Subckt &s) {
@@ -63,7 +63,7 @@ void compare(sch::Subckt s0, sch::Subckt s1) {
 	}
 }
 
-void compare(weaver::Program &prgm, weaver::Variant &child, weaver::Variant &parent) {
+void compare(choy::Program &prgm, choy::Variant &child, choy::Variant &parent) {
 	if (child.meta.dialect == "layout" and parent.meta.dialect == "spice") {
 		phy::Layout &macro = child.as<phy::Layout>();
 		sch::Subckt s0;
@@ -81,8 +81,8 @@ void compare(weaver::Program &prgm, weaver::Variant &child, weaver::Variant &par
 	}
 }
 
-void verifyImpl(weaver::Program &prgm, weaver::TermId idx) {
-	weaver::Term &t0 = prgm.termAt(idx);
+void verifyImpl(choy::Program &prgm, choy::TermId idx) {
+	choy::Term &t0 = prgm.termAt(idx);
 	for (int i = (int)t0.variants.size()-1; i >= 0; i--) {
 		int super = t0.variants[i].super;
 		if (super >= 0) {
@@ -96,7 +96,7 @@ void verifyImpl(weaver::Program &prgm, weaver::TermId idx) {
 				continue;
 			}
 
-			weaver::Term &t1 = prgm.termAt(*j);
+			choy::Term &t1 = prgm.termAt(*j);
 			if (t1.variants.empty()) {
 				continue;
 			}
@@ -106,12 +106,12 @@ void verifyImpl(weaver::Program &prgm, weaver::TermId idx) {
 	}
 }
 
-void verifyGroup(weaver::Program &prgm, Group group) {
+void verifyGroup(choy::Program &prgm, Group group) {
 	if (group.terms.empty()) {
 		return;
 	} else if (group.terms.size() == 1u) {
 		printf("%s:\n", group.terms[0].to_string().c_str());
-		vector<weaver::TermId> idx = prgm.findTerms(group.terms[0]);
+		vector<choy::TermId> idx = prgm.findTerms(group.terms[0]);
 		if (group.terms[0].name.empty()) {
 			if (idx[0].mod >= 0) {
 				for (idx[0].index = 0; idx[0].index < (int)prgm.mods[idx[0].mod].terms.size(); idx[0].index++) {
@@ -132,7 +132,7 @@ void verifyGroup(weaver::Program &prgm, Group group) {
 		return;
 	}
 	
-	vector<weaver::TermId> prev = prgm.findTerms(group.terms[0]);
+	vector<choy::TermId> prev = prgm.findTerms(group.terms[0]);
 	int prevVariant = group.terms[0].variant;
 	if (prevVariant < 0) {
 		prevVariant = 0;
@@ -142,7 +142,7 @@ void verifyGroup(weaver::Program &prgm, Group group) {
 		printf("error: term not found '%s'\n", group.terms[0].to_string().c_str());
 	}
 	for (int i = 1; i < (int)group.terms.size(); i++) {
-		vector<weaver::TermId> curr = prgm.findTerms(group.terms[i]);
+		vector<choy::TermId> curr = prgm.findTerms(group.terms[i]);
 		int currVariant = group.terms[i].variant;
 		if (currVariant < 0) {
 			currVariant = 0;
@@ -154,8 +154,8 @@ void verifyGroup(weaver::Program &prgm, Group group) {
 		for (auto j = prev.begin(); j != prev.end(); j++) {
 			for (auto k = curr.begin(); k != curr.end(); k++) {
 				if (k->hasTerm() and j->hasTerm()) {
-					weaver::Term &t0 = prgm.termAt(*j);
-					weaver::Term &t1 = prgm.termAt(*k);
+					choy::Term &t0 = prgm.termAt(*j);
+					choy::Term &t1 = prgm.termAt(*k);
 					if (prevVariant >= (int)t0.variants.size()) {
 						printf("error: variant not found '%s'\n", group.terms[i-1].to_string().c_str());
 						break;
@@ -166,14 +166,14 @@ void verifyGroup(weaver::Program &prgm, Group group) {
 					}	
 					compare(prgm, t0.variants[prevVariant], t1.variants[currVariant]);
 				} else if (k->hasTerm() and j->mod >= 0) {
-					weaver::Term &t1 = prgm.termAt(*k);
+					choy::Term &t1 = prgm.termAt(*k);
 					if (currVariant >= (int)t1.variants.size()) {
 						printf("error: variant not found '%s'\n", group.terms[i].to_string().c_str());
 						continue;
 					}
 
 					for (int t0i = 0; t0i < (int)prgm.mods[j->mod].terms.size(); t0i++) {
-						weaver::Term &t0 = prgm.termAt(weaver::TermId(j->mod, t0i));
+						choy::Term &t0 = prgm.termAt(choy::TermId(j->mod, t0i));
 						if (prevVariant >= (int)t0.variants.size()) {
 							printf("error: variant not found '%s'\n", group.terms[i-1].to_string().c_str());
 							continue;
@@ -183,13 +183,13 @@ void verifyGroup(weaver::Program &prgm, Group group) {
 						}
 					}
 				} else if (k->mod >= 0 and j->hasTerm()) {
-					weaver::Term &t0 = prgm.termAt(*j);
+					choy::Term &t0 = prgm.termAt(*j);
 					if (prevVariant >= (int)t0.variants.size()) {
 						printf("error: variant not found '%s'\n", group.terms[i-1].to_string().c_str());
 						continue;
 					}
 					for (int t1i = 0; t1i < (int)prgm.mods[k->mod].terms.size(); t1i++) {
-						weaver::Term &t1 = prgm.termAt(weaver::TermId(k->mod, t1i));
+						choy::Term &t1 = prgm.termAt(choy::TermId(k->mod, t1i));
 						if (currVariant >= (int)t1.variants.size()) {
 							printf("error: variant not found '%s'\n", group.terms[i].to_string().c_str());
 							continue;
@@ -200,13 +200,13 @@ void verifyGroup(weaver::Program &prgm, Group group) {
 					}
 				} else if (k->mod >= 0 and j->mod >= 0) {
 					for (int t0i = 0; t0i < (int)prgm.mods[j->mod].terms.size(); t0i++) {
-						weaver::Term &t0 = prgm.termAt(weaver::TermId(j->mod, t0i));
+						choy::Term &t0 = prgm.termAt(choy::TermId(j->mod, t0i));
 						if (prevVariant >= (int)t0.variants.size()) {
 							printf("error: variant not found '%s'\n", group.terms[i-1].to_string().c_str());
 							continue;
 						}
 						for (int t1i = 0; t1i < (int)prgm.mods[k->mod].terms.size(); t1i++) {
-							weaver::Term &t1 = prgm.termAt(weaver::TermId(k->mod, t1i));
+							choy::Term &t1 = prgm.termAt(choy::TermId(k->mod, t1i));
 							if (currVariant >= (int)t1.variants.size()) {
 								printf("error: variant not found '%s'\n", group.terms[i].to_string().c_str());
 								continue;
@@ -226,7 +226,7 @@ void verifyGroup(weaver::Program &prgm, Group group) {
 }
 
 int compare_command(int argc, char **argv) {
-	weaver::Project proj;
+	choy::Project proj;
 	if (proj.hasMod()) {
 		readMod(proj);
 	} else {
@@ -259,12 +259,12 @@ int compare_command(int argc, char **argv) {
 
 			size_t eq = arg.rfind("=");
 			while (eq != string::npos) {
-				groups.back().terms.push_back(weaver::Prototype(arg.substr(eq+1)));
+				groups.back().terms.push_back(choy::Prototype(arg.substr(eq+1)));
 				arg = arg.substr(0, eq);
 				eq = arg.rfind("=");
 			}
 			if (not arg.empty()) {
-				groups.back().terms.push_back(weaver::Prototype(arg));
+				groups.back().terms.push_back(choy::Prototype(arg));
 			}
 			reverse(groups.back().terms.begin(), groups.back().terms.end());
 		}
@@ -275,7 +275,7 @@ int compare_command(int argc, char **argv) {
 		return 1;
 	}
 
-	weaver::Program prgm;
+	choy::Program prgm;
 	loadGlobalTypes(prgm);
 
 	if (groups.empty()) {

@@ -17,7 +17,7 @@
 #include <interpret_chp/import.h>
 #include <interpret_hse/import.h>
 
-void readCog(weaver::Project &proj, weaver::Source &source, string buffer) {
+void readCog(choy::Project &proj, choy::Source &source, string buffer) {
 	source.tokens->register_token<parse::block_comment>(false);
 	source.tokens->register_token<parse::line_comment>(false);
 	parse_cog::composition::register_syntax(*source.tokens);
@@ -33,28 +33,28 @@ void readCog(weaver::Project &proj, weaver::Source &source, string buffer) {
 	}
 }
 
-std::vector<weaver::TermId> loadCog(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
+std::vector<choy::TermId> loadCog(choy::Project &proj, choy::Program &prgm, const choy::Source &source) {
 	string name = source.path.stem().string();
 	chp::graph g = std::any_cast<chp::graph>(factoryCog(name, source.syntax.get(), source.tokens.get()));
 
-	weaver::Prototype proto = weaver::Prototype::fromMangled(name, source.modName);
+	choy::Prototype proto = choy::Prototype::fromMangled(name, source.modName);
 	int mod = prgm.getModule(proto.mod);
 
-	weaver::TermId id = prgm.getTerm(proto, mod);
-	id.var = prgm.termAt(id).createVariant(weaver::Variant("func", g));
+	choy::TermId id = prgm.getTerm(proto, mod);
+	id.var = prgm.termAt(id).createVariant(choy::Variant("func", g));
 	prgm.varAt(id).fromSource = true;
 	return {id};
 }
 
-std::vector<weaver::TermId> loadCogw(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
+std::vector<choy::TermId> loadCogw(choy::Project &proj, choy::Program &prgm, const choy::Source &source) {
 	string name = source.path.stem().string();
 	hse::graph g = std::any_cast<hse::graph>(factoryCogw(name, source.syntax.get(), source.tokens.get()));
 
-	weaver::Prototype proto = weaver::Prototype::fromMangled(name, source.modName);
+	choy::Prototype proto = choy::Prototype::fromMangled(name, source.modName);
 	int mod = prgm.getModule(proto.mod);
 
-	weaver::TermId id = prgm.getTerm(proto, mod);
-	id.var   = prgm.termAt(id).createVariant(weaver::Variant("proto", g));
+	choy::TermId id = prgm.getTerm(proto, mod);
+	id.var   = prgm.termAt(id).createVariant(choy::Variant("proto", g));
 	prgm.varAt(id).fromSource = true;
 	return {id};
 }

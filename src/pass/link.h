@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../weaver/builder.h"
-#include <weaver/program.h>
-#include <weaver/term.h>
+#include "../choy/builder.h"
+#include <choy/program.h>
+#include <choy/term.h>
 
-bool link(Build &builder, weaver::Program &prgm, weaver::TermId id);
+bool link(Build &builder, choy::Program &prgm, choy::TermId id);
 

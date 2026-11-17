@@ -21,7 +21,7 @@ int mod_command(int argc, char **argv) {
 		return 0;
 	}
 
-	weaver::Project proj;
+	choy::Project proj;
 	if (proj.hasMod()) {
 		readMod(proj);
 	} else {
@@ -31,7 +31,7 @@ int mod_command(int argc, char **argv) {
 
 	loadAllFormats(proj);
 
-	vector<weaver::Prototype> protos;
+	vector<choy::Prototype> protos;
 	vector<std::string> files;
 	bool show = false;
 	bool debug = false;
@@ -52,7 +52,7 @@ int mod_command(int argc, char **argv) {
 			writeMod(proj);
 			std::filesystem::path srcPath = proj.pathFromModule(proj.modName);
 			std::filesystem::create_directories(srcPath);
-			std::string topPath = (srcPath / "top.wv").string();
+			std::string topPath = (srcPath / "top.ch").string();
 			FILE *fptr = fopen(topPath.c_str(), "w");
 			fprintf(fptr, "func top() {\n}\n");
 			fclose(fptr);
@@ -75,7 +75,7 @@ int mod_command(int argc, char **argv) {
 			debug = true;
 		} else if (show) {
 			if (arg.rfind("fn:", 0) != string::npos) {
-				protos.push_back(weaver::Prototype(arg.substr(3)));
+				protos.push_back(choy::Prototype(arg.substr(3)));
 			} else {
 				files.push_back(arg);
 			}
@@ -91,7 +91,7 @@ int mod_command(int argc, char **argv) {
 		return is_clean();
 	}
 
-	weaver::Program prgm;
+	choy::Program prgm;
 	loadGlobalTypes(prgm);
 
 	for (auto path : files) {

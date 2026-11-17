@@ -6,7 +6,7 @@
 
 #include <filesystem>
 
-Unpack::Unpack(weaver::Project &proj) : proj(proj) {
+Unpack::Unpack(choy::Project &proj) : proj(proj) {
 	stage = -1;
 	progress = false;
 	debug = false;

@@ -41,7 +41,7 @@
 //#include <parse_expression/assignment.h>
 //#include <parse_expression/composition.h>
 
-#include <weaver/project.h>
+#include <choy/project.h>
 #include "format/mod.h"
 #include "back/asic.h"
 
@@ -64,7 +64,7 @@ void tech_help() {
 	//printf("  drop [cell name...]     delete these cells from your cell library\n");
 }
 
-int tech_cells_command(weaver::Project &proj, int argc, char **argv) {
+int tech_cells_command(choy::Project &proj, int argc, char **argv) {
 	vector<string> files;
 
 	for (int i = 0; i < argc; i++) {
@@ -179,7 +179,7 @@ int tech_command(int argc, char **argv) {
 		tech_help();
 	}
 
-	weaver::Project proj;
+	choy::Project proj;
 	if (proj.hasMod()) {
 		readMod(proj);
 	} else {

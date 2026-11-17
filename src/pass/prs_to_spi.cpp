@@ -7,10 +7,10 @@
 #include <sch/Subckt.h>
 #include <phy/Script.h>
 
-#include <weaver/params.h>
-#include <interpret_wv/export.h>
+#include <choy/params.h>
+#include <interpret_choy/export.h>
 
-bool bubble(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
+bool bubble(const Build &builder, choy::Program &prgm, choy::TermId id) {
 	if (not id.hasVar() or prgm.varAt(id).meta.dialect != "circ") {
 		return false;
 	}
@@ -37,7 +37,7 @@ bool bubble(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
 	return true;
 }
 
-bool keepers(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
+bool keepers(const Build &builder, choy::Program &prgm, choy::TermId id) {
 	if (not id.hasVar() or prgm.varAt(id).meta.dialect != "circ") {
 		return false;
 	}
@@ -54,7 +54,7 @@ bool keepers(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
 	return true;
 }
 
-bool sizing(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
+bool sizing(const Build &builder, choy::Program &prgm, choy::TermId id) {
 	if (not id.hasVar() or prgm.varAt(id).meta.dialect != "circ") {
 		return false;
 	}
@@ -69,7 +69,7 @@ bool sizing(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
 	return true;
 }
 
-bool prsToSpi(Build &builder, weaver::Program &prgm, weaver::TermId id) {
+bool prsToSpi(Build &builder, choy::Program &prgm, choy::TermId id) {
 	if (not id.hasVar() or prgm.varAt(id).meta.dialect != "circ"
 		or not prgm.varAt(id).meta.has("circ.keepers")
 		or not prgm.varAt(id).meta.has("circ.sizing")) {
@@ -84,12 +84,12 @@ bool prsToSpi(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 	prs::production_rule_set &pr = prgm.varAt(id).as<prs::production_rule_set>();
 
 	sch::Subckt ckt = prs::build_netlist(*tech, pr, builder.progress);
-	ckt.comment = weaver::writeParams({{"decl", parse_ucs::export_decl(prgm, prgm.termAt(id).decl).to_string()}});
+	ckt.comment = choy::writeParams({{"decl", parse_ucs::export_decl(prgm, prgm.termAt(id).decl).to_string()}});
 	if (builder.debug) {
 		ckt.print();
 	}
 
-	id.var = prgm.termAt(id).createVariant(weaver::Variant("spice", ckt, id.var));
+	id.var = prgm.termAt(id).createVariant(choy::Variant("spice", ckt, id.var));
 	builder.push(prgm, id);
 	return true;
 }

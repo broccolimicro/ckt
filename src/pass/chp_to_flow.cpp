@@ -5,7 +5,7 @@
 
 #include <interpret_gc/export.h>
 
-bool flatten(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
+bool flatten(const Build &builder, choy::Program &prgm, choy::TermId id) {
 	if (not id.hasVar() or prgm.varAt(id).meta.dialect != "func") {
 		return false;
 	}
@@ -23,7 +23,7 @@ bool flatten(const Build &builder, weaver::Program &prgm, weaver::TermId id) {
 	return g.isFlat();
 }
 
-bool decompose(Build &builder, weaver::Program &prgm, weaver::TermId id) {
+bool decompose(Build &builder, choy::Program &prgm, choy::TermId id) {
 	if (not id.hasVar() or prgm.varAt(id).meta.dialect != "func") {
 		return false;
 	}
@@ -40,7 +40,7 @@ bool decompose(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 	}
 
 	string dialect = prgm.varAt(id).meta.dialect;
-	id.var = prgm.termAt(id).createVariant(weaver::Variant("struct", gc::GuardedCommands(), id.var));
+	id.var = prgm.termAt(id).createVariant(choy::Variant("struct", gc::GuardedCommands(), id.var));
 	gc::GuardedCommands &rules = prgm.varAt(id).as<gc::GuardedCommands>();
 	for (size_t pid = 0; pid < sub.size(); pid++) {
 		arithmetic::Action action(arithmetic::call(sub[pid].name, {}));
@@ -56,16 +56,16 @@ bool decompose(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 	builder.todo.push_back(id);
 
 	for (size_t pid = 0; pid < sub.size(); pid++) {
-		vector<weaver::Instance> args;
-		weaver::TermId subId = prgm.createTerm(id.mod, weaver::Term(sub[pid].name, args));
-		subId.var = prgm.termAt(subId).createVariant(weaver::Variant(dialect, sub[pid]));
+		vector<choy::Instance> args;
+		choy::TermId subId = prgm.createTerm(id.mod, choy::Term(sub[pid].name, args));
+		subId.var = prgm.termAt(subId).createVariant(choy::Variant(dialect, sub[pid]));
 		builder.todo.push_back(subId);
 	}
 
 	return true;
 }
 
-bool chpToFlow(Build &builder, weaver::Program &prgm, weaver::TermId id) {
+bool chpToFlow(Build &builder, choy::Program &prgm, choy::TermId id) {
 	if (not id.hasVar() or prgm.varAt(id).meta.dialect != "func") {
 		return false;
 	}
@@ -76,7 +76,7 @@ bool chpToFlow(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 
 	auto tmpl = chp::synthesizeFuncFromCHP(g, builder.debug);
 	
-	id.var = prgm.termAt(id).createVariant(weaver::Variant("flow", tmpl, id.var));
+	id.var = prgm.termAt(id).createVariant(choy::Variant("flow", tmpl, id.var));
 	builder.todo.push_back(id);
 	return true;
 }

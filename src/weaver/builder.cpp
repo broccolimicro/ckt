@@ -29,7 +29,7 @@
 
 #include "../format/dot.h"
 
-Build::Build(weaver::Project &proj) : proj(proj) {
+Build::Build(choy::Project &proj) : proj(proj) {
 	logic = LOGIC_CMOS;
 	timing = TIMING_MIXED;
 	stage = -1;
@@ -77,7 +77,7 @@ bool Build::has(int target) const {
 	return targets[target];
 }
 
-void Build::push(weaver::Program &prgm, weaver::TermId id) {
+void Build::push(choy::Program &prgm, choy::TermId id) {
 	if (not id.hasMod()) {
 		for (id.mod = 0; id.mod < (int)prgm.mods.size(); id.mod++) {
 			for (id.index = 0; id.index < (int)prgm.mods[id.mod].terms.size(); id.index++) {
@@ -122,9 +122,9 @@ void Build::push(weaver::Program &prgm, weaver::TermId id) {
 	}
 }
 
-void Build::build(weaver::Program &prgm) {
+void Build::build(choy::Program &prgm) {
 	while (not todo.empty()) {
-		weaver::TermId id = todo.back();
+		choy::TermId id = todo.back();
 		todo.pop_back();
 
 		if (prgm.termAt(id).variants.empty()) {
@@ -137,7 +137,7 @@ void Build::build(weaver::Program &prgm) {
 		}
 
 		std::string dialect = prgm.varAt(id).meta.dialect;
-		if (not prgm.varAt(id).meta.has("wv.link")) {
+		if (not prgm.varAt(id).meta.has("choy.link")) {
 			if (not link(*this, prgm, id)) {
 				printf("error: unable to link\n");
 			}

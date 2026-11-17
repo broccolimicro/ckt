@@ -15,9 +15,9 @@
 #include <parse_prs/factory.h>
 #include <parse_spice/factory.h>
 
-#include <weaver/project.h>
+#include <choy/project.h>
 
-#include "src/weaver/builder.h"
+#include "src/choy/builder.h"
 
 #include "src/format.h"
 
@@ -26,8 +26,8 @@
 const std::filesystem::path TEST_DIR = absolute(std::filesystem::current_path() / "tests");
 
 struct BuilderTest : ::testing::TestWithParam<std::string> {
-	weaver::Project proj;
-	weaver::Program prgm;                         
+	choy::Project proj;
+	choy::Program prgm;                         
 
 	BuilderTest() : proj(TEST_DIR) {
 	}
@@ -74,13 +74,13 @@ struct BuilderTest : ::testing::TestWithParam<std::string> {
 
 TEST_P(BuilderTest, buildProcess) {
 	std::string protoStr = GetParam();
-	weaver::Prototype proto(protoStr);
+	choy::Prototype proto(protoStr);
 	printf("%s\n", proto.to_string().c_str());
 
 	proj.incl(proto.mod);                        
 	proj.load(prgm);
 
-	std::vector<weaver::TermId> procs = prgm.findTerms(proto);
+	std::vector<choy::TermId> procs = prgm.findTerms(proto);
 	Build builder(proj);
 	builder.testDecompose = true;
 	builder.build(prgm);

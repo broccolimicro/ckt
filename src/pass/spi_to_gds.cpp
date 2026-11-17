@@ -9,11 +9,11 @@
 #include <sch/Tapeout.h>
 #include <sch/Placer.h>
 
-#include <weaver/params.h>
-#include <interpret_wv/export.h>
+#include <choy/params.h>
+#include <interpret_choy/export.h>
 #include <common/timer.h>
 
-bool mapCells(Build &builder, weaver::Program &prgm, weaver::TermId id) {
+bool mapCells(Build &builder, choy::Program &prgm, choy::TermId id) {
 	if (not id.hasVar() or not builder.get(Build::MAP)
 		or prgm.varAt(id).meta.dialect != "spice") {
 		return false;
@@ -32,31 +32,31 @@ bool mapCells(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 	}
 
 	vector<sch::Subckt> cells = sch::mapCells(*tech, ckt, builder.progress);
-	id.var = prgm.termAt(id).createVariant(weaver::Variant("spice", ckt, id.var));
+	id.var = prgm.termAt(id).createVariant(choy::Variant("spice", ckt, id.var));
 	prgm.varAt(id).meta.set("spi.mapped");
 	builder.push(prgm, id);
 
-	// Load the cells into weaver as terms
+	// Load the cells into choy as terms
 	// Loop through all subckt instantiations and make sure they have a term in
-	// the weaver program, and then add them to the todo list for the builder.
+	// the choy program, and then add them to the todo list for the builder.
 	for (auto &cell : cells) {
 		std::string originalName = cell.name;
 		std::string baseName = "cell_" + encodeBase32(cell.id);
 
 		int mod = prgm.getModule(builder.proj.tech.name);
-		weaver::Decl decl = declFromSubckt(prgm, cell, baseName);
-		cell.comment = weaver::writeParams(declToParams(prgm, decl));
+		choy::Decl decl = declFromSubckt(prgm, cell, baseName);
+		cell.comment = choy::writeParams(declToParams(prgm, decl));
 
 		// Create the term and schedule it for compilation
 		int step = 0;
-		weaver::TermId cellId;
-		weaver::Prototype proto;
+		choy::TermId cellId;
+		choy::Prototype proto;
 		while (true) {
 			cellId = prgm.getTerm(mod, decl);
 			proto = prgm.getPrototype(cellId);
 			cell.name = proto.mangle();
 			if (prgm.termAt(cellId).variants.empty()) {
-				cellId.var = prgm.termAt(cellId).createVariant(weaver::Variant("spice", cell));
+				cellId.var = prgm.termAt(cellId).createVariant(choy::Variant("spice", cell));
 				prgm.varAt(cellId).meta.set("spi.cell");
 				builder.push(prgm, cellId);
 				break;
@@ -76,7 +76,7 @@ bool mapCells(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 		for (auto i = mapped.inst.begin(); i != mapped.inst.end(); i++) {
 			if (i->type == originalName) {
 				i->type = cell.name;
-				i->comment = weaver::writeParams(protoToParams(proto));
+				i->comment = choy::writeParams(protoToParams(proto));
 			}
 		}
 	}
@@ -85,18 +85,18 @@ bool mapCells(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 
 struct SchLinker : sch::Linker {
 	const phy::Tech &tech;
-	weaver::Program &prgm;
+	choy::Program &prgm;
 	int mod;
 
-	SchLinker(const phy::Tech &tech, weaver::Program &prgm, int mod) : tech(tech), prgm(prgm) {
+	SchLinker(const phy::Tech &tech, choy::Program &prgm, int mod) : tech(tech), prgm(prgm) {
 		this->mod = mod;
 	}
 	~SchLinker() {}
 
 	sch::Implementation find(const sch::Instance &inst) override {
 		sch::Implementation result;
-		weaver::Prototype proto = protoFromInstance(prgm, inst, false);
-		std::vector<weaver::TermId> terms = prgm.findTerms(proto, mod);
+		choy::Prototype proto = protoFromInstance(prgm, inst, false);
+		std::vector<choy::TermId> terms = prgm.findTerms(proto, mod);
 		if (terms.empty() or not prgm.termValid(terms[0])) {
 			error("", "unable to link '" + proto.to_string() + "'", __FILE__, __LINE__);
 			//prgm.print();
@@ -105,14 +105,14 @@ struct SchLinker : sch::Linker {
 			warning("", "ambiguous instance '" + proto.to_string() + "'", __FILE__, __LINE__);
 		}
 
-		weaver::Term &term = prgm.termAt(terms[0]);
+		choy::Term &term = prgm.termAt(terms[0]);
 		proto = prgm.getPrototype(term.decl, prgm.mods[mod].name);
 
 		int i = term.rfindVariant("spice");
 		int j = term.rfindVariant("layout");
 
 		if (j < 0 or j >= (int)term.variants.size()) {
-			j = term.createVariant(weaver::Variant("layout", phy::Layout(tech, proto.mangle(true)), i));
+			j = term.createVariant(choy::Variant("layout", phy::Layout(tech, proto.mangle(true)), i));
 		}
 
 		if (i >= 0 and i < (int)term.variants.size()) {
@@ -127,7 +127,7 @@ struct SchLinker : sch::Linker {
 	}
 };
 
-bool spiToGds(Build &builder, weaver::Program &prgm, weaver::TermId id) {
+bool spiToGds(Build &builder, choy::Program &prgm, choy::TermId id) {
 	if (not id.hasVar()
 		or prgm.varAt(id).meta.dialect != "spice") {
 		printf("not spice\n");
@@ -164,10 +164,10 @@ bool spiToGds(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 			fflush(stdout);
 		}
 		Timer tmr;
-		weaver::Term &term = prgm.termAt(id);
-		weaver::Prototype proto = prgm.getPrototype(term.decl, prgm.mods[id.mod].name);
+		choy::Term &term = prgm.termAt(id);
+		choy::Prototype proto = prgm.getPrototype(term.decl, prgm.mods[id.mod].name);
 
-		id.var = term.createVariant(weaver::Variant("layout", phy::Layout(*tech, proto.mangle(true)), id.var));
+		id.var = term.createVariant(choy::Variant("layout", phy::Layout(*tech, proto.mangle(true)), id.var));
 		phy::Layout &macro = term.variants[id.var].as<phy::Layout>();
 
 		SchLinker linker(*tech, prgm, id.mod);
@@ -177,7 +177,7 @@ bool spiToGds(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 		prob.solve();
 		prob.save(macro);
 
-		declToParam(macro.properties, prgm, term.decl, "wv.");
+		declToParam(macro.properties, prgm, term.decl, "choy.");
 
 		prgm.varAt(id).meta.set("gds.place");
 		builder.push(prgm, id);
@@ -186,18 +186,18 @@ bool spiToGds(Build &builder, weaver::Program &prgm, weaver::TermId id) {
 		}
 		return true;
 	} else if (ckt.mos.empty() and ckt.inst.empty()) {
-		weaver::Term &term = prgm.termAt(id);
-		weaver::Prototype proto = prgm.getPrototype(term.decl, prgm.mods[id.mod].name);
+		choy::Term &term = prgm.termAt(id);
+		choy::Prototype proto = prgm.getPrototype(term.decl, prgm.mods[id.mod].name);
 		warning("", "found blackbox \"" + proto.to_string() + "\"", __FILE__, __LINE__);
 
 		phy::Layout macro(*tech, proto.mangle(true));
-		declToParam(macro.properties, prgm, term.decl, "wv.");
+		declToParam(macro.properties, prgm, term.decl, "choy.");
 
-		id.var = term.createVariant(weaver::Variant("layout", macro, id.var));
+		id.var = term.createVariant(choy::Variant("layout", macro, id.var));
 		return true;
 	} else {
-		weaver::Term &term = prgm.termAt(id);
-		weaver::Prototype proto = prgm.getPrototype(term.decl, prgm.mods[id.mod].name);
+		choy::Term &term = prgm.termAt(id);
+		choy::Prototype proto = prgm.getPrototype(term.decl, prgm.mods[id.mod].name);
 		error("", "no support for mixed macro/micro layout in \"" + proto.to_string() + "\"", __FILE__, __LINE__);
 		return false;
 	}

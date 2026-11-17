@@ -5,13 +5,13 @@
 
 #include <filesystem>
 
-#include <interpret_wv/export.h>
+#include <interpret_choy/export.h>
 
 using namespace std::filesystem;
 
 namespace cell {
 
-void export_cell(std::string path, const phy::Tech &tech, const weaver::Term &term) {
+void export_cell(std::string path, const phy::Tech &tech, const choy::Term &term) {
 	bool spiceFound = false;
 	bool layoutFound = false;
 	string cellPath = path + "/" + term.decl.name;
@@ -30,7 +30,7 @@ void export_cell(std::string path, const phy::Tech &tech, const weaver::Term &te
 	}
 }
 
-void export_cells(std::string path, const phy::Tech &tech, const weaver::Module &mod) {
+void export_cells(std::string path, const phy::Tech &tech, const choy::Module &mod) {
 	if (not filesystem::exists(path)) {
 		filesystem::create_directory(path);
 	}
@@ -41,7 +41,7 @@ void export_cells(std::string path, const phy::Tech &tech, const weaver::Module 
 	}
 }
 
-void export_cells(std::string path, const phy::Tech &tech, const weaver::Program &prgm) {
+void export_cells(std::string path, const phy::Tech &tech, const choy::Program &prgm) {
 	if (not filesystem::exists(path)) {
 		filesystem::create_directory(path);
 	}
@@ -51,7 +51,7 @@ void export_cells(std::string path, const phy::Tech &tech, const weaver::Program
 }
 
 // returns whether the cell was imported
-bool import_cell(std::string path, const phy::Tech &tech, const weaver::Program &prgm, weaver::Term &term, array<int, 2> *idx, bool progress, bool debug) {
+bool import_cell(std::string path, const phy::Tech &tech, const choy::Program &prgm, choy::Term &term, array<int, 2> *idx, bool progress, bool debug) {
 	string cellPath = path + "/" + term.decl.name+".gds";
 	if (progress) {
 		printf("  %s...", term.decl.name.c_str());
@@ -117,7 +117,7 @@ bool import_cell(std::string path, const phy::Tech &tech, const weaver::Program 
 		}
 		if (imported) {
 			macro.trace();
-			phyIdx = term.createVariant(weaver::Variant("layout", macro, spiIdx));
+			phyIdx = term.createVariant(choy::Variant("layout", macro, spiIdx));
 			if (idx != nullptr) {
 				*idx = {spiIdx, phyIdx};
 			}
@@ -146,9 +146,9 @@ bool import_cell(std::string path, const phy::Tech &tech, const weaver::Program 
 
 			genDelay = tmr.since();
 			if (gdsNet.compare(spiNet) == 0) {
-				macro.properties.insert({"!wv decl", parse_ucs::export_decl(prgm, term.decl).to_string()});
+				macro.properties.insert({"!choy decl", parse_ucs::export_decl(prgm, term.decl).to_string()});
 				printf("%sGENERATED %d DBUNIT2 AREA%s]\t(%gs %gs)\n", KGRN, macro.box.area(), KNRM, searchDelay, genDelay);
-				phyIdx = term.createVariant(weaver::Variant("layout", macro, spiIdx));
+				phyIdx = term.createVariant(choy::Variant("layout", macro, spiIdx));
 			} else {
 				printf("%sFAILED LVS%s]\t(%gs %gs)\n", KRED, KNRM, searchDelay, genDelay);
 				if (debug) {
@@ -164,7 +164,7 @@ bool import_cell(std::string path, const phy::Tech &tech, const weaver::Program 
 	return false;
 }
 
-void update_library(std::string path, const phy::Tech &tech, const weaver::Program &prgm, weaver::Module &mod, bool progress, bool debug) {
+void update_library(std::string path, const phy::Tech &tech, const choy::Program &prgm, choy::Module &mod, bool progress, bool debug) {
 	bool libFound = filesystem::exists(path);
 	if (progress) {
 		printf("Load cell layouts:\n");

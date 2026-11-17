@@ -1,9 +1,9 @@
 #pragma once
 
-#include <weaver/project.h>
+#include <choy/project.h>
 
-void readPrs(weaver::Project &proj, weaver::Source &source, string buffer);
-std::vector<weaver::TermId> loadPrs(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source);
-void writePrs(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, weaver::TermId id);
+void readPrs(choy::Project &proj, choy::Source &source, string buffer);
+std::vector<choy::TermId> loadPrs(choy::Project &proj, choy::Program &prgm, const choy::Source &source);
+void writePrs(fs::path path, choy::Project &proj, const choy::Filetype &lang, const choy::Program &prgm, choy::TermId id);
 std::any factoryPrs(string name, const parse::syntax *syntax, tokenizer *tokens);
 

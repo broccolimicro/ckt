@@ -1,12 +1,12 @@
 #pragma once
 
-#include <weaver/project.h>
+#include <choy/project.h>
 #include <sch/Subckt.h>
 
-weaver::Decl declFromSubckt(const weaver::Program &prgm, const sch::Subckt &ckt, std::string name="");
-weaver::Prototype protoFromInstance(const weaver::Program &prgm, const sch::Instance &inst, bool qualify=false);
+choy::Decl declFromSubckt(const choy::Program &prgm, const sch::Subckt &ckt, std::string name="");
+choy::Prototype protoFromInstance(const choy::Program &prgm, const sch::Instance &inst, bool qualify=false);
 
-void readSpice(weaver::Project &proj, weaver::Source &source, string buffer);
-std::vector<weaver::TermId> loadSpice(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source);
-void writeSpice(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, weaver::TermId id);
-std::vector<weaver::Prototype> linkSpice(const weaver::Project &proj, const weaver::Program &prgm, weaver::TermId id);
+void readSpice(choy::Project &proj, choy::Source &source, string buffer);
+std::vector<choy::TermId> loadSpice(choy::Project &proj, choy::Program &prgm, const choy::Source &source);
+void writeSpice(fs::path path, choy::Project &proj, const choy::Filetype &lang, const choy::Program &prgm, choy::TermId id);
+std::vector<choy::Prototype> linkSpice(const choy::Project &proj, const choy::Program &prgm, choy::TermId id);

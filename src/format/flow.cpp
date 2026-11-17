@@ -8,23 +8,23 @@
 
 #include <flow/func.h>
 
-#include <weaver/params.h>
+#include <choy/params.h>
 
-weaver::Prototype protoFromInstance(const weaver::Program &prgm, const flow::Instance &inst, bool qualify) {
-	std::map<std::string, std::string> params = weaver::readParams({inst.comment});
-	weaver::Prototype proto = protoFromParam(params);
+choy::Prototype protoFromInstance(const choy::Program &prgm, const flow::Instance &inst, bool qualify) {
+	std::map<std::string, std::string> params = choy::readParams({inst.comment});
+	choy::Prototype proto = protoFromParam(params);
 	if (not proto.empty()) {
 		return proto;
 	}
 
-	proto = weaver::Prototype::fromMangled(inst.type);
+	proto = choy::Prototype::fromMangled(inst.type);
 
 	if (qualify) {
 		proto.qualified = true;
 		for (auto j : inst.ports) {
-			proto.args.push_back(weaver::Typename("chan"));
+			proto.args.push_back(choy::Typename("chan"));
 		}
-		proto.argsHash = weaver::getHash(proto.args);
+		proto.argsHash = choy::getHash(proto.args);
 	}
 	return proto;
 }

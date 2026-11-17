@@ -1,10 +1,10 @@
 #pragma once
 
-#include "../weaver/builder.h"
-#include <weaver/program.h>
-#include <weaver/term.h>
+#include "../choy/builder.h"
+#include <choy/program.h>
+#include <choy/term.h>
 
-bool elaborate(const Build &builder, weaver::Program &prgm, weaver::TermId id);
-bool conflicts(const Build &builder, weaver::Program &prgm, weaver::TermId id);
-bool encode(const Build &builder, weaver::Program &prgm, weaver::TermId id);
-bool hseToPrs(Build &builder, weaver::Program &prgm, weaver::TermId id);
+bool elaborate(const Build &builder, choy::Program &prgm, choy::TermId id);
+bool conflicts(const Build &builder, choy::Program &prgm, choy::TermId id);
+bool encode(const Build &builder, choy::Program &prgm, choy::TermId id);
+bool hseToPrs(Build &builder, choy::Program &prgm, choy::TermId id);

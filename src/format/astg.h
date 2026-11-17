@@ -1,10 +1,10 @@
 #pragma once
 
-#include <weaver/project.h>
+#include <choy/project.h>
 
-void readAstg(weaver::Project &proj, weaver::Source &source, string buffer);
-std::vector<weaver::TermId> loadAstg(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source);
-std::vector<weaver::TermId> loadAstgw(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source);
-void writeAstg(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, weaver::TermId id);
-void writeAstgw(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, weaver::TermId id);
+void readAstg(choy::Project &proj, choy::Source &source, string buffer);
+std::vector<choy::TermId> loadAstg(choy::Project &proj, choy::Program &prgm, const choy::Source &source);
+std::vector<choy::TermId> loadAstgw(choy::Project &proj, choy::Program &prgm, const choy::Source &source);
+void writeAstg(fs::path path, choy::Project &proj, const choy::Filetype &lang, const choy::Program &prgm, choy::TermId id);
+void writeAstgw(fs::path path, choy::Project &proj, const choy::Filetype &lang, const choy::Program &prgm, choy::TermId id);
 

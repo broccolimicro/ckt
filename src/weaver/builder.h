@@ -2,11 +2,11 @@
 
 #include <common/standard.h>
 
-#include <weaver/program.h>
-#include <weaver/project.h>
+#include <choy/program.h>
+#include <choy/project.h>
 
 struct Build {
-	Build(weaver::Project &proj);
+	Build(choy::Project &proj);
 	~Build();
 
 	enum {
@@ -36,7 +36,7 @@ struct Build {
 		ROUTE = 11
 	};
 
-	weaver::Project &proj;
+	choy::Project &proj;
 
 	int logic;
 	int timing;
@@ -56,7 +56,7 @@ struct Build {
 	
 	vector<bool> targets;
 
-	vector<weaver::TermId> todo;
+	vector<choy::TermId> todo;
 
 	void set(int target);
 	bool get(int target) const;
@@ -66,7 +66,7 @@ struct Build {
 	void excl(int target);
 	bool has(int target) const;
 
-	void push(weaver::Program &prgm, weaver::TermId term=weaver::TermId());
-	void build(weaver::Program &prgm);
+	void push(choy::Program &prgm, choy::TermId term=choy::TermId());
+	void build(choy::Program &prgm);
 };
 

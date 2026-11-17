@@ -15,9 +15,9 @@
 
 #include "../back/asic.h"
 
-void guessPorts(weaver::Prototype &proto, const phy::Layout &macro) {
+void guessPorts(choy::Prototype &proto, const phy::Layout &macro) {
 	// All of the ports in a cell are wires
-	weaver::Typename wireType("wire");
+	choy::Typename wireType("wire");
 	for (const auto &net : macro.nets) {
 		if (net.isInput or net.isOutput) {
 			proto.args.push_back(wireType);
@@ -26,8 +26,8 @@ void guessPorts(weaver::Prototype &proto, const phy::Layout &macro) {
 	proto.hashArgs();
 }
 
-std::vector<weaver::TermId> loadGds(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
-	std::vector<weaver::TermId> result;
+std::vector<choy::TermId> loadGds(choy::Project &proj, choy::Program &prgm, const choy::Source &source) {
+	std::vector<choy::TermId> result;
 	phy::Tech *tech = loadASIC(proj);
 	if (not tech) {
 		return result;
@@ -38,16 +38,16 @@ std::vector<weaver::TermId> loadGds(weaver::Project &proj, weaver::Program &prgm
 	import_library(lib, *tech, source.path.string());
 
 	for (auto macro = lib.begin(); macro != lib.end(); macro++) {
-		weaver::Prototype proto = weaver::Prototype::fromMangled(macro->name);
+		choy::Prototype proto = choy::Prototype::fromMangled(macro->name);
 		if (proto.mod.empty()) {
 			proto.mod = source.modName;
 		}
 		int mod = prgm.getModule(proto.mod);
 
-		weaver::TermId id;
+		choy::TermId id;
 
 		// First, check the metadata to see if we can extract the type information
-		weaver::Decl decl = declFromParam(prgm, macro->properties, "wv.", mod);
+		choy::Decl decl = declFromParam(prgm, macro->properties, "choy.", mod);
 		if (not decl.name.empty()) {
 			id = prgm.getTerm(mod, decl);
 		}
@@ -64,7 +64,7 @@ std::vector<weaver::TermId> loadGds(weaver::Project &proj, weaver::Program &prgm
 
 		if (prgm.termValid(id)) {
 			auto &term = prgm.termAt(id);
-			id.var = term.createVariant(weaver::Variant("layout", *macro));
+			id.var = term.createVariant(choy::Variant("layout", *macro));
 			prgm.varAt(id).fromSource = true;
 			// look for the parent
 			for (int i = id.var-1; i >= 0; i--) {
@@ -83,7 +83,7 @@ std::vector<weaver::TermId> loadGds(weaver::Project &proj, weaver::Program &prgm
 	return result;
 }
 
-void writeGds(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, weaver::TermId id) {
+void writeGds(fs::path path, choy::Project &proj, const choy::Filetype &lang, const choy::Program &prgm, choy::TermId id) {
 	static std::map<std::string, gdstk::GdsWriter> prev;
 
 	phy::Tech *tech = loadASIC(proj);

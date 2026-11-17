@@ -1,6 +1,6 @@
 #pragma once
 
-#include <weaver/project.h>
+#include <choy/project.h>
 #include <flow/func.h>
 
-weaver::Prototype protoFromInstance(const weaver::Program &prgm, const flow::Instance &inst, bool qualify=false);
+choy::Prototype protoFromInstance(const choy::Program &prgm, const flow::Instance &inst, bool qualify=false);

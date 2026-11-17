@@ -1,10 +1,10 @@
 #pragma once
 
-#include "../weaver/builder.h"
-#include <weaver/program.h>
-#include <weaver/term.h>
+#include "../choy/builder.h"
+#include <choy/program.h>
+#include <choy/term.h>
 
-bool flatten(const Build &builder, weaver::Program &prgm, weaver::TermId id);
-bool decompose(Build &builder, weaver::Program &prgm, weaver::TermId id);
-bool chpToFlow(Build &builder, weaver::Program &prgm, weaver::TermId id);
+bool flatten(const Build &builder, choy::Program &prgm, choy::TermId id);
+bool decompose(Build &builder, choy::Program &prgm, choy::TermId id);
+bool chpToFlow(Build &builder, choy::Program &prgm, choy::TermId id);
 

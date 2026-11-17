@@ -7,10 +7,10 @@
 
 #include <parse_ucs/modfile.h>
 
-#include <interpret_wv/import.h>
-#include <interpret_wv/export.h>
+#include <interpret_choy/import.h>
+#include <interpret_choy/export.h>
 
-void readMod(weaver::Project &proj) {
+void readMod(choy::Project &proj) {
 	tokenizer tokens;
 	tokens.register_token<parse::block_comment>(false);
 	tokens.register_token<parse::line_comment>(false);
@@ -41,7 +41,7 @@ void readMod(weaver::Project &proj) {
 	}
 }
 
-void writeMod(const weaver::Project &proj) {
+void writeMod(const choy::Project &proj) {
 	parse_ucs::modfile result = parse_ucs::export_modfile(proj);
 
 	ofstream fout;

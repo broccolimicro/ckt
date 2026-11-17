@@ -1,6 +1,6 @@
 #include "asic.h"
 
-phy::Tech *loadASIC(weaver::Project &proj) {
+phy::Tech *loadASIC(choy::Project &proj) {
 	if (not proj.tech.def.has_value()) {
 		proj.tech.def = make_any<phy::Tech>();
 	}

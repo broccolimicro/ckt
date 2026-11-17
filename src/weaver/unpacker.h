@@ -3,11 +3,11 @@
 #include <common/standard.h>
 #include <parse/parse.h>
 
-#include <weaver/program.h>
-#include <weaver/project.h>
+#include <choy/program.h>
+#include <choy/project.h>
 
 struct Unpack {
-	Unpack(weaver::Project &proj);
+	Unpack(choy::Project &proj);
 	~Unpack();
 
 	enum {
@@ -16,7 +16,7 @@ struct Unpack {
 		SIZED = 2
 	};
 
-	weaver::Project &proj;
+	choy::Project &proj;
 
 	int stage;
 

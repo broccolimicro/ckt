@@ -60,7 +60,7 @@ void show_help() {
 	printf(" -s,--sync       Render half synchronization actions\n");
 }
 
-void show(ShowOptions opts, weaver::Term &t, weaver::Variant &v, string outPath) {
+void show(ShowOptions opts, choy::Term &t, choy::Variant &v, string outPath) {
 	if (v.meta.dialect == "func") {
 		chp::graph g = v.as<chp::graph>();
 		if (opts.process) {
@@ -84,7 +84,7 @@ void show(ShowOptions opts, weaver::Term &t, weaver::Variant &v, string outPath)
 	}
 }
 
-void show(ShowOptions opts, weaver::Term &t, string outPath) {
+void show(ShowOptions opts, choy::Term &t, string outPath) {
 	if (t.variants.empty()) {
 		internal("", "dialect not defined for term '" + t.decl.name + "'", __FILE__, __LINE__);
 		return;
@@ -94,7 +94,7 @@ void show(ShowOptions opts, weaver::Term &t, string outPath) {
 	}
 }
 
-void show(ShowOptions opts, fs::path outPath, weaver::Program &prgm, weaver::TermId term=weaver::TermId()) {
+void show(ShowOptions opts, fs::path outPath, choy::Program &prgm, choy::TermId term=choy::TermId()) {
 	if (term.mod < 0) {
 		for (term.mod = 0; term.mod < (int)prgm.mods.size(); term.mod++) {
 			show(opts, outPath, prgm, term);
@@ -104,13 +104,13 @@ void show(ShowOptions opts, fs::path outPath, weaver::Program &prgm, weaver::Ter
 			show(opts, outPath, prgm, term);
 		}
 	} else {
-		weaver::Term &t = prgm.termAt(term);
+		choy::Term &t = prgm.termAt(term);
 		show(opts, t, outPath / (t.decl.name + ".png"));
 	}
 }
 
 int show_command(int argc, char **argv) {
-	weaver::Project proj;
+	choy::Project proj;
 	if (proj.hasMod()) {
 		readMod(proj);
 	} else {
@@ -120,7 +120,7 @@ int show_command(int argc, char **argv) {
 
 	loadAllFormats(proj);
 
-	vector<weaver::Prototype> protos;
+	vector<choy::Prototype> protos;
 	vector<std::string> files;
 
 	ShowOptions opts;
@@ -151,7 +151,7 @@ int show_command(int argc, char **argv) {
 			opts.petri = true;
 		} else {
 			if (arg.rfind("fn:", 0) != string::npos) {
-				protos.push_back(weaver::Prototype(arg.substr(3)));
+				protos.push_back(choy::Prototype(arg.substr(3)));
 			} else {
 				files.push_back(arg);
 			}
@@ -163,7 +163,7 @@ int show_command(int argc, char **argv) {
 		return 1;
 	}
 
-	weaver::Program prgm;
+	choy::Program prgm;
 	loadGlobalTypes(prgm);
 
 	for (auto path : files) {
@@ -191,7 +191,7 @@ int show_command(int argc, char **argv) {
 		cout << "See " << debugDir << endl;
 	} else {
 		for (auto i = protos.begin(); i != protos.end(); i++) {
-			vector<weaver::TermId> curr = prgm.findTerms(*i);
+			vector<choy::TermId> curr = prgm.findTerms(*i);
 			if (curr.empty()) {
 				error("", "module not found for term '" + i->to_string() + "'", __FILE__, __LINE__);
 			}

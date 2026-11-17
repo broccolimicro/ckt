@@ -12,7 +12,7 @@
 #include <interpret_gc/import.h>
 #include <interpret_gc/export.h>
 
-void readGc(weaver::Project &proj, weaver::Source &source, string buffer) {
+void readGc(choy::Project &proj, choy::Source &source, string buffer) {
 	source.tokens->register_token<parse::block_comment>(false);
 	source.tokens->register_token<parse::line_comment>(false);
 	parse_gc::rule_set::register_syntax(*source.tokens);
@@ -25,22 +25,22 @@ void readGc(weaver::Project &proj, weaver::Source &source, string buffer) {
 	}
 }
 
-std::vector<weaver::TermId> loadGc(weaver::Project &proj, weaver::Program &prgm, const weaver::Source &source) {
+std::vector<choy::TermId> loadGc(choy::Project &proj, choy::Program &prgm, const choy::Source &source) {
 	string name = source.path.stem().string();
 	gc::GuardedCommands rules;
 	rules.name = name;
 	gc::import_rule_set(*(parse_gc::rule_set*)source.syntax.get(), rules, 0, source.tokens.get(), true);
 
-	weaver::Prototype proto = weaver::Prototype::fromMangled(name, source.modName);
+	choy::Prototype proto = choy::Prototype::fromMangled(name, source.modName);
 	int mod = prgm.getModule(proto.mod);
 
-	weaver::TermId id = prgm.getTerm(proto, mod);
-	id.var   = prgm.termAt(id).createVariant(weaver::Variant("struct", rules));
+	choy::TermId id = prgm.getTerm(proto, mod);
+	id.var   = prgm.termAt(id).createVariant(choy::Variant("struct", rules));
 	prgm.varAt(id).fromSource = true;
 	return {id};
 }
 
-void writeGc(fs::path path, weaver::Project &proj, const weaver::Filetype &lang, const weaver::Program &prgm, weaver::TermId id) {
+void writeGc(fs::path path, choy::Project &proj, const choy::Filetype &lang, const choy::Program &prgm, choy::TermId id) {
 	string pathstr = path.string();
 	ofstream fout(pathstr.c_str(), ios::out);
 	if (not fout.is_open()) {
